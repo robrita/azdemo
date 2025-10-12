@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Gasoek+One&family=Oswald:wght@200..700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Oswald', sans-serif;
+    color: #a7a7a7;
+}
+
+/* App Settings */
+.stApp {
+    margin: auto;
+    overflow: auto;
+    font-family: 'Oswald', sans-serif;
+    background-color: black;
+    background-image:
+      linear-gradient(to right, rgba(24, 23, 23, 1) 5px, transparent 1px),
+      linear-gradient(to bottom, rgba(24, 23, 23, 1) 5px, transparent 1px);
+    background-size: 60px 60px;
+    background-repeat: repeat;
+}
+
+/* Container */
+.st-key-container{
+  padding: 2em;
+  background-color: rgba(60, 255, 208, 1);
+  border-radius: 3em;
+}
+
+/* Container */
+.st-key-container1{
+  padding: 2em;
+  background-color: gray;
+  border-radius: 3em;
+}
+
+/* Container */
+.st-key-container2{
+  padding: 2em;
+  background-color: gray;
+  border-radius: 3em;
+}
+
+/* Container */
+.st-key-container3{
+  padding: 2em;
+  background-color: gray;
+  border-radius: 3em;
+}
+
+/* Container */
+.st-key-container4{
+  padding: 2em;
+  background-color: gray;
+  border-radius: 3em;
+}
