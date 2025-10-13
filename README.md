@@ -1,3 +1,5 @@
+![Dashboard Hero Banner](img/dashboard.png)
+
 ## 🛠️ Technology Stack
 
 - **Frontend:** Streamlit 1.50.0 (Python-based web application framework)
