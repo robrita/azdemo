@@ -17,55 +17,37 @@ def render_sidebar():
     )
 
     st.logo(
-        "https://upload.wikimedia.org/wikipedia/commons/9/9a/Universal_Robina_logo_2016.svg",
-        link="https://www.urc.com.ph/",
+        "https://devblogs.microsoft.com/foundry/wp-content/uploads/sites/89/2025/03/ai-foundry.png",
+        link="https://ai.azure.com/",
     )
 
-    # Custom CSS to adjust padding and hide certain elements
-    # This is useful to ensure the layout looks good across different pages
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            padding-top: 3rem;
-            # padding-bottom: 1rem;
-            # padding-left: 1rem;
-            # padding-right: 1rem;
-        }
-        .stAppDeployButton {
-            display: none;
-        }
-        .st-emotion-cache-15ecox0 {
-            display: none;
-        }
-        .viewerBadge_container__r5tak {
-            display: none;
-        }
-        .styles_viewerBadge__CvC9N {
-            display: none;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    # Loading the CSS
+    with open('style.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
     with st.sidebar:
         with st.container(border=True):
             st.page_link("app.py", label="PMO Dashboard", icon="🚀")
-            st.page_link("pages/0_Dashboard_Overview.py", label="Dashboard Overview", icon="🏠")
-            st.page_link("pages/1_Employee_Skills_Generator.py", label="Skills Generator", icon="👥")
-            st.page_link("pages/2_Project_Scoping_Document_Evaluator.py", label="Document Evaluator", icon="📄")
-            st.page_link("pages/3_Project_Timeline_Monitor.py", label="Timeline Monitor", icon="⏰")
-            st.page_link("pages/4_Unstructured_Document_Parser.py", label="Document Parser", icon="📋")
-            st.page_link("pages/5_Skills_Management.py", label="Skills Management", icon="🎯")
-            st.page_link("pages/6_Document_Analysis.py", label="Document Analysis", icon="🔍")
-            st.page_link("pages/7_Project_Monitoring.py", label="Project Monitoring", icon="📊")
-            st.page_link("pages/8_PMO_Operations.py", label="PMO Operations", icon="🔧")
+            st.page_link("pages/1_Dashboard_Overview.py", label="Dashboard Overview", icon="🏠")
+            st.page_link("pages/2_Skills_Management.py", label="Skills Management", icon="🎯")
+            st.page_link("pages/3_Document_Analysis.py", label="Document Analysis", icon="🔍")
+            st.page_link("pages/4_Project_Monitoring.py", label="Project Monitoring", icon="📊")
+            st.page_link("pages/5_PMO_Operations.py", label="PMO Operations", icon="🔧")
 
         st.image(
-            "https://cdn.manilastandard.net/wp-content/uploads/2024/02/URC-Universal-Robina-Corp.jpg",
+            "https://miro.medium.com/1*zBt3FbYHV2-CWcBnkYoQRA.png",
         )
         st.write("Powered by Azure AI Foundry.")
+
+        # Footer
+        st.markdown("---")
+        st.markdown("""
+        <div style='text-align: center; color: #64748B; padding: 20px;'>
+            <p><strong>PMO Agent Dashboard</strong> v1.0 | Built with Streamlit, Pandas & Plotly</p>
+            <p>© 2024 Project Management Operations Platform</p>
+        </div>
+        """, unsafe_allow_html=True)
+
 
 def keep_state(state_object, state_name):
     """

@@ -62,10 +62,33 @@ def main():
             'Status': ['Completed', 'Completed', 'In Progress', 'Not Started', 'Not Started']
         })
         st.dataframe(timeline_data, width='stretch', hide_index=True)
+        st.info("📅 Next Milestone: Development Phase Completion - May 1, 2024")
 
     with tab3:
         st.subheader("Budget Tracking")
-        st.info("Budget tracking feature coming soon!")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Budget pie chart
+            budget_data = pd.DataFrame({
+                'Category': ['Development', 'Infrastructure', 'Resources', 'Contingency'],
+                'Amount': [1200000, 500000, 600000, 200000]
+            })
+            
+            fig = px.pie(budget_data, values='Amount', names='Category', 
+                        title='Budget Allocation',
+                        color_discrete_sequence=['#3B82F6', '#10B981', '#F59E0B', '#EF4444'])
+            st.plotly_chart(fig, width='stretch')
+        
+        with col2:
+            # Budget metrics
+            st.metric("Total Budget", "$2.5M")
+            st.metric("Spent", "$1.8M", delta="-$700K")
+            st.metric("Remaining", "$700K")
+            
+            st.progress(72)
+            st.caption("72% of budget utilized")
 
 if __name__ == "__main__":
     main()

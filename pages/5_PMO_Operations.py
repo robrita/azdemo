@@ -64,13 +64,47 @@ def main():
             "🔄 Task Assignment Automation",
             "📊 Dashboard Updates"
         ]
-        selected_workflows = st.multiselect("Select Workflows to Automate", workflow_options)
-        if st.button("Enable Automation"):
-            st.success("✅ Selected workflows have been automated!")
+
+        for option in workflow_options:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(option)
+            with col2:
+                st.toggle("Enable", key=option)
+        
+        st.markdown("---")
+        
+        if st.button("Save Automation Settings"):
+            st.success("✅ Automation settings saved successfully!")
 
     with tab3:
-        st.subheader("Reports")
-        st.info("Reports feature coming soon!")
+        st.subheader("Generate Reports")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            report_type = st.selectbox(
+                "Report Type",
+                ["Executive Summary", "Detailed Project Report", "Resource Utilization", 
+                 "Financial Overview", "Risk Assessment"]
+            )
+            
+            time_period = st.selectbox("Time Period", ["Last Week", "Last Month", "Last Quarter", "YTD"])
+        
+        with col2:
+            format_type = st.selectbox("Format", ["PDF", "Excel", "PowerPoint", "HTML"])
+            
+            include_charts = st.checkbox("Include Charts & Visualizations", value=True)
+        
+        if st.button("📄 Generate Report"):
+            with st.spinner("Generating report..."):
+                st.success("✅ Report generated successfully!")
+                st.download_button(
+                    label="📥 Download Report",
+                    data="Sample report content",
+                    file_name=f"{report_type.replace(' ', '_')}.pdf",
+                    mime="application/pdf"
+                )
 
 if __name__ == "__main__":
     main()

@@ -61,6 +61,31 @@ def main():
 
     with tab3:
         st.subheader("Skills Gap Analysis")
+        
+        st.markdown("""
+        The AI-powered skills gap analysis identifies missing competencies and 
+        recommends training programs to bridge the gaps.
+        """)
+        
+        # Sample gap analysis
+        gap_data = pd.DataFrame({
+            'Required Skill': ['Advanced Python', 'Kubernetes', 'Machine Learning', 'Security Best Practices'],
+            'Current Level': ['Intermediate', 'Beginner', 'Beginner', 'Intermediate'],
+            'Target Level': ['Expert', 'Expert', 'Intermediate', 'Expert'],
+            'Gap': ['High', 'Critical', 'Medium', 'Medium'],
+            'Recommended Action': [
+                'Advanced Python training course',
+                'Kubernetes certification program',
+                'ML fundamentals workshop',
+                'Security certification'
+            ]
+        })
+        
+        st.dataframe(gap_data, width='stretch', hide_index=True)
+        
+        if st.button("Generate AI Recommendations"):
+            st.info("🤖 AI is analyzing skills gaps and generating personalized training recommendations...")
+            st.balloons()
 
 if __name__ == "__main__":
     main()

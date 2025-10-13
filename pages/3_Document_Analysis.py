@@ -66,7 +66,32 @@ def main():
 
     with tab2:
         st.subheader("Document Repository")
-        st.info("Document repository feature coming soon!")
+        
+        # Sample document repository
+        docs_data = pd.DataFrame({
+            'Document Name': [
+                'Q4 Project Plan.pdf',
+                'Risk Assessment Report.docx',
+                'Budget Proposal.xlsx',
+                'Technical Specification.pdf',
+                'Stakeholder Analysis.pptx'
+            ],
+            'Type': ['Project Plan', 'Risk Report', 'Financial', 'Technical', 'Analysis'],
+            'Upload Date': pd.date_range(start='2024-01-01', periods=5, freq='W'),
+            'Status': ['Analyzed', 'Analyzed', 'Pending', 'Analyzed', 'In Progress'],
+            'Size': ['2.3 MB', '1.5 MB', '890 KB', '4.2 MB', '3.1 MB']
+        })
+        
+        st.dataframe(docs_data, width='stretch', hide_index=True)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Documents", "47")
+        with col2:
+            st.metric("Analyzed", "35")
+        with col3:
+            st.metric("Pending", "12")
 
 if __name__ == "__main__":
     main()
