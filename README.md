@@ -103,7 +103,7 @@ uv sync --frozen
 ✅ **Simpler**: All project configuration in one file  
 ✅ **Better UX**: Clear error messages and progress indicators
 
-## � Deployment
+## 🚀 Deployment
 
 ### Quick Start (Development)
 ```bash
@@ -130,7 +130,7 @@ EXPOSE 8080
 CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0"]
 ```
 
-## �🔐 Security
+## 🔒 Security
 
 - Environment variables for sensitive data
 - No hardcoded credentials
