@@ -1,0 +1,136 @@
+{
+  "results": [
+    {
+      "file_name": "bir2303-true-14.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.583,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "006-228-047-000",
+          "confidence": 0.78
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/03/2005",
+          "confidence": 0.604
+        },
+        {
+          "name": "registeredAddress",
+          "value": "KOOPERATIBA NATON MULTIPURPOSE\nCOOPERATIVE",
+          "confidence": 0.702
+        },
+        {
+          "name": "businessType",
+          "value": "FOOD, BEVERAGES,\n6611 FINANCING COMPANY OPERATIONS\nLENDING INVESTOR ACTIVITIES\nOTHER COMPUTER RELATED\nACTIVITIES\n9199 ACTIVITIES OF OTHER MEMBERSHIP\nORGANIZATIONS, N.E.C",
+          "confidence": 0.482
+        },
+        {
+          "name": "tradeName",
+          "value": "KOOPERATIBA NATON MULTIPURPOSE\nCOOPERATIVE",
+          "confidence": 0.345
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-14.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.471,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "006-228-047-000",
+          "confidence": 0.813
+        },
+        {
+          "name": "tradeName",
+          "value": "KOOPERATIBA NATON MULTIPURPOSE\nCOOPERATIVE",
+          "confidence": 0.714
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/03/2005",
+          "confidence": 0.839
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BUYUAN TIGBAUAN\nILOILO 5021",
+          "confidence": 0.816
+        },
+        {
+          "name": "businessType",
+          "value": "5211 RETAIL IN NON-SPECIALIZED\nSTORES : FOOD, BEVERAGES,\nTOBACCO\n6611 FINANCING COMPANY OPERATIONS\n6612\nLENDING INVESTOR ACTIVITIES\n7290\nOTHER COMPUTER RELATED\nACTIVITIES\n9199 ACTIVITIES OF OTHER MEMBERSHIP\nORGANIZATIONS, N.E.C",
+          "confidence": 0.712
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-21.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.937,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "223-375-564-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tradeName",
+          "value": "SOLOMON, \"MARCO CARMELO CABRERA",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/01/2003 E098",
+          "confidence": 0.943
+        },
+        {
+          "name": "businessType",
+          "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
+          "confidence": 0.771
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-21.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.981,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "223-375-564-000",
+          "confidence": 0.81
+        },
+        {
+          "name": "tradeName",
+          "value": "SOLOMON, \"MARCO CARMELO CABRERA",
+          "confidence": 0.48
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/01/2003",
+          "confidence": 0.704
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "confidence": 0.494
+        },
+        {
+          "name": "businessType",
+          "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
+          "confidence": 0.783
+        }
+      ]
+    }
+  ]
+}

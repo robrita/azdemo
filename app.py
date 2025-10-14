@@ -47,15 +47,20 @@ def main():
         if st.button("Project Monitoring", width='stretch'):
             st.switch_page("pages/4_Project_Monitoring.py")
 
-    # Second row: 1 column (centered)
-    col5_container = st.container()
-    col5_left, col5, col5_right = st.columns([1.5, 1, 1.5], gap = 'medium')
+    # Second row: 2 columns
+    col5, col6 = st.columns(2, gap = 'medium')
 
     with col5.container(key = 'container8'):
         img = "https://cdn-icons-png.flaticon.com/512/1006/1006555.png"
         st.markdown(f"""<div style="text-align: center;"><img src="{img}" width="125" style="border-radius: 12px;" /><br><br></div>""",unsafe_allow_html=True)
         if st.button("PMO Operations", width='stretch'):
             st.switch_page("pages/5_PMO_Operations.py")
+
+    with col6.container(key = 'container9'):
+        img = "https://cdn-icons-png.flaticon.com/512/3652/3652191.png"
+        st.markdown(f"""<div style="text-align: center;"><img src="{img}" width="125" style="border-radius: 12px;" /><br><br></div>""",unsafe_allow_html=True)
+        if st.button("Document Extraction", width='stretch'):
+            st.switch_page("pages/6_Document_Extraction.py")
 
 if __name__ == "__main__":
     main()

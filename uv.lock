@@ -59,25 +59,31 @@ name = "azdemo"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "azure-ai-documentintelligence" },
     { name = "azure-ai-projects" },
+    { name = "azure-core" },
     { name = "azure-cosmos" },
     { name = "azure-identity" },
     { name = "dotenv" },
     { name = "openai" },
     { name = "pandas" },
     { name = "plotly" },
+    { name = "python-dotenv" },
     { name = "streamlit" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "azure-ai-documentintelligence", specifier = ">=1.0.2" },
     { name = "azure-ai-projects", specifier = ">=1.0.0" },
+    { name = "azure-core", specifier = ">=1.35.1" },
     { name = "azure-cosmos", specifier = ">=4.9.0" },
     { name = "azure-identity", specifier = ">=1.25.1" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "openai", specifier = "==2.3.0" },
     { name = "pandas", specifier = "==2.3.3" },
     { name = "plotly", specifier = "==6.3.1" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "streamlit", specifier = "==1.50.0" },
 ]
 
@@ -96,6 +102,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/39/98/bbe2e9e5b0a934be1930545025bf7018ebc4cc33b10134cc3314d6487076/azure_ai_agents-1.1.0.tar.gz", hash = "sha256:eb9d7226282d03206c3fab3f3ee0a2fc71e0ad38e52d2f4f19a92c56ed951aea", size = 303656, upload-time = "2025-08-05T19:02:26.7Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/31/43750555bf20d3d2d7589fcd775c96ce7c96e58e208b81c1ed6d4bad6c5f/azure_ai_agents-1.1.0-py3-none-any.whl", hash = "sha256:f660bb0d564aeb88e33140ebc1e4700d2e36e2e12ee60c3346915d702a9310a9", size = 191126, upload-time = "2025-08-05T19:02:28.178Z" },
+]
+
+[[package]]
+name = "azure-ai-documentintelligence"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/44/7b/8115cd713e2caa5e44def85f2b7ebd02a74ae74d7113ba20bdd41fd6dd80/azure_ai_documentintelligence-1.0.2.tar.gz", hash = "sha256:4d75a2513f2839365ebabc0e0e1772f5601b3a8c9a71e75da12440da13b63484", size = 170940, upload-time = "2025-03-27T02:46:20.606Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/75/c9ec040f23082f54ffb1977ff8f364c2d21c79a640a13d1c1809e7fd6b1a/azure_ai_documentintelligence-1.0.2-py3-none-any.whl", hash = "sha256:e1fb446abbdeccc9759d897898a0fe13141ed29f9ad11fc705f951925822ed59", size = 106005, upload-time = "2025-03-27T02:46:22.356Z" },
 ]
 
 [[package]]

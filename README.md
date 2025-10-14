@@ -6,6 +6,10 @@
 - **UI Styling:** Custom CSS with Google Fonts (Gasoek One, Oswald)
 - **Data Processing:** Pandas 2.3.3, Plotly 6.3.1
 - **AI Integration:** OpenAI 2.3.0 API support
+- **Azure Services:** 
+  - Azure AI Document Intelligence (document extraction)
+  - Azure Cosmos DB (data storage)
+  - Azure Identity (authentication)
 - **Visualization:** Plotly Express, Plotly Graph Objects
 - **Package Management:** uv + pyproject.toml (modern Python tooling)
 - **Build System:** Hatchling
@@ -35,11 +39,23 @@ uv sync
 pip install streamlit==1.50.0 pandas==2.3.3 plotly==6.3.1 openai==2.3.0
 ```
 
-3. (Optional) Set up environment variables:
-Create a `.env` file in the root directory:
-```
+3. Set up environment variables:
+Create a `.env` file in the root directory (see `.env.example` for template):
+```bash
+# Azure Document Intelligence
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key-here
+AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID=prebuilt-invoice
+
+# Azure Cosmos DB
+AZURE_COSMOS_ENDPOINT=https://your-cosmos-account.documents.azure.com:443/
+AZURE_COSMOS_DATABASE=your-database-name
+
+# OpenAI (Optional)
 OPENAI_API_KEY=your_api_key_here
 ```
+
+**See [DOCUMENT_INTELLIGENCE_SETUP.md](DOCUMENT_INTELLIGENCE_SETUP.md) for detailed Azure setup instructions.**
 
 ## 🚀 Usage
 
@@ -66,6 +82,10 @@ This project uses modern Python packaging standards with `pyproject.toml`:
 - **pandas==2.3.3** - Data manipulation and analysis
 - **plotly==6.3.1** - Interactive visualizations
 - **openai==2.3.0** - AI/LLM integration
+- **azure-ai-documentintelligence>=1.0.2** - Document extraction
+- **azure-cosmos>=4.9.0** - Azure Cosmos DB client
+- **azure-identity>=1.25.1** - Azure authentication
+- **python-dotenv** - Environment variable management
 
 ### Key Commands with pyproject.toml
 
