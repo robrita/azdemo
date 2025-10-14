@@ -145,37 +145,37 @@ def main():
                                      value=st.session_state.get("svc_template", False))
             svc_neural = st.checkbox("Document Intelligence - Neural", 
                                    value=st.session_state.get("svc_neural", False))
-            svc_content = st.checkbox("Content Understanding", 
-                                    value=st.session_state.get("svc_content", False))
-        with col2:
             svc_mistral = st.checkbox("Mistral Document AI", 
                                     value=st.session_state.get("svc_mistral", False))
-            svc_gpt5 = st.checkbox("GPT-5 for Vision", 
-                                 value=st.session_state.get("svc_gpt5", False))
-            svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
-                                  value=st.session_state.get("svc_gpt41", False))
+        # with col2:
+        #     svc_content = st.checkbox("Content Understanding", 
+        #                             value=st.session_state.get("svc_content", False))
+        #     svc_gpt5 = st.checkbox("GPT-5 for Vision", 
+        #                          value=st.session_state.get("svc_gpt5", False))
+        #     svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
+        #                           value=st.session_state.get("svc_gpt41", False))
 
         # Store checkbox states in session
         st.session_state["svc_template"] = svc_template
         st.session_state["svc_neural"] = svc_neural
-        st.session_state["svc_content"] = svc_content
         st.session_state["svc_mistral"] = svc_mistral
-        st.session_state["svc_gpt5"] = svc_gpt5
-        st.session_state["svc_gpt41"] = svc_gpt41
+        # st.session_state["svc_content"] = svc_content
+        # st.session_state["svc_gpt5"] = svc_gpt5
+        # st.session_state["svc_gpt41"] = svc_gpt41
 
         selected_services = []
         if svc_template:
             selected_services.append(("ADI-Template", DocumentIntelligence))
         if svc_neural:
             selected_services.append(("ADI-Neural", DocumentIntelligence))
-        if svc_content:
-            selected_services.append(("Content-Understanding", ContentUnderstanding))
         if svc_mistral:
             selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
-        if svc_gpt5:
-            selected_services.append(("GPT-5-Vision", GPT5ForVision))
-        if svc_gpt41:
-            selected_services.append(("GPT-4.1-Vision", GPT41ForVision))
+        # if svc_content:
+        #     selected_services.append(("Content-Understanding", ContentUnderstanding))
+        # if svc_gpt5:
+        #     selected_services.append(("GPT-5-Vision", GPT5ForVision))
+        # if svc_gpt41:
+        #     selected_services.append(("GPT-4.1-Vision", GPT41ForVision))
 
         # Use keep_state to persist selected_services across page navigation
         keep_state(selected_services, "selected_services")

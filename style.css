@@ -62,7 +62,7 @@ h1 {
     background-clip: text;
 }
 
-/* Override for PMO Agent Dashboard header to be white */
+/* Override for Document Processing Dashboard header to be white */
 /* Target the first h1 element or use a more specific selector */
 .stMarkdown h1:first-of-type,
 [data-testid="stMarkdownContainer"] h1:first-child,
@@ -76,7 +76,7 @@ h1 {
 }
 
 /* Alternative: Target by content using attribute selectors if you add a class */
-.pmo-dashboard-title {
+.document-dashboard-title {
     background: none !important;
     -webkit-background-clip: unset !important;
     -webkit-text-fill-color: unset !important;

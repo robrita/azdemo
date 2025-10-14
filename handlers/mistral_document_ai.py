@@ -1,15 +1,32 @@
 import streamlit as st
 from typing import Any, Dict
-import io
+import base64
+import json
+import requests
+import os
+import sys
+import time
+sys.path.append('..')
+from utils import save_extraction_to_json
 
 class MistralDocumentAI:
     """
     Handler for Mistral Document AI service
     Uses Mistral's AI models for document understanding and extraction
+    Supports: Images (JPEG, PNG) and PDF documents
     """
     
     def __init__(self, service_name=None):
         self.service_name = service_name or "Mistral Document AI"
+        # Initialize Mistral Document AI configuration
+        self.endpoint = os.environ.get("AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT")
+        self.key = os.environ.get("AZURE_MISTRAL_DOCUMENT_AI_KEY")
+        
+        # Request headers
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.key}",
+        }
         
     def extract(self, uploaded_file) -> Dict[str, Any]:
         """
@@ -22,14 +39,115 @@ class MistralDocumentAI:
             Dict containing extracted data
         """
         try:
+            # Start timing
+            start_time = time.time()
+            
             # Read file content
             file_bytes = uploaded_file.getvalue()
             file_name = uploaded_file.name
             file_type = uploaded_file.type
             
-            # Simulate Mistral Document AI extraction
-            # In real implementation, this would call Mistral's document AI API
+            # Encode document to base64
+            encoded_document = base64.b64encode(file_bytes).decode("utf-8")
             
+            # Determine MIME type based on file type
+            mime_type = "image/jpeg"  # Default
+            if "png" in file_type.lower():
+                mime_type = "image/png"
+            elif "pdf" in file_type.lower():
+                mime_type = "application/pdf"
+            elif "jpg" in file_type.lower() or "jpeg" in file_type.lower():
+                mime_type = "image/jpeg"
+            
+            # Determine document type and URL key based on file type
+            if "pdf" in file_type.lower():
+                doc_type = "document_url"
+                doc_url_key = "document_url"
+            else:
+                doc_type = "image_url"
+                doc_url_key = "image_url"
+            
+            # Build the JSON schema for document annotation based on extract_results.json structure
+            # Supports both images (JPEG, PNG) and PDF documents
+            document_annotation_payload = {
+                "model": "mistral-document-ai-2505",
+                "document": {
+                    "type": doc_type,
+                    doc_url_key: f"data:{mime_type};base64,{encoded_document}",
+                },
+                "include_image_base64": "true",
+                "document_annotation_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "bir_document_extraction",
+                        "description": "Extract structured information from BIR (Bureau of Internal Revenue) tax documents",
+                        "schema": {
+                            "properties": {
+                                "language": {
+                                    "title": "Language",
+                                    "type": "string",
+                                    "description": "The language of the document.",
+                                },
+                                "summary": {
+                                    "title": "Summary",
+                                    "type": "string",
+                                    "description": "A brief summary of the document in English.",
+                                },
+                                "tin": {
+                                    "title": "TIN Number",
+                                    "type": "string",
+                                    "description": "The taxpayer identification number (TIN) in format XXX-XXX-XXX-XXXXX or XXX-XXX-XXX-XXXX or XXX-XXX-XXX-XXX.",
+                                },
+                                "tradeName": {
+                                    "title": "Trade Name",
+                                    "type": "string",
+                                    "description": "The registered trade name or business name of the taxpayer.",
+                                },
+                                "registeredDate": {
+                                    "title": "Registered Date",
+                                    "type": "string",
+                                    "description": "The date the TIN was issued or registered in MM/DD/YYYY format.",
+                                },
+                                "registeredAddress": {
+                                    "title": "Registered Address",
+                                    "type": "string",
+                                    "description": "The complete registered address of the taxpayer or business.",
+                                },
+                                "businessType": {
+                                    "title": "Business Type",
+                                    "type": "string",
+                                    "description": "The line of business, business activities, or industry classification codes.",
+                                },
+                            },
+                        },
+                    },
+                },
+            }
+            
+            # Make API request to Mistral Document AI
+            # Increased timeout for PDF processing which may take longer
+            timeout_duration = 120 if "pdf" in file_type.lower() else 60
+            with st.spinner(f"Analyzing document with Mistral Document AI..."):
+                response = requests.post(
+                    url=self.endpoint,
+                    json=document_annotation_payload,
+                    headers=self.headers,
+                    timeout=timeout_duration
+                )
+                response.raise_for_status()
+            
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Parse response
+            response_data = response.json()
+            
+            # Extract document annotation
+            document_annotation = None
+            if "document_annotation" in response_data:
+                document_annotation = json.loads(response_data["document_annotation"])
+
+            # Build extracted data structure
             extracted_data = {
                 "service": self.service_name,
                 "file_info": {
@@ -37,65 +155,86 @@ class MistralDocumentAI:
                     "type": file_type,
                     "size": len(file_bytes)
                 },
-                "mistral_analysis": {
-                    "model_used": "mistral-document-large",
-                    "processing_mode": "comprehensive",
-                    "confidence_level": "high",
-                    "document_classification": "Financial Report"
+                "model_info": {
+                    "model_id": "mistral-document-ai-2505",
+                    "api_version": "2025.05"
                 },
-                "extracted_information": {
-                    "document_summary": "Quarterly financial report showing strong performance metrics with revenue growth of 15.2% compared to previous quarter. The document includes detailed breakdowns of operational expenses, profit margins, and strategic initiatives for market expansion.",
-                    "key_figures": {
-                        "total_revenue": "$1,200,000",
-                        "quarterly_growth": "15.2%",
-                        "net_profit": "$350,000",
-                        "profit_margin": "29.2%",
-                        "operational_efficiency": "87.3%"
-                    },
-                    "structured_data": {
-                        "financial_metrics": [
-                            {
-                                "metric": "Revenue",
-                                "current_quarter": "$1,200,000",
-                                "previous_quarter": "$1,050,000",
-                                "change": "+14.3%"
-                            },
-                            {
-                                "metric": "Operating Expenses",
-                                "current_quarter": "$850,000",
-                                "previous_quarter": "$750,000",
-                                "change": "+13.3%"
-                            }
-                        ],
-                        "business_insights": [
-                            "Strong revenue growth driven by new product launches",
-                            "Controlled expense growth maintaining healthy profit margins",
-                            "Successful market penetration in target segments",
-                            "Improved operational efficiency through automation"
-                        ]
-                    },
-                    "recommendations": [
-                        "Continue investment in high-growth product lines",
-                        "Monitor expense ratios to maintain profitability",
-                        "Expand successful marketing strategies to new regions",
-                        "Leverage automation gains for competitive advantage"
-                    ]
-                },
-                "processing_details": {
-                    "tokens_processed": 2847,
-                    "processing_time_ms": 1850,
-                    "api_version": "v1.2.3",
-                    "model_temperature": 0.1,
-                    "extraction_quality": "excellent"
+                "documents": []
+            }
+            
+            # Process extracted fields from document annotation
+            if document_annotation and "properties" in document_annotation:
+                properties = document_annotation["properties"]
+
+                # Build fields dictionary for save_extraction_to_json
+                fields_dict = {}
+                overall_confidence = 0.0
+                
+                # Map the extracted properties to fields with confidence scores
+                # Mistral doesn't provide per-field confidence, so we set it to 0
+                for field_name, field_value in properties.items():
+                    if field_value:  # Only include fields with values
+                        fields_dict[field_name] = {
+                            "content": str(field_value),
+                            "confidence": 0.0,
+                            "type": "string",
+                        }
+                
+                # Create document entry
+                doc_data = {
+                    "document_number": 1,
+                    "doc_type": "BIR Tax Document",
+                    "confidence": round(overall_confidence, 3),
+                    "fields": {}
                 }
+                
+                # Add fields to document data for display
+                for field_name, field_info in fields_dict.items():
+                    doc_data["fields"][field_name] = {
+                        "type": field_info["type"],
+                        "content": field_info["content"],
+                        "confidence": field_info["confidence"]
+                    }
+                
+                extracted_data["documents"].append(doc_data)
+                
+                # Save results to JSON file using common utility function
+                if fields_dict:
+                    save_extraction_to_json(
+                        file_name,
+                        self.service_name,
+                        pages_count=1,  # Mistral processes single images
+                        fields=fields_dict,
+                        overall_confidence=overall_confidence,
+                        processing_time=processing_time
+                    )
+            
+            # Add processing summary
+            extracted_data["processing_info"] = {
+                "pages_processed": 1,
+                "documents_found": len(extracted_data["documents"]),
+                "processing_time_seconds": round(processing_time, 3)
             }
             
             return extracted_data
             
+        except requests.exceptions.RequestException as e:
+            import traceback
+            return {
+                "service": self.service_name,
+                "error": f"Mistral Document AI API request failed: {str(e)}",
+                "error_details": traceback.format_exc(),
+                "file_info": {
+                    "name": uploaded_file.name if uploaded_file else "Unknown",
+                    "type": uploaded_file.type if uploaded_file else "Unknown"
+                }
+            }
         except Exception as e:
+            import traceback
             return {
                 "service": self.service_name,
                 "error": f"Mistral Document AI extraction failed: {str(e)}",
+                "error_details": traceback.format_exc(),
                 "file_info": {
                     "name": uploaded_file.name if uploaded_file else "Unknown",
                     "type": uploaded_file.type if uploaded_file else "Unknown"

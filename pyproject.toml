@@ -1,7 +1,7 @@
 [project]
 name = "azdemo"
 version = "0.1.0"
-description = "PMO Agent Dashboard - Comprehensive Project Management Operations Platform"
+description = "Document Processing Dashboard - Comprehensive Document Extraction and Analysis Platform"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -12,7 +12,6 @@ dependencies = [
     "dotenv>=0.9.9",
     "azure-ai-projects>=1.0.0",
     "azure-identity>=1.25.1",
-    "azure-cosmos>=4.9.0",
     "azure-ai-documentintelligence>=1.0.2",
     "azure-core>=1.35.1",
     "python-dotenv>=1.1.1",

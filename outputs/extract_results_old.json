@@ -1,0 +1,1426 @@
+{
+  "results": [
+    {
+      "file_name": "bir2303-true-04.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.915,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration for a business named Philippine Native E-Tailer Co. The document includes details such as the TIN number, registered address, trade name, line of business, and the date of registration.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "009-081-209-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Philippine Native E-Tailer Co.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2015",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "3001 Jose Abad Santos Ave, Brgy. 201 Zone 16 Dist. III, Tondo Manila 1012",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "5259 Other Non-Store Retail Sale",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-04.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.942,
+      "processing_time": 9.321,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "5259. OTHER NON-STORE RETAIL SALE",
+          "confidence": 0.972
+        },
+        {
+          "name": "registeredAddress",
+          "value": "3001 JOSE ABAD SANTOS AVE\nBRGY 201 ZONE 18 DIST III\nTONDO MANILA 1012",
+          "confidence": 0.854
+        },
+        {
+          "name": "tin",
+          "value": "009-081-209-000",
+          "confidence": 0.972
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NATIVE E-TAILER CO.",
+          "confidence": 0.971
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2015",
+          "confidence": 0.942
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-04.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.904,
+      "processing_time": 12.084,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-081-209-000",
+          "confidence": 0.814
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NATIVE E-TAILER CO.",
+          "confidence": 0.551
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2015",
+          "confidence": 0.614
+        },
+        {
+          "name": "registeredAddress",
+          "value": "3001 JOSE ABAD SANTOS AVE\nBRGY 201 ZONE 18 DIST III\nTONDO MANILA 1012",
+          "confidence": 0.44
+        },
+        {
+          "name": "businessType",
+          "value": "5259. OTHER NON-STORE RETAIL SALE",
+          "confidence": 0.454
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-05.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.932,
+      "processing_time": 8.122,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "915-994-471-000",
+          "confidence": 0.973
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/13/2015",
+          "confidence": 0.932
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LAMAK\nPOBLAIONJOSE DALMAN\nZAMBO DEL NORTE 7111",
+          "confidence": 0.978
+        },
+        {
+          "name": "businessType",
+          "value": "5231 RETAIL OF PHARMACEUTICAL. MEDICAL, COSMETIC, TOILET ARTICLES 5239 OTHER RETAIL SALE IN SPECIALIZED STORES",
+          "confidence": 0.799
+        },
+        {
+          "name": "tradeName",
+          "value": "USAD. ELMERINDO T",
+          "confidence": 0.978
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-05.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 10.533,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Republic of the Philippines, Bureau of Internal Revenue. It certifies that Usad, Elmerindo T. is registered under the taxpayer identification number 916-994-471-000. The registered address is Lamak, Poblacion Jose Dalman, Zambo Del Norte, 7111. The registration date is 07/13/2015. The business is registered under the trade name 'Surich Livelihood Entrepreneur' and operates in the retail of pharmaceuticals, medical, cosmetic, and toilet articles, as well as other retail sales in specialized stores.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "916-994-471-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Surich Livelihood Entrepreneur",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/13/2015",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Lamak, Poblacion Jose Dalman, Zambo Del Norte, 7111",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Retail of pharmaceutical, medical, cosmetic, toilet articles; other retail sale in specialized stores",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-05.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 10.78,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "915-994-471-000",
+          "confidence": 0.825
+        },
+        {
+          "name": "tradeName",
+          "value": "USAD. ELMERINDO T",
+          "confidence": 0.438
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/13/2015",
+          "confidence": 0.816
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LAMAK\nPOBLAIONJOSE DALMAN\nZAMBO DEL NORTE 7111",
+          "confidence": 0.577
+        },
+        {
+          "name": "businessType",
+          "value": "5231 RETAIL OF PHARMACEUTICAL. MEDICAL, COSMETIC, TOILET ARTICLES 5239 OTHER RETAIL SALE IN SPECIALIZED STORES",
+          "confidence": 0.537
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-06.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.974,
+      "processing_time": 10.83,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.97
+        },
+        {
+          "name": "registeredAddress",
+          "value": "DEPT. OF RESEARCH & EXT. SERVS\nMAAP BRGY. ALAS-ASINMARIVELES\nBATAAN 2105",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "007-324-134-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tradeName",
+          "value": "PHIL. ASSOC. OF EXTENSION PROG. IMPLEMENTERS, INC.",
+          "confidence": 0.979
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/29/2009",
+          "confidence": 0.941
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-06.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 13.29,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies the registration of the Phil. Assoc. of Extension Prog. Implementers, Inc. for income tax purposes.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "007-324-134-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "PHIL. ASSOC. OF EXTENSION PROG. IMPLEMENTERS, INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/29/2009",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "DEPT. OF RESEARCH & EXT. SERVS, MAAP BRGY. ALAS-ASINMARIVELES, BATAAN 2105",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C.",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-06.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.89,
+      "processing_time": 17.002,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "007-324-134-000",
+          "confidence": 0.823
+        },
+        {
+          "name": "tradeName",
+          "value": "PHIL. ASSOC. OF EXTENSION PROG. IMPLEMENTERS, INC.",
+          "confidence": 0.655
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/29/2009",
+          "confidence": 0.823
+        },
+        {
+          "name": "registeredAddress",
+          "value": "DEPT. OF RESEARCH & EXT. SERVS\nMAAP BRGY. ALAS-ASINMARIVELES\nBATAAN 2105",
+          "confidence": 0.624
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.504
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-12.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.968,
+      "processing_time": 11.233,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "7512 REGULATION OF THE ACTIVITIES\nOF SOCIAL SERVICE AGENCIES",
+          "confidence": 0.941
+        },
+        {
+          "name": "registeredAddress",
+          "value": "PNRC BLDG BONIFACIO DR\nPORT AREA\nMANILA 1002",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "000-804-271-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE RED CROSS",
+          "confidence": 0.98
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/31/1996",
+          "confidence": 0.942
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-12.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.937,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies the registration of the Philippine Red Cross with the BIR. The document includes details such as the Taxpayer Identification Number (TIN), registered address, trade name, line of business, and the date of registration.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "000-804-271-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Philippine Red Cross",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/31/1996",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "PNRC Bldg Bonifacio Dr, Port Area, Manila 1002",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "7512 Regulation of the Activities of Social Service Agencies",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-12.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.948,
+      "processing_time": 17.525,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "000-804-271-000",
+          "confidence": 0.874
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE RED CROSS",
+          "confidence": 0.842
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/31/1996",
+          "confidence": 0.505
+        },
+        {
+          "name": "registeredAddress",
+          "value": "PNRC BLDG BONIFACIO DR\nPORT AREA\nMANILA 1002",
+          "confidence": 0.767
+        },
+        {
+          "name": "businessType",
+          "value": "7512 REGULATION OF THE ACTIVITIES\nOF SOCIAL SERVICE AGENCIES",
+          "confidence": 0.674
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-21.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.476,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details such as the taxpayer identification number (TIN), registered name, registration date, registered address, tax types, trade name, and line of business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "223-375-564-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Your Price Online Shop",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/01/2003",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 Brown St., Felicisima Village, Mojo Malolos City, Bulacan 3000",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "5239 Other Retail Sale in Specialized Stores",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-21.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.937,
+      "processing_time": 12.714,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
+          "confidence": 0.771
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "223-375-564-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tradeName",
+          "value": "SOLOMON, \"MARCO CARMELO CABRERA",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/01/2003 E098",
+          "confidence": 0.943
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-21.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.981,
+      "processing_time": 13.313,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "223-375-564-000",
+          "confidence": 0.81
+        },
+        {
+          "name": "tradeName",
+          "value": "SOLOMON, \"MARCO CARMELO CABRERA",
+          "confidence": 0.48
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/01/2003",
+          "confidence": 0.704
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "confidence": 0.494
+        },
+        {
+          "name": "businessType",
+          "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
+          "confidence": 0.783
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-23.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.529,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies that NIMBUS WORLD TRAVEL CONSULTANTS INC. is registered under the provisions of the National Internal Revenue Code.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "007-887-272-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "NIMBUS WORLD TRAVEL CONSULTANT S INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "10/07/2010",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "12 Amado Brinas St, BF Resort Village, Las Piñas City 1740",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "7414 Business and Management Consultancy Activities",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-23.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.978,
+      "processing_time": 9.669,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "007-887-272-000",
+          "confidence": 0.86
+        },
+        {
+          "name": "tradeName",
+          "value": "NIMBUS WORLD TRAVEL CONSULTANTS INC.",
+          "confidence": 0.582
+        },
+        {
+          "name": "registeredDate",
+          "value": "10/07/2010",
+          "confidence": 0.859
+        },
+        {
+          "name": "registeredAddress",
+          "value": "12 AMADO BRINAS ST\nBF RESORT VILLAGE LAS PINAS CITY 1740",
+          "confidence": 0.3
+        },
+        {
+          "name": "businessType",
+          "value": "7414 BUSINESS AND MANAGEMENT CONSULTANCY ACTIVITIES",
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-25.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.969,
+      "processing_time": 9.949,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "440-646-539-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "09/04/2013",
+          "confidence": 0.963
+        },
+        {
+          "name": "registeredAddress",
+          "value": "MAOYOD LEGAZPI CITY ALBAY 4500",
+          "confidence": 0.971
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.97
+        },
+        {
+          "name": "tradeName",
+          "value": "ECS RESIDENCES HOMEOWNERS",
+          "confidence": 0.952
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-25.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.973,
+      "processing_time": 12.153,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "440-646-539-000",
+          "confidence": 0.881
+        },
+        {
+          "name": "tradeName",
+          "value": "ECS RESIDENCES HOMEOWNERS ASSOCIATION, INC.",
+          "confidence": 0.641
+        },
+        {
+          "name": "registeredDate",
+          "value": "09/04/2013",
+          "confidence": 0.876
+        },
+        {
+          "name": "registeredAddress",
+          "value": "MAOYOD LEGAZPI CITY ALBAY 4500",
+          "confidence": 0.825
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.674
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-25.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 22.138,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies that ECS Residences Homeowners Association, Inc. is registered with the BIR for income tax purposes. The document includes details such as the TIN, registered address, trade name, and line of business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "440-646-539-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "ECS Residences Homeowners Association, Inc.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "09/04/2013",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Maoyod Legazpi City, Albay 4500",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "9199 Activities of Other Membership Organizations, N.E.C.",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 10.018,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details about the taxpayer's identification number, business name, registered address, and other relevant information.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Philippine Network Foundation (PFI), Inc.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2721 Berkeley Residences Katipunan Ave Cor J Escaler St Loyola Heights Quezon City 1108",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "9199 Activities of Other Membership Organizations, N.E.C.",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.961,
+      "processing_time": 23.386,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.858
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
+          "confidence": 0.603
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.893
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2721 BERKELEY RESIDENCES KATIPUNAN AVE COR J ESCALER ST\nLOYOLA HEIGHTS\nQUEZON CITY 1108",
+          "confidence": 0.4
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.596
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.976,
+      "processing_time": 11.315,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.958
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2721 BERKELEY RESIDENCES KATIPUNAN AVE COR J ESCALER ST\nLOYOLA HEIGHTS\nQUEZON CITY 1108",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
+          "confidence": 0.97
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.973
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-35.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.378,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration for a business named Yeun Soo - St. Jude International School Inc. The document includes details such as the TIN number, registered address, trade name, and business type.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "005-867-819-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "YEUN SOO - ST. JUDE INTERNATIONAL SCHOOL INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2004",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "29 LIZARES COMPOUND, LEONARD WOOD ROAD, BAGUIO CITY",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "8159 Other Private Education Services, N.E.C.",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-35.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.982,
+      "processing_time": 9.952,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "YEUN SOO - ST. JUDE INTERNATIONAL SCHOOL ING.",
+          "confidence": 0.979
+        },
+        {
+          "name": "tin",
+          "value": "005-867-819-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2004",
+          "confidence": 0.971
+        },
+        {
+          "name": "businessType",
+          "value": "8159 OTHER PRIVATE EDUCATION SERVICES, N.E.C.",
+          "confidence": 0.982
+        },
+        {
+          "name": "registeredAddress",
+          "value": "29 LIZARES COMPOUND LEONARD WOOD ROAD BAGUIO CITY 2600",
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-35.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.98,
+      "processing_time": 12.293,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "005-867-819-000",
+          "confidence": 0.869
+        },
+        {
+          "name": "tradeName",
+          "value": "YEUN SOO - ST. JUDE INTERNATIONAL",
+          "confidence": 0.724
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2004",
+          "confidence": 0.838
+        },
+        {
+          "name": "registeredAddress",
+          "value": "ING.\n29 LIZARES COMPOUND LEONARD WOOD ROAD BAGUIO CITY",
+          "confidence": 0.127
+        },
+        {
+          "name": "businessType",
+          "value": "8159 OTHER PRIVATE EDUCATION SERVICES, N.E.C.",
+          "confidence": 0.629
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-37.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.865,
+      "processing_time": 10.512,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "351-993-821-000",
+          "confidence": 0.973
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/09/2018",
+          "confidence": 0.942
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK3 LOT 22 GRANDE VITA SUBD PHI 1\nBRGY BIGNAY DISTRICT 1 VALENZUELA CITY 1447",
+          "confidence": 0.567
+        },
+        {
+          "name": "businessType",
+          "value": "6412 COURIER ACTIVITIES OTHER THAN NATIONAL POSTAL ACTIVITIES",
+          "confidence": 0.901
+        },
+        {
+          "name": "tradeName",
+          "value": "OLIVER, CHRYSLER DARYL SERRANO",
+          "confidence": 0.943
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-37.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 13.2,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "351-993-821-000",
+          "confidence": 0.834
+        },
+        {
+          "name": "tradeName",
+          "value": "OLIVER, CHRYSLER DARYL SERRANO",
+          "confidence": 0.824
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/09/2018",
+          "confidence": 0.866
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK3 LOT 22 GRANDE VITA SUBD PHI 1\nBRGY BIGNAY DISTRICT 1 VALENZUELA CITY 1447",
+          "confidence": 0.222
+        },
+        {
+          "name": "businessType",
+          "value": "6412 COURIER ACTIVITIES OTHER THAN NATIONAL POSTAL ACTIVITIES",
+          "confidence": 0.67
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-37.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 18.902,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration for a taxpayer named Oliver, Chrysler Daryl Serrano. The document includes details such as the taxpayer's TIN, registered address, trade name, line of business, and the date of registration.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "351-993-821-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "D.S. OLIVER COURIER SERVICE",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/09/2018",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Blk 3 Lot 22 Grande Vita Subd Ph 1, Brgy. Bignay District 1, Valenzuela City 1447",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "6412 Courier Activities Other Than National Postal Activities",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-46.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.963,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration for a business named Philcore System Solutions Power R Inc. The document includes details such as the TIN number, registered address, trade name, line of business, and the date of registration.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "009-987-539-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Philcore System Solutions Power R Inc.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/31/2018",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Blk 31 Lot 6 Tokyo St Goldencity Diamond Vill Ph 1 Anabu II-F Imus City Cavite 4103",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "4520 Building of Constructions or Parts, Civil Engineering",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-46.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.866,
+      "processing_time": 9.539,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "4520 BUILDING OF CONSTRUCTIONS OR\nPARTS, CIVIL ENGINEERING",
+          "confidence": 0.927
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK 31 LOT 6 TOKYO ST GOLDENCITY DIAMOND VILL PH 1\nANABU II-F IMUS CITY\nCAVITE 4103",
+          "confidence": 0.98
+        },
+        {
+          "name": "tin",
+          "value": "009-987-539-000",
+          "confidence": 0.972
+        },
+        {
+          "name": "tradeName",
+          "value": "BIRMESESTRAHION DATE\nPHILCORE SYSTEM SOLUTIONS POWER\nINC.",
+          "confidence": 0.561
+        },
+        {
+          "name": "registeredDate",
+          "value": "(DILSEC, CDOF53192018",
+          "confidence": 0.891
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-46.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.967,
+      "processing_time": 10.872,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-987-539-000",
+          "confidence": 0.85
+        },
+        {
+          "name": "tradeName",
+          "value": "(DILSEC, CDOF53192018\nPHILCORE SYSTEM SOLUTIONS POWER\nINC.",
+          "confidence": 0.214
+        },
+        {
+          "name": "registeredDate",
+          "value": "JUL 31- 2018",
+          "confidence": 0.291
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK 31 LOT 6 TOKYO ST GOLDENCITY DIAMOND VILL PH 1\nANABU II-F IMUS CITY\nCAVITE 4103",
+          "confidence": 0.603
+        },
+        {
+          "name": "businessType",
+          "value": "4520 BUILDING OF CONSTRUCTIONS OR\nPARTS, CIVIL ENGINEERING",
+          "confidence": 0.765
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-55.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 6.758,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "997.997-897 000",
+          "confidence": 0.198
+        },
+        {
+          "name": "tradeName",
+          "value": "FAREMO INTERNATIONAL INC",
+          "confidence": 0.278
+        },
+        {
+          "name": "registeredDate",
+          "value": "03/25/2003",
+          "confidence": 0.817
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B19 L4,6 & 8 PIII\nPEZA ROSARIO",
+          "confidence": 0.629
+        },
+        {
+          "name": "businessType",
+          "value": "1899 MANUFCTURE OF OTHER WEARING APPAREL N. E. C 5190 OTHER WHOLESALING",
+          "confidence": 0.686
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-55.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 7.572,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration for Faremo International Inc. issued by the Bureau of Internal Revenue in the Philippines. The document includes details such as the TIN, registered address, trade name, and line of business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "293-293-007-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Faremo International Inc",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "03/25/2003",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B19 L4,6 & 8 PIII Peza Rosario Cavite 4106",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Manufacture of Other Wearing Apparel N.E.C, Other Wholesaling",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-55.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.983,
+      "processing_time": 8.405,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "997.997-897 000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "03/25/2003",
+          "confidence": 0.971
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B19 L4,6 & 8 PIII\nPEZA ROSARIO\nCAVITE 4106",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "1899 MANUFCTURE OF OTHER WEARING APPAREL N. E. C 5190 OTHER WHOLESALING",
+          "confidence": 0.973
+        },
+        {
+          "name": "tradeName",
+          "value": "FAREMO INTERNATIONAL INC",
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-69.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.63,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details such as the taxpayer's name, address, TIN, trade name, business activities, and registration date.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "908-843-807-000",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "CEBOOM REALTY VENTURES",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "06/14/2005",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 L2 VI TO VILLA LEYSON CT, BACAYAN, CEBU CITY 6000",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "7020 Real Estate Activities on a Fee or Contract Basis",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-69.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.832,
+      "processing_time": 9.498,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "TIN908-843-807-000",
+          "confidence": 0.892
+        },
+        {
+          "name": "registeredDate",
+          "value": "06/14/2005",
+          "confidence": 0.767
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BACAYAN CEBU CITY 6000",
+          "confidence": 0.764
+        },
+        {
+          "name": "businessType",
+          "value": "7020 REAL ESTATE ACTIVITIES ON A FEE OR CONTRACT BASIS",
+          "confidence": 0.94
+        },
+        {
+          "name": "tradeName",
+          "value": "NAMFFAYCO, ROY PARADELA",
+          "confidence": 0.799
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-69.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 13.643,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "TIN908-843-807-000",
+          "confidence": 0.79
+        },
+        {
+          "name": "tradeName",
+          "value": "NAMFFAYCO, ROY PARADELA",
+          "confidence": 0.454
+        },
+        {
+          "name": "registeredDate",
+          "value": "06/14/2005",
+          "confidence": 0.823
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 12 VITO VILLA LEYSON OF\nBACAYAN CEBU CITY 6000",
+          "confidence": 0.399
+        },
+        {
+          "name": "businessType",
+          "value": "7020 REAL ESTATE ACTIVITIES ON A FEE OR CONTRACT BASIS",
+          "confidence": 0.655
+        }
+      ]
+    }
+  ]
+}
