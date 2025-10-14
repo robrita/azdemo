@@ -1,22 +1,15 @@
 # pages/6_Document_Extraction.py
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 import sys
 import os
 import json
 import asyncio
 import concurrent.futures
 import time
-from datetime import datetime
 sys.path.append('..')
 from utils import render_sidebar, keep_state
-
-# Import plotly for performance analytics (lazy import in repository section)
-try:
-    import plotly.express as px
-    PLOTLY_AVAILABLE = True
-except ImportError:
-    PLOTLY_AVAILABLE = False
 
 # Import extraction service classes (implementations should be in handlers/)
 from handlers.document_intelligence import DocumentIntelligence
@@ -46,7 +39,7 @@ def get_file_type_description(file):
         return type_map.get(file_extension, f'{file_extension.upper()} File')
     return 'Unknown File Type'
 
-async def extract_with_service_async(svc_name, svc_class, file, progress_callback=None):
+async def extract_with_service_async(svc_name, svc_class, file):
     """
     Asynchronously extract data using a specific service.
     
@@ -54,7 +47,6 @@ async def extract_with_service_async(svc_name, svc_class, file, progress_callbac
         svc_name: Name of the service
         svc_class: Service class to instantiate
         file: File to process
-        progress_callback: Optional callback to report progress
         
     Returns:
         Tuple of (service_name, extraction_result, processing_time)
@@ -70,10 +62,6 @@ async def extract_with_service_async(svc_name, svc_class, file, progress_callbac
             result = await loop.run_in_executor(executor, svc.extract, file)
         
         processing_time = time.time() - start_time
-        
-        # Call progress callback if provided
-        if progress_callback:
-            progress_callback(svc_name, True, processing_time)
             
         return svc_name, result, processing_time
         
@@ -84,48 +72,24 @@ async def extract_with_service_async(svc_name, svc_class, file, progress_callbac
             "error": f"Async extraction failed: {str(e)}",
             "processing_time": processing_time
         }
-        
-        # Call progress callback if provided
-        if progress_callback:
-            progress_callback(svc_name, False, processing_time)
             
         return svc_name, error_result, processing_time
 
-async def process_file_with_services_async(file, selected_services, progress_container=None):
+async def process_file_with_services_async(file, selected_services):
     """
     Process a single file with multiple services in parallel.
     
     Args:
         file: File to process
         selected_services: List of (service_name, service_class) tuples
-        progress_container: Streamlit container for progress updates
         
     Returns:
         Dictionary of service results
     """
-    # Create progress tracking
-    service_status = {svc_name: "⏳ Pending" for svc_name, _ in selected_services}
-    
-    if progress_container:
-        progress_placeholder = progress_container.empty()
-        
-        def update_progress(svc_name, success, proc_time):
-            if success:
-                service_status[svc_name] = f"✅ Complete ({proc_time:.1f}s)"
-            else:
-                service_status[svc_name] = f"❌ Failed ({proc_time:.1f}s)"
-            
-            # Update progress display
-            progress_text = "\n".join([f"**{svc}**: {status}" 
-                                     for svc, status in service_status.items()])
-            progress_placeholder.markdown(f"**Processing Status:**\n\n{progress_text}")
-    else:
-        update_progress = None
-    
     # Create tasks for all services
     tasks = []
     for svc_name, svc_class in selected_services:
-        task = extract_with_service_async(svc_name, svc_class, file, update_progress)
+        task = extract_with_service_async(svc_name, svc_class, file)
         tasks.append(task)
     
     # Run all services in parallel and gather results
@@ -163,7 +127,7 @@ def main():
     render_sidebar()
     st.header("📑 Document Extraction")
 
-    tab1, tab2 = st.tabs(["📤 Upload & Extract", "📚 Document Repository"])
+    tab1, tab2 = st.tabs(["📤 Upload & Extract", "🔍 Analyze Output"])
 
     with tab1:
         st.subheader("Upload Documents for Extraction")
@@ -273,39 +237,18 @@ def main():
             # No need to check for selected_services again since button only shows when services are selected
             with st.spinner(f"Extracting {len(valid_files)} document(s) with {len(selected_services)} services in parallel..."):
                 os.makedirs("outputs", exist_ok=True)
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
-                # Overall progress tracking
-                overall_start_time = time.time()
                 
                 # Process each valid file with async parallel processing
-                for i, file in enumerate(valid_files):
-                    # Create progress container for this file
-                    progress_container = st.container()
-                    
+                for file in valid_files:
                     # Run async processing for this file
                     try:
                         # Run the async function in Streamlit
                         file_results = asyncio.run(
-                            process_file_with_services_async(file, selected_services, progress_container)
+                            process_file_with_services_async(file, selected_services)
                         )
                         
-                        # Extract processing summary
-                        processing_summary = file_results.pop("_processing_summary", {})
-                        
-                        # Display processing performance metrics
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("Total Services", processing_summary.get("total_services", 0))
-                        with col2:
-                            st.metric("Successful", processing_summary.get("successful_services", 0), 
-                                    delta=f"+{processing_summary.get('successful_services', 0)}")
-                        with col3:
-                            st.metric("Failed", processing_summary.get("failed_services", 0),
-                                    delta=f"-{processing_summary.get('failed_services', 0)}" if processing_summary.get("failed_services", 0) > 0 else None)
-                        with col4:
-                            file_overall_time = time.time() - overall_start_time
-                            st.metric("Processing Time", f"{file_overall_time:.2f}s")
+                        # Remove processing summary from results
+                        file_results.pop("_processing_summary", {})
                         
                         # Display results for this file
                         with st.expander(f"📄 Results for {file.name}", expanded=False):
@@ -333,68 +276,140 @@ def main():
                         continue
                 
     with tab2:
-        st.subheader("Document Repository")
-        repo = []
-        if os.path.exists("outputs"):
-            for fname in os.listdir("outputs"):
-                if fname.endswith(".json"):
-                    with open(os.path.join("outputs", fname), "r", encoding="utf-8") as f:
-                        try:
-                            data = json.load(f)
-                            processing_summary = data.get("processing_summary", {})
-                            results = data.get("results", {})
-                            
-                            # Count successful vs failed extractions
-                            successful_count = processing_summary.get("successful_services", 
-                                len([r for r in results.values() if isinstance(r, dict) and "error" not in r]))
-                            total_services = processing_summary.get("total_services", len(data.get("services", [])))
-                            
-                            repo.append({
-                                "File Name": data.get("file_name", fname),
-                                "File Type": data.get("file_type", "-"),
-                                "Timestamp": data.get("timestamp", "-"),
-                                "Services": f"{total_services} services",
-                                "Success Rate": f"{successful_count}/{total_services}" if total_services > 0 else "-",
-                                "Result Keys": ", ".join(results.keys()) if results else "-",
-                                "File": fname
-                            })
-                        except Exception:
-                            continue
+        st.subheader("Analyze Output")
         
-        if repo:
-            df = pd.DataFrame(repo)
-            
-            # Display enhanced repository table
-            st.dataframe(df, width='stretch', hide_index=True)
-            
-            # Show repository statistics
-            if len(repo) > 0:
-                col1, col2, col3, col4 = st.columns(4)
-                
-                total_files = len(repo)
-                avg_services = sum([int(r["Services"].split()[0]) for r in repo if r["Services"] != "-"]) / total_files if total_files > 0 else 0
-                
-                # Calculate success rates
-                success_rates = []
-                for r in repo:
-                    if r["Success Rate"] != "-" and "/" in r["Success Rate"]:
-                        success, total = map(int, r["Success Rate"].split("/"))
-                        if total > 0:
-                            success_rates.append(success / total * 100)
-                
-                avg_success_rate = sum(success_rates) / len(success_rates) if success_rates else 0
-                
-                with col1:
-                    st.metric("Total Documents", total_files)
-                with col2:
-                    st.metric("Avg Services/Doc", f"{avg_services:.1f}")
-                with col3:
-                    st.metric("Avg Success Rate", f"{avg_success_rate:.1f}%")
-                with col4:
-                    total_extractions = sum([int(r["Services"].split()[0]) for r in repo if r["Services"] != "-"])
-                    st.metric("Total Extractions", total_extractions)
+        # Load JSON data from outputs folder
+        json_files = []
+        if os.path.exists("outputs"):
+            json_files = [f for f in os.listdir("outputs") if f.endswith(".json")]
+        
+        if not json_files:
+            st.info("No extraction results found in outputs folder.")
         else:
-            st.info("No extracted documents found.")
+            # Allow user to select which JSON file to analyze
+            selected_json = st.selectbox("Select JSON file to analyze", json_files, index=0)
+            
+            if selected_json:
+                json_path = os.path.join("outputs", selected_json)
+                
+                try:
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    
+                    # Extract results array from JSON
+                    results = data.get("results", [])
+                    
+                    if not results:
+                        st.warning("No results found in the selected JSON file.")
+                    else:
+                        # Add filter to select value or confidence view
+                        view_type = st.selectbox("Select data view", ["Values", "Confidence"])
+                        
+                        # Prepare data for tables
+                        table_data = []
+                        
+                        for result in results:
+                            file_name = result.get("file_name", "")
+                            service_name = result.get("service_name", "")
+                            processing_time = result.get("processing_time", 0.0)
+                            
+                            # Create a dictionary to store field values or confidences
+                            row = {
+                                "file_name": file_name,
+                                "service_name": service_name,
+                                "processing_time": f"{processing_time:.3f}s" if processing_time else "0.000s",
+                                "tin": "",
+                                "registeredDate": "",
+                                "registeredAddress": "",
+                                "businessType": "",
+                                "tradeName": ""
+                            }
+                            
+                            # Extract fields based on view type
+                            fields = result.get("fields", [])
+                            for field in fields:
+                                field_name = field.get("name", "")
+                                if field_name in row:
+                                    if view_type == "Values":
+                                        row[field_name] = field.get("value", "")
+                                    else:  # Confidence Scores
+                                        confidence = field.get("confidence", 0)
+                                        row[field_name] = f"{confidence:.3f}" if confidence else ""
+                            
+                            table_data.append(row)
+                        
+                        # Create DataFrame and sort by file_name, then service_name
+                        df = pd.DataFrame(table_data)
+                        df = df.sort_values(by=["file_name", "service_name"], ascending=True).reset_index(drop=True)
+                        
+                        # Display the table
+                        st.markdown(f"### {view_type} Table")
+                        st.dataframe(df, width='stretch', hide_index=True, use_container_width=True)
+                        
+                        # Add Processing Time Trends Graph
+                        st.markdown("---")
+                        st.markdown("### Processing Time Trends")
+                        
+                        # Prepare data for line chart
+                        # Group by file_name and service_name, get processing times
+                        chart_data = []
+                        for result in results:
+                            file_name = result.get("file_name", "")
+                            service_name = result.get("service_name", "")
+                            processing_time = result.get("processing_time", 0.0)
+                            chart_data.append({
+                                "file_name": file_name,
+                                "service_name": service_name,
+                                "processing_time": processing_time
+                            })
+                        
+                        chart_df = pd.DataFrame(chart_data)
+                        
+                        # Get unique services
+                        services = sorted(chart_df['service_name'].unique())
+                        
+                        # Create line chart with a line for each service
+                        fig = go.Figure()
+                        
+                        # Color palette for services
+                        colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+                        
+                        for idx, service in enumerate(services):
+                            service_data = chart_df[chart_df['service_name'] == service]
+                            # Sort by file_name to ensure proper line connection
+                            service_data = service_data.sort_values('file_name')
+                            
+                            fig.add_trace(go.Scatter(
+                                x=service_data['file_name'],
+                                y=service_data['processing_time'],
+                                mode='lines+markers',
+                                name=service,
+                                line=dict(color=colors[idx % len(colors)], width=2),
+                                marker=dict(size=8)
+                            ))
+                        
+                        fig.update_layout(
+                            hovermode='x unified',
+                            xaxis_title="File Name",
+                            yaxis_title="Processing Time (seconds)",
+                            yaxis=dict(
+                                rangemode='tozero',
+                                dtick=2
+                            ),
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1
+                            ),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                except Exception as e:
+                    st.error(f"Error loading JSON file: {str(e)}")
 
 if __name__ == "__main__":
     main()

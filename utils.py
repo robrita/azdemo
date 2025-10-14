@@ -52,7 +52,7 @@ def keep_state(state_object, state_name):
         return True
     return False
 
-def save_extraction_to_json(file_name: str, service_name: str, pages_count: int, fields: dict, overall_confidence: float = None, results_file_path: str = "outputs/extract_results.json") -> None:
+def save_extraction_to_json(file_name: str, service_name: str, pages_count: int, fields: dict, overall_confidence: float = None, processing_time: float = None, results_file_path: str = "outputs/extract_results.json") -> None:
     """
     Save extraction results to JSON file following standardized structure.
     This function handles loading existing data, filtering by file_name and service_name,
@@ -64,6 +64,7 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
         pages_count: Number of pages in the document
         fields: Dictionary of extracted fields with confidence scores and content
         overall_confidence: Overall document confidence score (if None, defaults to 0.0)
+        processing_time: Time taken to process the file in seconds (if None, defaults to 0.0)
         results_file_path: Path to the JSON results file (default: outputs/extract_results.json)
     """
     import json
@@ -99,12 +100,16 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
         # Use provided overall_confidence or default to 0.0
         document_confidence = round(overall_confidence, 3) if overall_confidence is not None else 0.0
         
+        # Use provided processing_time or default to 0.0
+        proc_time = round(processing_time, 3) if processing_time is not None else 0.0
+        
         # Create new result entry
         new_result = {
             "file_name": file_name,
             "service_name": service_name,
             "pages_count": pages_count,
             "document_confidence": document_confidence,
+            "processing_time": proc_time,
             "fields": fields_array
         }
         

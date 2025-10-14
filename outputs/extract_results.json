@@ -5,6 +5,7 @@
       "service_name": "ADI-Template",
       "pages_count": 1,
       "document_confidence": 0.583,
+      "processing_time": 9.571,
       "fields": [
         {
           "name": "tin",
@@ -38,6 +39,7 @@
       "service_name": "ADI-Neural",
       "pages_count": 1,
       "document_confidence": 0.471,
+      "processing_time": 11.001,
       "fields": [
         {
           "name": "tin",
@@ -71,20 +73,16 @@
       "service_name": "ADI-Template",
       "pages_count": 1,
       "document_confidence": 0.937,
+      "processing_time": 9.533,
       "fields": [
-        {
-          "name": "tin",
-          "value": "223-375-564-000",
-          "confidence": 0.99
-        },
         {
           "name": "tradeName",
           "value": "SOLOMON, \"MARCO CARMELO CABRERA",
           "confidence": 0.99
         },
         {
-          "name": "registeredAddress",
-          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "name": "tin",
+          "value": "223-375-564-000",
           "confidence": 0.99
         },
         {
@@ -96,6 +94,11 @@
           "name": "businessType",
           "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
           "confidence": 0.771
+        },
+        {
+          "name": "registeredAddress",
+          "value": "215 BROWN ST. FELICISIMA VILLAGE\nMOJON MALOLOS CITY\nBULACAN 3000",
+          "confidence": 0.99
         }
       ]
     },
@@ -104,6 +107,7 @@
       "service_name": "ADI-Neural",
       "pages_count": 1,
       "document_confidence": 0.981,
+      "processing_time": 13.236,
       "fields": [
         {
           "name": "tin",
@@ -129,6 +133,958 @@
           "name": "businessType",
           "value": "5239 OTHER RETAIL SALE IN\nSPECIALIZED STORES",
           "confidence": 0.783
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-04.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.904,
+      "processing_time": 8.388,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-081-209-000",
+          "confidence": 0.814
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NATIVE E-TAILER CO.",
+          "confidence": 0.551
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2015",
+          "confidence": 0.614
+        },
+        {
+          "name": "registeredAddress",
+          "value": "3001 JOSE ABAD SANTOS AVE\nBRGY 201 ZONE 18 DIST III\nTONDO MANILA 1012",
+          "confidence": 0.44
+        },
+        {
+          "name": "businessType",
+          "value": "5259. OTHER NON-STORE RETAIL SALE",
+          "confidence": 0.454
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-04.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.942,
+      "processing_time": 7.297,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NATIVE E-TAILER CO.",
+          "confidence": 0.971
+        },
+        {
+          "name": "tin",
+          "value": "009-081-209-000",
+          "confidence": 0.972
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2015",
+          "confidence": 0.942
+        },
+        {
+          "name": "businessType",
+          "value": "5259. OTHER NON-STORE RETAIL SALE",
+          "confidence": 0.972
+        },
+        {
+          "name": "registeredAddress",
+          "value": "3001 JOSE ABAD SANTOS AVE\nBRGY 201 ZONE 18 DIST III\nTONDO MANILA 1012",
+          "confidence": 0.854
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-05.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 8.619,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "915-994-471-000",
+          "confidence": 0.825
+        },
+        {
+          "name": "tradeName",
+          "value": "USAD. ELMERINDO T",
+          "confidence": 0.438
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/13/2015",
+          "confidence": 0.816
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LAMAK\nPOBLAIONJOSE DALMAN\nZAMBO DEL NORTE 7111",
+          "confidence": 0.577
+        },
+        {
+          "name": "businessType",
+          "value": "5231 RETAIL OF PHARMACEUTICAL. MEDICAL, COSMETIC, TOILET ARTICLES 5239 OTHER RETAIL SALE IN SPECIALIZED STORES",
+          "confidence": 0.537
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-05.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.932,
+      "processing_time": 8.707,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "915-994-471-000",
+          "confidence": 0.973
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/13/2015",
+          "confidence": 0.932
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LAMAK\nPOBLAIONJOSE DALMAN\nZAMBO DEL NORTE 7111",
+          "confidence": 0.978
+        },
+        {
+          "name": "businessType",
+          "value": "5231 RETAIL OF PHARMACEUTICAL. MEDICAL, COSMETIC, TOILET ARTICLES 5239 OTHER RETAIL SALE IN SPECIALIZED STORES",
+          "confidence": 0.799
+        },
+        {
+          "name": "tradeName",
+          "value": "USAD. ELMERINDO T",
+          "confidence": 0.978
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-06.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.974,
+      "processing_time": 8.599,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "007-324-134-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/29/2009",
+          "confidence": 0.941
+        },
+        {
+          "name": "registeredAddress",
+          "value": "DEPT. OF RESEARCH & EXT. SERVS\nMAAP BRGY. ALAS-ASINMARIVELES\nBATAAN 2105",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.97
+        },
+        {
+          "name": "tradeName",
+          "value": "PHIL. ASSOC. OF EXTENSION PROG. IMPLEMENTERS, INC.",
+          "confidence": 0.979
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-06.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.89,
+      "processing_time": 16.323,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "007-324-134-000",
+          "confidence": 0.823
+        },
+        {
+          "name": "tradeName",
+          "value": "PHIL. ASSOC. OF EXTENSION PROG. IMPLEMENTERS, INC.",
+          "confidence": 0.655
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/29/2009",
+          "confidence": 0.823
+        },
+        {
+          "name": "registeredAddress",
+          "value": "DEPT. OF RESEARCH & EXT. SERVS\nMAAP BRGY. ALAS-ASINMARIVELES\nBATAAN 2105",
+          "confidence": 0.624
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.504
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-12.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.948,
+      "processing_time": 8.289,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "000-804-271-000",
+          "confidence": 0.874
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE RED CROSS",
+          "confidence": 0.842
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/31/1996",
+          "confidence": 0.505
+        },
+        {
+          "name": "registeredAddress",
+          "value": "PNRC BLDG BONIFACIO DR\nPORT AREA\nMANILA 1002",
+          "confidence": 0.767
+        },
+        {
+          "name": "businessType",
+          "value": "7512 REGULATION OF THE ACTIVITIES\nOF SOCIAL SERVICE AGENCIES",
+          "confidence": 0.674
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-12.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.968,
+      "processing_time": 8.359,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "000-804-271-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/31/1996",
+          "confidence": 0.942
+        },
+        {
+          "name": "registeredAddress",
+          "value": "PNRC BLDG BONIFACIO DR\nPORT AREA\nMANILA 1002",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "7512 REGULATION OF THE ACTIVITIES\nOF SOCIAL SERVICE AGENCIES",
+          "confidence": 0.941
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE RED CROSS",
+          "confidence": 0.98
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-23.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.978,
+      "processing_time": 9.073,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "007-887-272-000",
+          "confidence": 0.86
+        },
+        {
+          "name": "tradeName",
+          "value": "NIMBUS WORLD TRAVEL CONSULTANTS INC.",
+          "confidence": 0.582
+        },
+        {
+          "name": "registeredDate",
+          "value": "10/07/2010",
+          "confidence": 0.859
+        },
+        {
+          "name": "registeredAddress",
+          "value": "12 AMADO BRINAS ST\nBF RESORT VILLAGE LAS PINAS CITY 1740",
+          "confidence": 0.3
+        },
+        {
+          "name": "businessType",
+          "value": "7414 BUSINESS AND MANAGEMENT CONSULTANCY ACTIVITIES",
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-24.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.382,
+      "processing_time": 9.678,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "\"190 OTHER WHOLESALING",
+          "confidence": 0.939
+        },
+        {
+          "name": "registeredAddress",
+          "value": "",
+          "confidence": 0.96
+        },
+        {
+          "name": "tin",
+          "value": "",
+          "confidence": 0.95
+        },
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.4
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/11/2014",
+          "confidence": 0.972
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-24.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.978,
+      "processing_time": 8.312,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "OCARC0000647139",
+          "confidence": 0.305
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/11/2014",
+          "confidence": 0.855
+        },
+        {
+          "name": "businessType",
+          "value": "\"190 OTHER WHOLESALING",
+          "confidence": 0.51
+        },
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.242
+        },
+        {
+          "name": "registeredAddress",
+          "value": "",
+          "confidence": 0.355
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-25.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.969,
+      "processing_time": 7.899,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "440-646-539-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "09/04/2013",
+          "confidence": 0.963
+        },
+        {
+          "name": "registeredAddress",
+          "value": "MAOYOD LEGAZPI CITY ALBAY 4500",
+          "confidence": 0.971
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.97
+        },
+        {
+          "name": "tradeName",
+          "value": "ECS RESIDENCES HOMEOWNERS",
+          "confidence": 0.952
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-25.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.973,
+      "processing_time": 6.679,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "440-646-539-000",
+          "confidence": 0.881
+        },
+        {
+          "name": "tradeName",
+          "value": "ECS RESIDENCES HOMEOWNERS ASSOCIATION, INC.",
+          "confidence": 0.641
+        },
+        {
+          "name": "registeredDate",
+          "value": "09/04/2013",
+          "confidence": 0.876
+        },
+        {
+          "name": "registeredAddress",
+          "value": "MAOYOD LEGAZPI CITY ALBAY 4500",
+          "confidence": 0.825
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.674
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.961,
+      "processing_time": 12.548,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.858
+        },
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
+          "confidence": 0.603
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.893
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2721 BERKELEY RESIDENCES KATIPUNAN AVE COR J ESCALER ST\nLOYOLA HEIGHTS\nQUEZON CITY 1108",
+          "confidence": 0.4
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.596
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-35.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.982,
+      "processing_time": 7.077,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "005-867-819-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2004",
+          "confidence": 0.971
+        },
+        {
+          "name": "registeredAddress",
+          "value": "29 LIZARES COMPOUND LEONARD WOOD ROAD BAGUIO CITY 2600",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "8159 OTHER PRIVATE EDUCATION SERVICES, N.E.C.",
+          "confidence": 0.982
+        },
+        {
+          "name": "tradeName",
+          "value": "YEUN SOO - ST. JUDE INTERNATIONAL SCHOOL ING.",
+          "confidence": 0.979
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-35.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.98,
+      "processing_time": 9.433,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "005-867-819-000",
+          "confidence": 0.869
+        },
+        {
+          "name": "tradeName",
+          "value": "YEUN SOO - ST. JUDE INTERNATIONAL",
+          "confidence": 0.724
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2004",
+          "confidence": 0.838
+        },
+        {
+          "name": "registeredAddress",
+          "value": "ING.\n29 LIZARES COMPOUND LEONARD WOOD ROAD BAGUIO CITY",
+          "confidence": 0.127
+        },
+        {
+          "name": "businessType",
+          "value": "8159 OTHER PRIVATE EDUCATION SERVICES, N.E.C.",
+          "confidence": 0.629
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-37.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.865,
+      "processing_time": 8.194,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "OLIVER, CHRYSLER DARYL SERRANO",
+          "confidence": 0.943
+        },
+        {
+          "name": "tin",
+          "value": "351-993-821-000",
+          "confidence": 0.973
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/09/2018",
+          "confidence": 0.942
+        },
+        {
+          "name": "businessType",
+          "value": "6412 COURIER ACTIVITIES OTHER THAN NATIONAL POSTAL ACTIVITIES",
+          "confidence": 0.901
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK3 LOT 22 GRANDE VITA SUBD PHI 1\nBRGY BIGNAY DISTRICT 1 VALENZUELA CITY 1447",
+          "confidence": 0.567
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-37.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 10.788,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "351-993-821-000",
+          "confidence": 0.834
+        },
+        {
+          "name": "tradeName",
+          "value": "OLIVER, CHRYSLER DARYL SERRANO",
+          "confidence": 0.824
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/09/2018",
+          "confidence": 0.866
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK3 LOT 22 GRANDE VITA SUBD PHI 1\nBRGY BIGNAY DISTRICT 1 VALENZUELA CITY 1447",
+          "confidence": 0.222
+        },
+        {
+          "name": "businessType",
+          "value": "6412 COURIER ACTIVITIES OTHER THAN NATIONAL POSTAL ACTIVITIES",
+          "confidence": 0.67
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-46.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.866,
+      "processing_time": 8.754,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "4520 BUILDING OF CONSTRUCTIONS OR\nPARTS, CIVIL ENGINEERING",
+          "confidence": 0.927
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK 31 LOT 6 TOKYO ST GOLDENCITY DIAMOND VILL PH 1\nANABU II-F IMUS CITY\nCAVITE 4103",
+          "confidence": 0.98
+        },
+        {
+          "name": "tin",
+          "value": "009-987-539-000",
+          "confidence": 0.972
+        },
+        {
+          "name": "tradeName",
+          "value": "BIRMESESTRAHION DATE\nPHILCORE SYSTEM SOLUTIONS POWER\nINC.",
+          "confidence": 0.561
+        },
+        {
+          "name": "registeredDate",
+          "value": "(DILSEC, CDOF53192018",
+          "confidence": 0.891
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-46.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.967,
+      "processing_time": 9.753,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-987-539-000",
+          "confidence": 0.85
+        },
+        {
+          "name": "tradeName",
+          "value": "(DILSEC, CDOF53192018\nPHILCORE SYSTEM SOLUTIONS POWER\nINC.",
+          "confidence": 0.214
+        },
+        {
+          "name": "registeredDate",
+          "value": "JUL 31- 2018",
+          "confidence": 0.291
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BLK 31 LOT 6 TOKYO ST GOLDENCITY DIAMOND VILL PH 1\nANABU II-F IMUS CITY\nCAVITE 4103",
+          "confidence": 0.603
+        },
+        {
+          "name": "businessType",
+          "value": "4520 BUILDING OF CONSTRUCTIONS OR\nPARTS, CIVIL ENGINEERING",
+          "confidence": 0.765
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-54.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.673,
+      "processing_time": 5.255,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "",
+          "confidence": 0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Beimk hy ber",
+          "confidence": 0.941
+        },
+        {
+          "name": "tin",
+          "value": "03203422",
+          "confidence": 0.513
+        },
+        {
+          "name": "tradeName",
+          "value": "MAGISTRFIN IT WITHACARING TAR - ROMPEMENTDOS",
+          "confidence": 0.931
+        },
+        {
+          "name": "registeredDate",
+          "value": "A",
+          "confidence": 0.983
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-55.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.983,
+      "processing_time": 6.206,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "997.997-897 000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "03/25/2003",
+          "confidence": 0.971
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B19 L4,6 & 8 PIII\nPEZA ROSARIO\nCAVITE 4106",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "1899 MANUFCTURE OF OTHER WEARING APPAREL N. E. C 5190 OTHER WHOLESALING",
+          "confidence": 0.973
+        },
+        {
+          "name": "tradeName",
+          "value": "FAREMO INTERNATIONAL INC",
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-55.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 7.487,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "997.997-897 000",
+          "confidence": 0.198
+        },
+        {
+          "name": "tradeName",
+          "value": "FAREMO INTERNATIONAL INC",
+          "confidence": 0.278
+        },
+        {
+          "name": "registeredDate",
+          "value": "03/25/2003",
+          "confidence": 0.817
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B19 L4,6 & 8 PIII\nPEZA ROSARIO",
+          "confidence": 0.629
+        },
+        {
+          "name": "businessType",
+          "value": "1899 MANUFCTURE OF OTHER WEARING APPAREL N. E. C 5190 OTHER WHOLESALING",
+          "confidence": 0.686
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-69.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.921,
+      "processing_time": 11.431,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "TIN908-843-807-000",
+          "confidence": 0.79
+        },
+        {
+          "name": "tradeName",
+          "value": "NAMFFAYCO, ROY PARADELA",
+          "confidence": 0.454
+        },
+        {
+          "name": "registeredDate",
+          "value": "06/14/2005",
+          "confidence": 0.823
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 12 VITO VILLA LEYSON OF\nBACAYAN CEBU CITY 6000",
+          "confidence": 0.399
+        },
+        {
+          "name": "businessType",
+          "value": "7020 REAL ESTATE ACTIVITIES ON A FEE OR CONTRACT BASIS",
+          "confidence": 0.655
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-69.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.832,
+      "processing_time": 6.35,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "7020 REAL ESTATE ACTIVITIES ON A FEE OR CONTRACT BASIS",
+          "confidence": 0.94
+        },
+        {
+          "name": "registeredAddress",
+          "value": "BACAYAN CEBU CITY 6000",
+          "confidence": 0.764
+        },
+        {
+          "name": "tin",
+          "value": "TIN908-843-807-000",
+          "confidence": 0.892
+        },
+        {
+          "name": "tradeName",
+          "value": "NAMFFAYCO, ROY PARADELA",
+          "confidence": 0.799
+        },
+        {
+          "name": "registeredDate",
+          "value": "06/14/2005",
+          "confidence": 0.767
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-23.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.958,
+      "processing_time": 7.641,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "NIMBUS WORLD TRAVEL CONSULTANTS",
+          "confidence": 0.957
+        },
+        {
+          "name": "tin",
+          "value": "007-887-272-000",
+          "confidence": 0.958
+        },
+        {
+          "name": "registeredDate",
+          "value": "10/07/2010",
+          "confidence": 0.942
+        },
+        {
+          "name": "businessType",
+          "value": "7414 BUSINESS AND MANAGEMENT CONSULTANCY ACTIVITIES",
+          "confidence": 0.941
+        },
+        {
+          "name": "registeredAddress",
+          "value": "12 AMADO BRINAS ST\nBF RESORT VILLAGE LAS PINAS CITY 1740",
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.976,
+      "processing_time": 8.743,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
+          "confidence": 0.97
+        },
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.973
+        },
+        {
+          "name": "businessType",
+          "value": "9199 ACTIVITIES OF OTHER MEMBERSHIP ORGANIZATIONS, N.E.C",
+          "confidence": 0.958
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2721 BERKELEY RESIDENCES KATIPUNAN AVE COR J ESCALER ST\nLOYOLA HEIGHTS\nQUEZON CITY 1108",
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-54.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.067,
+      "processing_time": 6.652,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "of\nENCORE THE\nIT",
+          "confidence": 0.028
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2823 MOTAETTE Er MEME, VANDERMER CHATEMAT INWA",
+          "confidence": 0.02
+        },
+        {
+          "name": "businessType",
+          "value": "SE OF M.SENEST",
+          "confidence": 0
+        },
+        {
+          "name": "tin",
+          "value": "",
+          "confidence": 0.665
+        },
+        {
+          "name": "registeredDate",
+          "value": "",
+          "confidence": 0.871
         }
       ]
     }

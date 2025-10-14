@@ -41,7 +41,12 @@ class DocumentIntelligence:
         Returns:
             Dict containing extracted data
         """
+        import time
+        
         try:
+            # Start timing
+            start_time = time.time()
+            
             # Read file content
             file_bytes = uploaded_file.getvalue()
             file_name = uploaded_file.name
@@ -56,6 +61,9 @@ class DocumentIntelligence:
                     model_id, AnalyzeDocumentRequest(bytes_source=file_bytes)
                 )
                 result = poller.result()
+            
+            # Calculate processing time
+            processing_time = time.time() - start_time
             
             # Extract data from result
             extracted_data = {
@@ -104,13 +112,14 @@ class DocumentIntelligence:
                 # Use the first document's fields for scoring
                 first_doc = result.documents[0]
                 pages_count = len(result.pages) if result.pages else 0
-                # Pass document.confidence as overall_confidence
+                # Pass document.confidence as overall_confidence and processing time
                 save_extraction_to_json(
                     file_name, 
                     self.service_name, 
                     pages_count, 
                     first_doc.fields, 
-                    overall_confidence=first_doc.confidence
+                    overall_confidence=first_doc.confidence,
+                    processing_time=processing_time
                 )
             
             return extracted_data
