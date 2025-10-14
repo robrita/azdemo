@@ -1,4 +1,6 @@
-![Dashboard Hero Banner](img/dashboard.png)
+![Dashboard Hero Banner](img/doc-extract.png)
+
+![Dashboard Hero Banner](img/doc-analysis.png)
 
 ## 🛠️ Technology Stack
 

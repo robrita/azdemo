@@ -72,33 +72,33 @@
       "file_name": "4. BIR 2303 (3).pdf",
       "service_name": "ADI-Template",
       "pages_count": 2,
-      "document_confidence": 0.62,
-      "processing_time": 12.971,
+      "document_confidence": 0.774,
+      "processing_time": 12.616,
       "fields": [
         {
-          "name": "businessType",
-          "value": "year.\nOn or before January 31 of the",
-          "confidence": 0.484
-        },
-        {
-          "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD",
-          "confidence": 0.987
+          "name": "tradeName",
+          "value": "MARIA SINUKUAN PETROLEUM",
+          "confidence": 0.942
         },
         {
           "name": "tin",
           "value": "625-928-561-00000",
-          "confidence": 0.768
-        },
-        {
-          "name": "tradeName",
-          "value": "NAME OF TAXPAYER\nMARIA SINUKUAN PETROLEUM\nCORPORATION\nHead Office",
-          "confidence": 0.345
+          "confidence": 0.943
         },
         {
           "name": "registeredDate",
           "value": "May 8, 2023",
-          "confidence": 0.514
+          "confidence": 0.799
+        },
+        {
+          "name": "businessType",
+          "value": "BUSINESS INFORMATION DETAILS",
+          "confidence": 0.489
+        },
+        {
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.799
         }
       ]
     },
@@ -106,33 +106,33 @@
       "file_name": "4. BIR 2303 (3).pdf",
       "service_name": "ADI-Neural",
       "pages_count": 2,
-      "document_confidence": 0.854,
-      "processing_time": 15.151,
+      "document_confidence": 0.921,
+      "processing_time": 13.367,
       "fields": [
         {
           "name": "tin",
           "value": "625-928-561-00000",
-          "confidence": 0.784
+          "confidence": 0.895
         },
         {
           "name": "tradeName",
           "value": "MARIA SINUKUAN PETROLEUM\nCORPORATION",
-          "confidence": 0.585
+          "confidence": 0.776
         },
         {
           "name": "registeredDate",
           "value": "May 8, 2023",
-          "confidence": 0.576
+          "confidence": 0.751
         },
         {
           "name": "registeredAddress",
           "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.492
+          "confidence": 0.383
         },
         {
           "name": "businessType",
-          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES\nPrimary\nRETAIL SALE OF AUTOMOTIVE FUEL",
-          "confidence": 0.588
+          "value": "RETAIL SALE OF AUTOMOTIVE FUEL",
+          "confidence": 0.675
         }
       ]
     },
@@ -141,7 +141,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 9.84,
+      "processing_time": 11.869,
       "fields": [
         {
           "name": "language",
@@ -150,7 +150,7 @@
         },
         {
           "name": "summary",
-          "value": "This document is a Certificate of Registration from the Bureau of Internal Revenue (BIR) of the Philippines. It details the registration information for a taxpayer named Yzabella Beatriz Castro Durano, who operates a business named Strange Matcha Cafe. The business is registered as a single proprietorship and is classified under the category of café or coffee shops. The document includes the taxpayer's TIN, registered address, tax types, and filing details.",
+          "value": "This document is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details about a taxpayer's registration, including their TIN, registered address, tax types, and business information.",
           "confidence": 0.0
         },
         {
@@ -185,12 +185,17 @@
       "service_name": "ADI-Template",
       "pages_count": 1,
       "document_confidence": 0.632,
-      "processing_time": 13.278,
+      "processing_time": 11.128,
       "fields": [
         {
-          "name": "businessType",
-          "value": "year covering income for the\npreceding taxable year.\n1st Quarter-on or before MAY 15 2nd Quarter-on or before\nAUGUST 15 3rd Quarter-on or before November 15\nWithin twenty five (25) days after the end of each taxable quarter.\nCATEGORY\nPrimary",
-          "confidence": 0.2
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.911
+        },
+        {
+          "name": "registeredDate",
+          "value": "TIN ISSUANCE DATE\nJanuary 5, 2015",
+          "confidence": 0.507
         },
         {
           "name": "registeredAddress",
@@ -198,19 +203,14 @@
           "confidence": 0.962
         },
         {
-          "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.911
+          "name": "businessType",
+          "value": "year covering income for the\npreceding taxable year.\n1st Quarter-on or before MAY 15 2nd Quarter-on or before\nAUGUST 15 3rd Quarter-on or before November 15\nWithin twenty five (25) days after the end of each taxable quarter.\nCATEGORY\nPrimary",
+          "confidence": 0.2
         },
         {
           "name": "tradeName",
           "value": "NAME OF TAXPAYER\nDURANO YZABELLA BEATRIZ CASTRO",
           "confidence": 0.578
-        },
-        {
-          "name": "registeredDate",
-          "value": "TIN ISSUANCE DATE\nJanuary 5, 2015",
-          "confidence": 0.507
         }
       ]
     },
@@ -218,33 +218,33 @@
       "file_name": "BIR_COR (87).jpeg",
       "service_name": "ADI-Neural",
       "pages_count": 1,
-      "document_confidence": 0.679,
-      "processing_time": 15.161,
+      "document_confidence": 0.914,
+      "processing_time": 11.165,
       "fields": [
         {
           "name": "tin",
           "value": "461-846-496-00000",
-          "confidence": 0.698
+          "confidence": 0.822
         },
         {
           "name": "tradeName",
           "value": "DURANO YZABELLA BEATRIZ CASTRO",
-          "confidence": 0.437
+          "confidence": 0.534
+        },
+        {
+          "name": "registeredDate",
+          "value": "January 5, 2015",
+          "confidence": 0.672
         },
         {
           "name": "registeredAddress",
           "value": "III JUANA OSMENA ST",
-          "confidence": 0.557
+          "confidence": 0.651
         },
         {
           "name": "businessType",
-          "value": "56303-CAFE OR COFFEE SHOPS\nPrimary\nCOFFEE SHOP",
-          "confidence": 0.406
-        },
-        {
-          "name": "registeredDate",
-          "value": "",
-          "confidence": 0.155
+          "value": "COFFEE SHOP",
+          "confidence": 0.726
         }
       ]
     },
@@ -297,7 +297,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 12.642,
+      "processing_time": 15.456,
       "fields": [
         {
           "name": "language",
