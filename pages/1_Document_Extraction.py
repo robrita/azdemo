@@ -152,8 +152,8 @@ def main():
                                     value=st.session_state.get("svc_content", False))
         #     svc_gpt5 = st.checkbox("GPT-5 for Vision", 
         #                          value=st.session_state.get("svc_gpt5", False))
-        #     svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
-        #                           value=st.session_state.get("svc_gpt41", False))
+            svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
+                                  value=st.session_state.get("svc_gpt41", False))
 
         # Store checkbox states in session
         st.session_state["svc_template"] = svc_template
@@ -161,7 +161,7 @@ def main():
         st.session_state["svc_mistral"] = svc_mistral
         st.session_state["svc_content"] = svc_content
         # st.session_state["svc_gpt5"] = svc_gpt5
-        # st.session_state["svc_gpt41"] = svc_gpt41
+        st.session_state["svc_gpt41"] = svc_gpt41
 
         selected_services = []
         if svc_template:
@@ -174,8 +174,8 @@ def main():
             selected_services.append(("Content-Understanding", ContentUnderstanding))
         # if svc_gpt5:
         #     selected_services.append(("GPT-5-Vision", GPT5ForVision))
-        # if svc_gpt41:
-        #     selected_services.append(("GPT-4.1-Vision", GPT41ForVision))
+        if svc_gpt41:
+            selected_services.append(("GPT-4.1-Vision", GPT41ForVision))
 
         # Use keep_state to persist selected_services across page navigation
         keep_state(selected_services, "selected_services")

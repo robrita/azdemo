@@ -497,6 +497,153 @@
           "confidence": 0.0
         }
       ]
+    },
+    {
+      "file_name": "BIR_COR (87).jpeg",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.913,
+      "processing_time": 11.712,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for Yzabella Beatriz Castro Durano, a single proprietorship business named Strange Matcha Cafe, registered as a coffee shop at III Juana Osmena St, Camputhaw, Cebu City. The TIN was issued on January 5, 2015. The document lists the tax types, filing frequencies, and due dates for the business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DURANO, YZABELLA BEATRIZ CASTRO",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/05/2015",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "III JUANA OSMENA ST CAMPUTHAW 6000 CITY OF CEBU CEBU PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "STRANGE MATCHA CAFE",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "COFFEE SHOP",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "4. BIR 2303 (3).pdf",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 2,
+      "document_confidence": 0.907,
+      "processing_time": 17.904,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for Maria Sinukuan Petroleum Corporation, issued on May 8, 2023. It details the taxpayer's TIN, registered address, business type, trade name, and tax types to be filed.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "625-928-561-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/08/2023",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES; RETAIL SALE OF AUTOMOTIVE FUEL (PSIC 47300) Primary Line of Business: RETAIL SALE OF AUTOMOTIVE FUEL; Taxpayer Type: DOMESTIC CORPORATION; Category: Primary; Registration Fee: Annually; Tax Types: Withholding Tax-Compensation, Corporate Income Tax, Value Added Tax, Registration Fee; Filing Frequency: Monthly, Annually, Quarterly; Filing Start Dates: June 1, 2023, January 1, 2024, July 1, 2023; Filing Due Dates: 10th day of the month, January 31, 15th day of the 4th month, 60 days after quarter, 25th day after quarter, last day of January; Reminders: Annual registration fee, filing of required tax returns/conformity with tax types, with or without business operations.",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "2 COR_SHELA CLOTHING STORE (1).pdf",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 2,
+      "document_confidence": 0.928,
+      "processing_time": 14.561,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for Rowena Espina Bulat-ag, a single proprietor of SHELA CLOTHING STORE, registered under TIN 259-769-972-00004. The business is located at 2nd Flr. S043 Elizabeth Mall, Leon Kilat St., Pahina Central, Cebu City. The certificate lists the applicable tax types and filing frequencies, and the registration date is May 30, 2022.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "259-769-972-00004",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "BULAT-AG, ROWENA ESPINA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/30/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST., PAHINA CENTRAL (POB.), 6000 CEBU CITY (CAPITAL), CEBU PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "SHELA CLOTHING STORE",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "GEN. MDSE. (UKAY-UKAY) / 47749-RETAIL SALE OF SECOND-HAND GOODS, N.E.C. (PSIC)",
+          "confidence": 0.0
+        }
+      ]
     }
   ]
 }
