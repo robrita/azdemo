@@ -2,249 +2,79 @@
   "results": [
     {
       "file_name": "2 COR_SHELA CLOTHING STORE (1).pdf",
-      "service_name": "ADI-Template",
-      "pages_count": 2,
-      "document_confidence": 0.575,
-      "processing_time": 10.988,
-      "fields": [
-        {
-          "name": "businessType",
-          "value": "January\nOn or before the 10th day of the month following the month in which withholding was made\nNot later than the last day of the month following the close of the quarter during which withholding was made.\nOn or before March 1 of the year following the calendar year in which the income payments subject to expanded withholding\ntax were paid or accrued.",
-          "confidence": 0.2
-        },
-        {
-          "name": "registeredAddress",
-          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST. CEBU PHILIPPINES",
-          "confidence": 0.899
-        },
-        {
-          "name": "tin",
-          "value": "259-769-972-00004",
-          "confidence": 0.798
-        },
-        {
-          "name": "tradeName",
-          "value": "NAME OF TAXPAYER BULAT-AG, ROWENA ESPINA\nHead Office",
-          "confidence": 0.489
-        },
-        {
-          "name": "registeredDate",
-          "value": "TIN ISSUANCE DATE May 30, 2022",
-          "confidence": 0.491
-        }
-      ]
-    },
-    {
-      "file_name": "2 COR_SHELA CLOTHING STORE (1).pdf",
       "service_name": "ADI-Neural",
       "pages_count": 2,
-      "document_confidence": 0.904,
-      "processing_time": 11.738,
+      "document_confidence": 0.941,
+      "processing_time": 11.376,
       "fields": [
         {
           "name": "tin",
           "value": "259-769-972-00004",
-          "confidence": 0.913
+          "confidence": 0.903
         },
         {
-          "name": "tradeName",
+          "name": "taxpayerName",
           "value": "BULAT-AG, ROWENA ESPINA",
-          "confidence": 0.549
+          "confidence": 0.734
         },
         {
           "name": "registeredDate",
           "value": "May 30, 2022",
-          "confidence": 0.582
+          "confidence": 0.771
         },
         {
           "name": "registeredAddress",
           "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST.,PAHINA CENTRAL (POB.) 6000 CEBU CITY (CAPITAL)\nCEBU PHILIPPINES",
-          "confidence": 0.133
+          "confidence": 0.501
+        },
+        {
+          "name": "tradeName",
+          "value": "SHELA CLOTHING STORE",
+          "confidence": 0.673
         },
         {
           "name": "businessType",
-          "value": "47749-RETAIL SALE OF SECOND-HAND\nPrimary\nGOODS, N.E.C.\nGEN. MDSE. (UKAY-UKAY)",
-          "confidence": 0.391
+          "value": "GEN. MDSE. (UKAY-UKAY)",
+          "confidence": 0.376
         }
       ]
     },
     {
-      "file_name": "4. BIR 2303 (3).pdf",
+      "file_name": "2 COR_SHELA CLOTHING STORE (1).pdf",
       "service_name": "ADI-Template",
       "pages_count": 2,
-      "document_confidence": 0.774,
-      "processing_time": 12.616,
+      "document_confidence": 0.775,
+      "processing_time": 11.426,
       "fields": [
         {
-          "name": "tradeName",
-          "value": "MARIA SINUKUAN PETROLEUM",
-          "confidence": 0.942
+          "name": "businessType",
+          "value": "SHELA CLOTHING STORE",
+          "confidence": 0.652
         },
         {
-          "name": "tin",
-          "value": "625-928-561-00000",
-          "confidence": 0.943
+          "name": "taxpayerName",
+          "value": "BULAT-AG, ROWENA ESPINA",
+          "confidence": 0.97
         },
         {
           "name": "registeredDate",
-          "value": "May 8, 2023",
-          "confidence": 0.799
-        },
-        {
-          "name": "businessType",
-          "value": "BUSINESS INFORMATION DETAILS",
-          "confidence": 0.489
+          "value": "May 30, 2022",
+          "confidence": 0.798
         },
         {
           "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.799
-        }
-      ]
-    },
-    {
-      "file_name": "4. BIR 2303 (3).pdf",
-      "service_name": "ADI-Neural",
-      "pages_count": 2,
-      "document_confidence": 0.921,
-      "processing_time": 13.367,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "625-928-561-00000",
-          "confidence": 0.895
-        },
-        {
-          "name": "tradeName",
-          "value": "MARIA SINUKUAN PETROLEUM\nCORPORATION",
-          "confidence": 0.776
-        },
-        {
-          "name": "registeredDate",
-          "value": "May 8, 2023",
-          "confidence": 0.751
-        },
-        {
-          "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.383
-        },
-        {
-          "name": "businessType",
-          "value": "RETAIL SALE OF AUTOMOTIVE FUEL",
-          "confidence": 0.675
-        }
-      ]
-    },
-    {
-      "file_name": "BIR_COR (87).jpeg",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 11.869,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This document is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details about a taxpayer's registration, including their TIN, registered address, tax types, and business information.",
-          "confidence": 0.0
+          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST.,PAHINA CENTRAL (POB.) 6000 CEBU CITY (CAPITAL)\nCEBU PHILIPPINES",
+          "confidence": 0.769
         },
         {
           "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.0
+          "value": "259-769-972-00004",
+          "confidence": 0.972
         },
         {
           "name": "tradeName",
-          "value": "Strange Matcha Cafe",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "03/10/2025",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "III Juana Osmeña St, Camputhaw 6000 City of Cebu Cebu Philippines",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "Coffee Shop",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "BIR_COR (87).jpeg",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.632,
-      "processing_time": 11.128,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.911
-        },
-        {
-          "name": "registeredDate",
-          "value": "TIN ISSUANCE DATE\nJanuary 5, 2015",
-          "confidence": 0.507
-        },
-        {
-          "name": "registeredAddress",
-          "value": "III JUANA OSMENA ST",
-          "confidence": 0.962
-        },
-        {
-          "name": "businessType",
-          "value": "year covering income for the\npreceding taxable year.\n1st Quarter-on or before MAY 15 2nd Quarter-on or before\nAUGUST 15 3rd Quarter-on or before November 15\nWithin twenty five (25) days after the end of each taxable quarter.\nCATEGORY\nPrimary",
-          "confidence": 0.2
-        },
-        {
-          "name": "tradeName",
-          "value": "NAME OF TAXPAYER\nDURANO YZABELLA BEATRIZ CASTRO",
-          "confidence": 0.578
-        }
-      ]
-    },
-    {
-      "file_name": "BIR_COR (87).jpeg",
-      "service_name": "ADI-Neural",
-      "pages_count": 1,
-      "document_confidence": 0.914,
-      "processing_time": 11.165,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.822
-        },
-        {
-          "name": "tradeName",
-          "value": "DURANO YZABELLA BEATRIZ CASTRO",
-          "confidence": 0.534
-        },
-        {
-          "name": "registeredDate",
-          "value": "January 5, 2015",
-          "confidence": 0.672
-        },
-        {
-          "name": "registeredAddress",
-          "value": "III JUANA OSMENA ST",
-          "confidence": 0.651
-        },
-        {
-          "name": "businessType",
-          "value": "COFFEE SHOP",
-          "confidence": 0.726
+          "value": "47749-RETAIL SALE OF SECOND-HAND",
+          "confidence": 0.486
         }
       ]
     },
@@ -253,7 +83,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 10.771,
+      "processing_time": 13.547,
       "fields": [
         {
           "name": "language",
@@ -262,7 +92,7 @@
         },
         {
           "name": "summary",
-          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It contains details about the taxpayer, including their TIN, registered address, and business information.",
+          "value": "This is a Certificate of Registration from the Bureau of Internal Revenue (BIR) of the Philippines. It includes details such as the taxpayer's name, TIN, registered address, and business information.",
           "confidence": 0.0
         },
         {
@@ -271,8 +101,8 @@
           "confidence": 0.0
         },
         {
-          "name": "tradeName",
-          "value": "Shela Clothing Store",
+          "name": "taxpayerName",
+          "value": "BULAT-AG, ROWENA ESPINA",
           "confidence": 0.0
         },
         {
@@ -282,13 +112,96 @@
         },
         {
           "name": "registeredAddress",
-          "value": "2nd Flr. S043 Elizabeth Mall, Leon Kilat St., Pahina Central (Pob) 6000 Cebu City (Capital), Cebu Philippines",
+          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST., PAHINA CENTRAL (POB.) 6000 CEBU CITY (CAPITAL), CEBU PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "SHELA CLOTHING STORE",
           "confidence": 0.0
         },
         {
           "name": "businessType",
-          "value": "Retail Sale of Second-Hand Goods, N.E.C. (47749)",
+          "value": "GEN. MDSE. (UKAY-UKAY)",
           "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "4. BIR 2303 (3).pdf",
+      "service_name": "ADI-Template",
+      "pages_count": 2,
+      "document_confidence": 0.774,
+      "processing_time": 11.743,
+      "fields": [
+        {
+          "name": "registeredDate",
+          "value": "May 8, 2023",
+          "confidence": 0.798
+        },
+        {
+          "name": "tradeName",
+          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "confidence": 0.486
+        },
+        {
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.799
+        },
+        {
+          "name": "businessType",
+          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
+          "confidence": 0.466
+        },
+        {
+          "name": "tin",
+          "value": "625-928-561-00000",
+          "confidence": 0.944
+        },
+        {
+          "name": "taxpayerName",
+          "value": "MARIA SINUKUAN PETROLEUM",
+          "confidence": 0.943
+        }
+      ]
+    },
+    {
+      "file_name": "4. BIR 2303 (3).pdf",
+      "service_name": "ADI-Neural",
+      "pages_count": 2,
+      "document_confidence": 0.921,
+      "processing_time": 12.011,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "625-928-561-00000",
+          "confidence": 0.884
+        },
+        {
+          "name": "taxpayerName",
+          "value": "MARIA SINUKUAN PETROLEUM\nCORPORATION",
+          "confidence": 0.794
+        },
+        {
+          "name": "registeredDate",
+          "value": "May 8, 2023",
+          "confidence": 0.765
+        },
+        {
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.41
+        },
+        {
+          "name": "tradeName",
+          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "confidence": 0.688
+        },
+        {
+          "name": "businessType",
+          "value": "RETAIL SALE OF AUTOMOTIVE FUEL",
+          "confidence": 0.717
         }
       ]
     },
@@ -297,7 +210,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 15.456,
+      "processing_time": 12.81,
       "fields": [
         {
           "name": "language",
@@ -306,7 +219,7 @@
         },
         {
           "name": "summary",
-          "value": "This is a Certificate of Registration (COR) issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies that Maria Sinukuan Petroleum Corporation is registered with the BIR and provides details about the taxpayer's TIN, registered address, tax types, and business information.",
+          "value": "This is a Certificate of Registration (COR) issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies the registration of Maria Sinukuan Petroleum Corporation, a domestic corporation engaged in the retail sale of automotive fuel. The certificate includes details such as the TIN, registered address, tax types, and filing requirements.",
           "confidence": 0.0
         },
         {
@@ -315,7 +228,7 @@
           "confidence": 0.0
         },
         {
-          "name": "tradeName",
+          "name": "taxpayerName",
           "value": "Maria Sinukuan Petroleum Corporation",
           "confidence": 0.0
         },
@@ -330,8 +243,140 @@
           "confidence": 0.0
         },
         {
+          "name": "tradeName",
+          "value": "Maria Sinukuan Petroleum Corporation",
+          "confidence": 0.0
+        },
+        {
           "name": "businessType",
           "value": "Retail Sale of Automotive Fuel",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "BIR_COR (87).jpeg",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.841,
+      "processing_time": 10.459,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredAddress",
+          "value": "III JUANA OSMENA ST",
+          "confidence": 0.928
+        },
+        {
+          "name": "tradeName",
+          "value": "56303-CAFE OR COFFEE SHOPS",
+          "confidence": 0.492
+        },
+        {
+          "name": "businessType",
+          "value": "FILING",
+          "confidence": 0.636
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DURANO YZABELLA BEATRIZ CASTRO",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "January 5, 2015",
+          "confidence": 0.938
+        }
+      ]
+    },
+    {
+      "file_name": "BIR_COR (87).jpeg",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.914,
+      "processing_time": 11.709,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.824
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DURANO YZABELLA BEATRIZ CASTRO",
+          "confidence": 0.546
+        },
+        {
+          "name": "registeredDate",
+          "value": "January 5, 2015",
+          "confidence": 0.684
+        },
+        {
+          "name": "registeredAddress",
+          "value": "III JUANA OSMENA ST",
+          "confidence": 0.655
+        },
+        {
+          "name": "tradeName",
+          "value": "STRANGE MATCHA CAFE",
+          "confidence": 0.49
+        },
+        {
+          "name": "businessType",
+          "value": "COFFEE SHOP",
+          "confidence": 0.498
+        }
+      ]
+    },
+    {
+      "file_name": "BIR_COR (87).jpeg",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.775,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This document is a Certificate of Registration from the Bureau of Internal Revenue (BIR) of the Philippines. It details the registration information of a taxpayer named Yzabella Beatriz Castro Durano, who operates a coffee shop under the trade name 'Strange Matcha Cafe'. The document includes the taxpayer's TIN, registered address, tax types, filing details, and business information.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DURANO, YZABELLA BEATRIZ CASTRO",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/05/2015",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "III JUANA OSMEÑA ST. CAMPUTHAW 6000 CITY OF CEBU CEBU PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "STRANGE MATCHA CAFE",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "COFFEE SHOP",
           "confidence": 0.0
         }
       ]

@@ -98,10 +98,10 @@ class MistralDocumentAI:
                                     "type": "string",
                                     "description": "The taxpayer identification number (TIN) in format XXX-XXX-XXX-XXXXX or XXX-XXX-XXX-XXXX or XXX-XXX-XXX-XXX.",
                                 },
-                                "tradeName": {
-                                    "title": "Trade Name",
+                                "taxpayerName": {
+                                    "title": "Taxpayer Name",
                                     "type": "string",
-                                    "description": "The registered trade name or business name of the taxpayer.",
+                                    "description": "The full name of the taxpayer or business entity as registered with the tax authority.",
                                 },
                                 "registeredDate": {
                                     "title": "Registered Date",
@@ -113,10 +113,15 @@ class MistralDocumentAI:
                                     "type": "string",
                                     "description": "The complete registered address of the taxpayer or business.",
                                 },
+                                "tradeName": {
+                                    "title": "Trade Name",
+                                    "type": "string",
+                                    "description": "The registered trade name or business name of the taxpayer.",
+                                },
                                 "businessType": {
                                     "title": "Business Type",
                                     "type": "string",
-                                    "description": "The line of business, business activities, or industry classification codes.",
+                                    "description": "The line of business or business activities",
                                 },
                             },
                         },

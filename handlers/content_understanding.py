@@ -1,16 +1,88 @@
 import streamlit as st
 from typing import Any, Dict
-import io
+import os
+import sys
+import time
+import requests
+sys.path.append('..')
+from utils import save_extraction_to_json
 
 class ContentUnderstanding:
     """
-    Handler for Content Understanding service
-    Focuses on semantic understanding and content analysis
+    Handler for Azure Content Understanding service
+    Uses Azure Content Understanding SDK for document extraction
     """
     
     def __init__(self, service_name=None):
-        self.service_name = service_name or "Content Understanding"
+        self.service_name = service_name or "Content-Understanding"
+        # Initialize Azure Content Understanding client settings
+        self.endpoint = os.environ.get("AZURE_CONTENT_UNDERSTANDING_ENDPOINT")
+        self.subscription_key = os.environ.get("AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY")
+        self.analyzer_id = os.environ.get("AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID")
+        self.api_version = os.environ.get("AZURE_CONTENT_UNDERSTANDING_API_VERSION", "2025-05-01-preview")
         
+    def _get_headers(self) -> Dict[str, str]:
+        """Build request headers with authentication"""
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.subscription_key,
+            "x-ms-useragent": "content-understanding-document-extraction"
+        }
+        return headers
+    
+    def _begin_analyze(self, file_bytes: bytes) -> requests.Response:
+        """
+        Start document analysis operation
+        
+        Args:
+            file_bytes: Document content as bytes
+            
+        Returns:
+            Response object with operation location
+        """
+        url = f"{self.endpoint}/contentunderstanding/analyzers/{self.analyzer_id}:analyze?api-version={self.api_version}&stringEncoding=utf16"
+        
+        headers = self._get_headers()
+        headers["Content-Type"] = "application/octet-stream"
+        
+        response = requests.post(url=url, headers=headers, data=file_bytes)
+        response.raise_for_status()
+        
+        return response
+    
+    def _poll_result(self, operation_location: str, timeout_seconds: int = 120, polling_interval_seconds: int = 2) -> Dict[str, Any]:
+        """
+        Poll for analysis result until completion or timeout
+        
+        Args:
+            operation_location: URL to poll for results
+            timeout_seconds: Maximum wait time
+            polling_interval_seconds: Delay between polls
+            
+        Returns:
+            Analysis result as dict
+        """
+        headers = self._get_headers()
+        headers["Content-Type"] = "application/json"
+        
+        start_time = time.time()
+        while True:
+            elapsed_time = time.time() - start_time
+            
+            if elapsed_time > timeout_seconds:
+                raise TimeoutError(f"Operation timed out after {timeout_seconds} seconds")
+            
+            response = requests.get(operation_location, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            
+            status = result.get("status", "").lower()
+            if status == "succeeded":
+                return result
+            elif status == "failed":
+                raise RuntimeError(f"Analysis failed: {result}")
+            
+            time.sleep(polling_interval_seconds)
+    
     def extract(self, uploaded_file) -> Dict[str, Any]:
         """
         Extract data using Content Understanding service
@@ -22,96 +94,133 @@ class ContentUnderstanding:
             Dict containing extracted data
         """
         try:
+            # Start timing
+            start_time = time.time()
+            
             # Read file content
             file_bytes = uploaded_file.getvalue()
             file_name = uploaded_file.name
-            file_type = uploaded_file.type
             
-            # Simulate content understanding extraction
-            # In real implementation, this would call a content understanding API
-            # for semantic analysis and content comprehension
+            # Check if credentials are available
+            if not self.endpoint or not self.subscription_key or not self.analyzer_id:
+                return {
+                    "service": self.service_name,
+                    "error": "Content Understanding credentials not configured. Please set AZURE_CONTENT_UNDERSTANDING_ENDPOINT, AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY, and AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID in .env file",
+                    "file_info": {
+                        "name": file_name,
+                        "type": uploaded_file.type
+                    }
+                }
             
+            # Begin analyze document operation
+            with st.spinner(f"Analyzing document with Content Understanding..."):
+                response = self._begin_analyze(file_bytes)
+                operation_location = response.headers.get("operation-location", "")
+                
+                if not operation_location:
+                    raise ValueError("Operation location not found in response headers")
+                
+                # Poll for result
+                result = self._poll_result(operation_location, timeout_seconds=120, polling_interval_seconds=2)
+            
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Extract data from result
             extracted_data = {
                 "service": self.service_name,
                 "file_info": {
                     "name": file_name,
-                    "type": file_type,
+                    "type": uploaded_file.type,
                     "size": len(file_bytes)
                 },
-                "content_analysis": {
-                    "document_category": "Business Document",
-                    "primary_language": "English",
-                    "complexity_score": 0.7,
-                    "readability_score": 8.2,
-                    "sentiment": "Neutral"
+                "operation_info": {
+                    "id": result.get("id", "N/A"),
+                    "status": result.get("status", "N/A")
                 },
-                "semantic_understanding": {
-                    "main_topics": [
-                        "Financial Performance",
-                        "Business Metrics",
-                        "Quarterly Results",
-                        "Revenue Analysis"
-                    ],
-                    "key_concepts": [
-                        {
-                            "concept": "Revenue Growth",
-                            "importance": 0.95,
-                            "context": "The document discusses significant revenue growth trends"
-                        },
-                        {
-                            "concept": "Market Expansion",
-                            "importance": 0.78,
-                            "context": "References to new market opportunities and expansion strategies"
-                        },
-                        {
-                            "concept": "Cost Management",
-                            "importance": 0.85,
-                            "context": "Analysis of operational costs and efficiency improvements"
-                        }
-                    ],
-                    "summary": "This document presents a comprehensive financial analysis showing positive business performance with significant revenue growth and effective cost management strategies. The content indicates successful market expansion initiatives and strong operational efficiency.",
-                    "action_items": [
-                        "Review quarterly performance metrics",
-                        "Analyze cost reduction opportunities", 
-                        "Develop market expansion strategy",
-                        "Monitor revenue growth trends"
-                    ]
-                },
-                "content_structure": {
-                    "sections": [
-                        {
-                            "title": "Executive Summary",
-                            "page": 1,
-                            "importance": "High"
-                        },
-                        {
-                            "title": "Financial Metrics",
-                            "page": 1,
-                            "importance": "Critical"
-                        },
-                        {
-                            "title": "Analysis & Recommendations",
-                            "page": 1,
-                            "importance": "High"
-                        }
-                    ],
-                    "word_count": 1250,
-                    "estimated_reading_time": "5 minutes"
-                },
-                "processing_info": {
-                    "analysis_depth": "comprehensive",
-                    "processing_time_ms": 3200,
-                    "confidence_score": 0.89,
-                    "model_version": "content-understanding-v2.3"
-                }
+                "documents": []
             }
+            
+            # Process analysis result
+            result_data = result.get("result", {})
+            contents = result_data.get("contents", [])
+            
+            if contents:
+                for idx, content in enumerate(contents):
+                    fields = content.get("fields", {})
+                    
+                    doc_data = {
+                        "document_number": idx + 1,
+                        "doc_type": content.get("kind", "document"),
+                        "confidence": 0.0,  # Content Understanding doesn't provide overall confidence
+                        "page_range": {
+                            "start": content.get("startPageNumber", 1),
+                            "end": content.get("endPageNumber", 1)
+                        },
+                        "fields": {}
+                    }
+                    
+                    # Extract fields with their values
+                    for field_name, field_data in fields.items():
+                        if isinstance(field_data, dict):
+                            doc_data["fields"][field_name] = {
+                                "type": field_data.get("type", "unknown"),
+                                "content": field_data.get("valueString", str(field_data)),
+                                "confidence": 0.0  # Content Understanding doesn't provide field-level confidence
+                            }
+                    
+                    extracted_data["documents"].append(doc_data)
+            
+            # Add processing summary
+            extracted_data["processing_info"] = {
+                "analyzer_id": result_data.get("analyzerId", "N/A"),
+                "api_version": result_data.get("apiVersion", "N/A"),
+                "created_at": result_data.get("createdAt", "N/A"),
+                "warnings": result_data.get("warnings", [])
+            }
+            
+            # Save results to JSON file using common utility function
+            if contents and len(contents) > 0:
+                # Use the first content's fields for scoring
+                first_content = contents[0]
+                fields = first_content.get("fields", {})
+                pages_count = len(first_content.get("pages", []))
+                
+                # Convert fields to expected format for save_extraction_to_json
+                # Content Understanding returns dict with field objects, need to convert
+                fields_dict = {}
+                for field_name, field_data in fields.items():
+                    if isinstance(field_data, dict):
+                        # Create field object with required attributes
+                        class FieldObject:
+                            def __init__(self, value, field_type):
+                                self.content = value
+                                self.value = value
+                                self.confidence = 0.0  # Content Understanding doesn't provide confidence
+                                self.type = field_type
+                        
+                        value = field_data.get("valueString", str(field_data))
+                        field_type = field_data.get("type", "string")
+                        fields_dict[field_name] = FieldObject(value, field_type)
+                
+                # Save extraction results
+                save_extraction_to_json(
+                    file_name, 
+                    self.service_name, 
+                    pages_count, 
+                    fields_dict, 
+                    overall_confidence=0.0,  # Content Understanding doesn't provide overall confidence
+                    processing_time=processing_time
+                )
             
             return extracted_data
             
         except Exception as e:
+            import traceback
             return {
                 "service": self.service_name,
-                "error": f"Content understanding failed: {str(e)}",
+                "error": f"Content Understanding extraction failed: {str(e)}",
+                "error_details": traceback.format_exc(),
                 "file_info": {
                     "name": uploaded_file.name if uploaded_file else "Unknown",
                     "type": uploaded_file.type if uploaded_file else "Unknown"

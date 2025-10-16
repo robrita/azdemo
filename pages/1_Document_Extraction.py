@@ -147,9 +147,9 @@ def main():
                                    value=st.session_state.get("svc_neural", False))
             svc_mistral = st.checkbox("Mistral Document AI", 
                                     value=st.session_state.get("svc_mistral", False))
-        # with col2:
-        #     svc_content = st.checkbox("Content Understanding", 
-        #                             value=st.session_state.get("svc_content", False))
+        with col2:
+            svc_content = st.checkbox("Content Understanding", 
+                                    value=st.session_state.get("svc_content", False))
         #     svc_gpt5 = st.checkbox("GPT-5 for Vision", 
         #                          value=st.session_state.get("svc_gpt5", False))
         #     svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
@@ -159,7 +159,7 @@ def main():
         st.session_state["svc_template"] = svc_template
         st.session_state["svc_neural"] = svc_neural
         st.session_state["svc_mistral"] = svc_mistral
-        # st.session_state["svc_content"] = svc_content
+        st.session_state["svc_content"] = svc_content
         # st.session_state["svc_gpt5"] = svc_gpt5
         # st.session_state["svc_gpt41"] = svc_gpt41
 
@@ -170,8 +170,8 @@ def main():
             selected_services.append(("ADI-Neural", DocumentIntelligence))
         if svc_mistral:
             selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
-        # if svc_content:
-        #     selected_services.append(("Content-Understanding", ContentUnderstanding))
+        if svc_content:
+            selected_services.append(("Content-Understanding", ContentUnderstanding))
         # if svc_gpt5:
         #     selected_services.append(("GPT-5-Vision", GPT5ForVision))
         # if svc_gpt41:
@@ -319,10 +319,11 @@ def main():
                                 "service_name": service_name,
                                 "processing_time": f"{processing_time:.3f}s" if processing_time else "0.000s",
                                 "tin": "",
+                                "taxpayerName": "",
                                 "registeredDate": "",
                                 "registeredAddress": "",
-                                "businessType": "",
-                                "tradeName": ""
+                                "tradeName": "",
+                                "businessType": ""
                             }
                             
                             # Extract fields based on view type
