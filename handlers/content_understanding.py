@@ -186,32 +186,34 @@ class ContentUnderstanding:
                 fields = first_content.get("fields", {})
                 pages_count = len(first_content.get("pages", []))
                 
-                # Convert fields to expected format for save_extraction_to_json
-                # Content Understanding returns dict with field objects, need to convert
+                # Build fields dictionary for save_extraction_to_json
+                # Following the same pattern as mistral_document_ai.py
                 fields_dict = {}
+                overall_confidence = 0.0
+                
+                # Map the extracted properties to fields with confidence scores
                 for field_name, field_data in fields.items():
                     if isinstance(field_data, dict):
-                        # Create field object with required attributes
-                        class FieldObject:
-                            def __init__(self, value, field_type):
-                                self.content = value
-                                self.value = value
-                                self.confidence = 0.0  # Content Understanding doesn't provide confidence
-                                self.type = field_type
-                        
                         value = field_data.get("valueString", str(field_data))
                         field_type = field_data.get("type", "string")
-                        fields_dict[field_name] = FieldObject(value, field_type)
+                        
+                        if value:  # Only include fields with values
+                            fields_dict[field_name] = {
+                                "content": value,
+                                "confidence": 0.0,  # Content Understanding doesn't provide confidence
+                                "type": field_type,
+                            }
                 
                 # Save extraction results
-                save_extraction_to_json(
-                    file_name, 
-                    self.service_name, 
-                    pages_count, 
-                    fields_dict, 
-                    overall_confidence=0.0,  # Content Understanding doesn't provide overall confidence
-                    processing_time=processing_time
-                )
+                if fields_dict:
+                    save_extraction_to_json(
+                        file_name, 
+                        self.service_name, 
+                        pages_count, 
+                        fields_dict, 
+                        overall_confidence=overall_confidence,
+                        processing_time=processing_time
+                    )
             
             return extracted_data
             

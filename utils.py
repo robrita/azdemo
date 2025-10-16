@@ -88,7 +88,7 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
                 "value": value,
                 "confidence": round(confidence, 3)
             })
-        
+
         # Use provided overall_confidence or default to 0.0
         document_confidence = round(overall_confidence, 3) if overall_confidence is not None else 0.0
         
@@ -125,3 +125,4 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
             
     except Exception as e:
         st.warning(f"Failed to save results to JSON: {str(e)}")
+        print(f"Error details: {e}")
