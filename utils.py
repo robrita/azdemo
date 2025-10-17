@@ -24,8 +24,8 @@ def render_sidebar():
 
     with st.sidebar:
         with st.container(border=True):
-            st.page_link("app.py", label="Home", icon="🏠")
-            st.page_link("pages/1_Document_Extraction.py", label="Document Extraction", icon="📑")
+            st.page_link("app.py", label="Document Extraction", icon="📑")
+            st.page_link("pages/1_Pricing.py", label="Pricing", icon="💰")
 
         st.image(
             "https://miro.medium.com/1*zBt3FbYHV2-CWcBnkYoQRA.png",

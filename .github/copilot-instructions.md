@@ -1,156 +1,155 @@
-# Document Processing Dashboard - AI Agent Instructions
+# AI Agent Instructions for Document Extraction Dashboard
 
 ## Project Overview
-A Streamlit-based document extraction platform that processes BIR (Bureau of Internal Revenue) tax documents using multiple Azure AI services in parallel. Built with modern Python tooling (uv + pyproject.toml) and follows a pluggable service handler architecture.
+Streamlit-based multi-service document extraction platform comparing Azure AI services (Document Intelligence, Content Understanding, OpenAI Vision, Mistral Document AI) for BIR tax document processing. Uses async parallel processing to benchmark multiple services simultaneously.
 
-## Architecture & Key Patterns
+## Architecture Patterns
 
 ### Service Handler Pattern
-All extraction services follow a standardized interface in `handlers/`:
-- Each handler class implements `__init__(service_name)` and `extract(uploaded_file) -> Dict[str, Any]`
-- Handlers read environment variables for Azure endpoints/keys (see `.env.example`)
-- All handlers must call `save_extraction_to_json()` from `utils.py` to persist results to `outputs/extract_results.json`
-- Error handling returns dict with `"error"` key - never raise exceptions to user
-- Processing time tracking is mandatory (use `time.time()` start/end pattern)
+All extraction services implement a unified interface in `handlers/`:
+- `__init__(service_name)` - Initialize with service name for tracking
+- `extract(uploaded_file) -> Dict[str, Any]` - Returns standardized extraction dict
+- Must call `save_extraction_to_json()` from `utils.py` with fields dict
+- Error responses must include `"error"` key in returned dict
 
-**Active handlers:**
-- `DocumentIntelligence`: Azure Document Intelligence with template/neural models (selected by service name)
-- `MistralDocumentAI`: Mistral Document AI using base64-encoded documents with JSON schema extraction
-- `ContentUnderstanding`, `GPT5ForVision`, `GPT41ForVision`: Placeholder/mock implementations
+**Key implementations:**
+- `document_intelligence.py` - Uses `model_template` vs `model_neural` based on service_name
+- `gpt_vision.py` - Converts PDFs to images via PyMuPDF, uses Pydantic `BIR2303Document` for structured output
+- `mistral_document_ai.py` - Distinguishes `image_url` vs `document_url` based on MIME type
+- `content_understanding.py` - Implements polling pattern for async Azure operations
 
-### Async Parallel Processing
-Document extraction runs services concurrently (see `pages/1_Document_Extraction.py`):
+### Async Parallel Processing (app.py)
 ```python
+# Process multiple services in parallel for each file
 async def process_file_with_services_async(file, selected_services):
-    # Creates asyncio tasks for all services
-    # Uses ThreadPoolExecutor for blocking I/O operations
-    # Returns consolidated results with processing summary
+    tasks = [extract_with_service_async(name, cls, file) for name, cls in selected_services]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 ```
-This pattern enables 3-5x speedup when processing multiple services on same file.
+**Important:** Use `asyncio.run()` in Streamlit context, run blocking operations via `loop.run_in_executor()`.
 
-### Standardized Data Format
-All extraction results follow this schema (`outputs/extract_results.json`):
-```json
-{
-  "results": [{
-    "file_name": "document.pdf",
-    "service_name": "ADI-Template",
-    "pages_count": 3,
-    "document_confidence": 0.952,
-    "processing_time": 2.134,
-    "fields": [
-      {"name": "tin", "value": "123-456-789-000", "confidence": 0.98},
-      {"name": "tradeName", "value": "Acme Corp", "confidence": 0.95}
-    ]
-  }]
-}
+### Results Persistence
+`save_extraction_to_json()` in `utils.py`:
+- Updates/appends to `outputs/extract_results.json`
+- Filters by `file_name` + `service_name` for uniqueness
+- Standardized fields: `name`, `value`, `confidence` (rounded to 3 decimals)
+- Always include `processing_time` and `overall_confidence` parameters
+
+## Environment Configuration
+
+### Required `.env` Variables (see `.env.example`)
+```bash
+# Document Intelligence - Two models (template vs neural)
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=
+AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL=
+AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL=
+
+# OpenAI - Two deployments (gpt-4.1 vs gpt-5)
+AZURE_OPENAI_ENDPOINT=
+AZURE_OPENAI_DEPLOYMENT_GPT4-1=
+AZURE_OPENAI_DEPLOYMENT_GPT5=
+
+# Mistral - REST API with base64 encoding
+AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT=
+
+# Content Understanding - Polling-based async
+AZURE_CONTENT_UNDERSTANDING_ENDPOINT=
+AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID=
 ```
 
-### BIR Document Fields
-Target extraction fields (Philippines tax documents):
-- `tin`: TIN format XXX-XXX-XXX-XXXXX or variations
-- `tradeName`: Registered business name
-- `registeredDate`: Format MM/DD/YYYY
-- `registeredAddress`: Complete address string
-- `businessType`: Industry classification/line of business
-- `language`, `summary`: Context fields (Mistral only)
+**Service selection logic:** Service name determines model variant (e.g., "ADI-Template" uses template model, "GPT-5-Vision" uses gpt-5 deployment).
+
+## Dependency Management
+
+Uses `uv` (modern Python package manager) + `pyproject.toml`:
+```bash
+uv sync                    # Install all dependencies
+uv add package_name        # Add new dependency
+uv run streamlit run app.py  # Run application
+```
+
+**Critical dependencies:**
+- `streamlit==1.50.0` - Session state via `st.session_state`
+- `azure-ai-documentintelligence>=1.0.2` - Uses `begin_analyze_document()` poller pattern
+- `pymupdf>=1.26.5` - PDF to image conversion (fitz module)
+- `pydantic>=2.10.6` - Structured extraction schemas for GPT Vision
+
+## Streamlit Conventions
+
+### Session State Management (`utils.py`)
+```python
+keep_state(value, "state_key")  # Persist across page navigations
+```
+Used for: `valid_files`, `selected_services`, checkbox states (`svc_template`, `svc_neural`, etc.)
+
+### Page Structure
+- `render_sidebar()` - MUST be called first on every page for navigation
+- Tab pattern: "📤 Upload & Extract" | "🔍 Analyze Output"
+- File validation: `is_valid_file_type()` checks `['pdf', 'png', 'jpg', 'jpeg']`
+- Process button only shows when `valid_files AND selected_services`
+
+### Custom CSS Loading
+```python
+with open('style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+```
+Loads Google Fonts (Gasoek One, Oswald) via `style.css`.
+
+## Data Flow
+
+1. **Upload** → Validate file types → Store in `st.session_state["valid_files"]`
+2. **Service Selection** → Checkboxes create `[(service_name, ServiceClass)]` tuples
+3. **Extraction** → `process_file_with_services_async()` runs services in parallel
+4. **Save** → Each handler calls `save_extraction_to_json()` with standardized fields
+5. **Analysis** → Tab 2 loads JSON, creates DataFrame sorted by `file_name` + `service_name`
+
+**Output visualization:**
+- Switchable "Values" vs "Confidence" view
+- Processing time line chart using Plotly (`go.Scatter` with color palette)
+- Table fields: `tin`, `taxpayerName`, `registeredDate`, `registeredAddress`, `tradeName`, `businessType`
+
+## Common Tasks
+
+### Adding a New Extraction Service
+1. Create `handlers/new_service.py` implementing `extract(uploaded_file)`
+2. Add to `handlers/__init__.py` imports and `__all__`
+3. Add checkbox in `app.py` tab1 (follow pattern: `svc_newname = st.checkbox(...)`)
+4. Append to `selected_services` list with tuple `("Display-Name", NewServiceClass)`
+5. Extract fields, call `save_extraction_to_json()` with confidence scores
+
+### Debugging Extraction Issues
+- Check `outputs/extract_results.json` for saved results structure
+- Errors must include `"error"` key to be caught by `failed_results` filter
+- Use `st.spinner()` context for long operations (user feedback)
+- `processing_time` calculated via `time.time() - start_time`
+
+### Modifying BIR Document Schema
+Update both:
+1. Pydantic model `BIR2303Document` in `gpt_vision.py` (for OpenAI structured output)
+2. JSON schema `properties` in `mistral_document_ai.py` (for Mistral Document AI)
+3. Table columns in `app.py` tab2 DataFrame (`row = {...}` initialization)
 
 ## Development Workflow
 
-### Running the App
 ```bash
-# Development (auto-reloads on file changes)
+# Setup
+git clone https://github.com/robrita/azdemo.git
+cd azdemo
+uv sync
+
+# Configure environment
+cp .env.example .env
+# Edit .env with Azure credentials
+
+# Run locally
 uv run streamlit run app.py
 
-# Production
-uv run streamlit run app.py --server.port 8080 --server.address 0.0.0.0
+# Outputs stored in
+outputs/extract_results.json  # All extraction results
+inputs/test/new/             # Test documents
 ```
 
-### Adding Dependencies
-```bash
-uv add package_name              # Production dependency
-uv add --dev package_name        # Dev-only dependency
-uv sync                          # Install all dependencies
-```
-
-### Environment Setup
-1. Copy `.env.example` to `.env`
-2. Required variables for DocumentIntelligence and MistralDocumentAI
-3. Environment vars loaded via `load_dotenv()` in `app.py`
-
-### Adding New Services
-1. Create handler in `handlers/` following the pattern:
-   - Inherit naming from existing handlers (no base class)
-   - Implement `__init__(service_name)` and `extract(uploaded_file)`
-   - Use `utils.save_extraction_to_json()` to persist results
-   - Return structured dict matching existing services
-2. Import in `pages/1_Document_Extraction.py`
-3. Add checkbox in `tab1` section (col1 or col2)
-4. Add to `selected_services` list with tuple `("Display-Name", HandlerClass)`
-
-### File Organization
-```
-handlers/          # Service implementations (each is self-contained)
-pages/             # Streamlit pages (1_Document_Extraction.py is main app)
-inputs/            # Test documents (new/, old/, test/ subdirectories)
-outputs/           # JSON results (extract_results.json, extract_results_old.json)
-app.py             # Homepage with navigation
-utils.py           # Shared utilities (sidebar, state, JSON saving)
-style.css          # Theme-aware CSS (dark mode default)
-```
-
-## Critical Implementation Details
-
-### Streamlit State Management
-Use `utils.keep_state(state_object, state_name)` to persist data across page navigation:
-- `valid_files`: Uploaded files list
-- `selected_services`: Chosen extraction services
-- Checkbox states: `svc_template`, `svc_neural`, `svc_mistral`, etc.
-
-### CSS Theming
-`style.css` uses CSS variables for theme support:
-- Dark mode default with auto-detection via `prefers-color-scheme`
-- Theme variables: `--text-primary`, `--background-card`, `--border-color`
-- Special handling for sidebar gradient and button styles (not theme-aware)
-
-### Mistral JSON Schema Pattern
-When working with Mistral Document AI, use inline JSON schema in the request payload:
-```python
-"document_annotation_format": {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "bir_document_extraction",
-        "schema": {"properties": {...}}
-    }
-}
-```
-Base64 encode documents with proper MIME type detection for PDF/images.
-
-### Error Handling Philosophy
-- Never display stack traces directly to users
-- Return structured error dicts with `"error"` key
-- Use `st.warning()` for recoverable issues, `st.error()` for failures
-- Processing continues for other files/services even if one fails
-
-## Common Modifications
-
-### Changing Target Fields
-1. Update JSON schema in `MistralDocumentAI.extract()` (lines 83-120)
-2. Modify table columns in analysis tab (lines 265-275 in `1_Document_Extraction.py`)
-3. Ensure `save_extraction_to_json()` handles new field structure
-
-### Adjusting Timeouts
-- Mistral API: 120s for PDF, 60s for images (line 140 in `mistral_document_ai.py`)
-- Document Intelligence: Uses Azure SDK poller (no explicit timeout)
-
-### Output Formats
-Results stored in `outputs/extract_results.json` by default. To use different file:
-```python
-save_extraction_to_json(..., results_file_path="outputs/custom_results.json")
-```
-
-## Testing Strategy
-- Place test files in `inputs/test/new/` or `inputs/test/old/`
-- Use "Analyze Output" tab to compare service performance
-- Processing time trends graph shows performance across services
-- Confidence scores available in both Values and Confidence views
+**Troubleshooting:**
+- Missing credentials → Handlers return `{"error": "...not configured..."}` dict
+- PDF conversion fails → Check PyMuPDF/fitz installation (`uv sync`)
+- Async errors → Ensure `run_in_executor()` for blocking SDK calls
+- Session state loss → Verify `keep_state()` calls for stateful data

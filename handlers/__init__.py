@@ -7,8 +7,7 @@ This package contains handler classes for various document extraction services:
 - DocumentIntelligenceNeural: Azure Document Intelligence with neural models
 - ContentUnderstanding: Semantic content analysis and understanding
 - MistralDocumentAI: Mistral's AI-powered document extraction
-- GPT5ForVision: OpenAI GPT-5 with vision capabilities
-- GPT41ForVision: OpenAI GPT-4.1 with vision capabilities
+- GPTForVision: OpenAI GPT with vision capabilities
 
 Each handler implements an extract() method that takes an uploaded file and returns
 structured extraction results.
@@ -17,14 +16,12 @@ structured extraction results.
 from .document_intelligence import DocumentIntelligence
 from .content_understanding import ContentUnderstanding
 from .mistral_document_ai import MistralDocumentAI
-from .gpt5_vision import GPT5ForVision
-from .gpt41_vision import GPT41ForVision
+from .gpt_vision import GPTForVision
 
 __all__ = [
     'DocumentIntelligence',
     'DocumentIntelligenceNeural', 
     'ContentUnderstanding',
     'MistralDocumentAI',
-    'GPT5ForVision',
-    'GPT41ForVision'
+    'GPTForVision'
 ]

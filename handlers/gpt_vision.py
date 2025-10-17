@@ -24,18 +24,19 @@ class BIR2303Document(BaseModel):
     tradeName: Optional[str] = Field(None, description="The registered trade name or business name of the taxpayer.")
     businessType: Optional[str] = Field(None, description="The line of business or business activities")
 
-class GPT41ForVision:
+class GPTForVision:
     """
-    Handler for GPT-4.1 for Vision service
-    Uses OpenAI's GPT-4.1 model with vision capabilities for document analysis
+    Handler for GPT for Vision service
+    Uses OpenAI's GPT model with vision capabilities for document analysis
     """
     
     def __init__(self, service_name=None):
-        self.service_name = service_name or "GPT-4.1 for Vision"
+        self.service_name = service_name
         
         # Initialize Azure OpenAI configuration
         self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+        self.deployment_gpt41 = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4-1")
+        self.deployment_gpt5 = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT5")
         self.subscription_key = os.getenv("AZURE_OPENAI_API_KEY")
         self.api_version = "2025-01-01-preview"
         
@@ -101,37 +102,9 @@ class GPT41ForVision:
         base64_data = base64.b64encode(byte_io.getvalue()).decode('utf-8')
         return base64_data
     
-    def _calculate_confidence_from_logprobs(self, logprobs_data) -> float:
-        """
-        Calculate average confidence from logprobs
-        
-        Args:
-            logprobs_data: Logprobs data from completion
-            
-        Returns:
-            Average confidence score between 0 and 1
-        """
-        try:
-            if not logprobs_data or not logprobs_data.content:
-                return 0.0
-            
-            total_logprob = 0.0
-            token_count = 0
-            
-            for token_info in logprobs_data.content:
-                if hasattr(token_info, 'logprob') and token_info.logprob is not None:
-                    # Convert log probability to probability
-                    prob = min(1.0, max(0.0, pow(2.718281828, token_info.logprob)))
-                    total_logprob += prob
-                    token_count += 1
-            
-            return round(total_logprob / token_count, 3) if token_count > 0 else 0.0
-        except Exception:
-            return 0.0
-    
     def extract(self, uploaded_file) -> Dict[str, Any]:
         """
-        Extract data using GPT-4.1 for Vision service with Azure OpenAI SDK
+        Extract data using GPT for Vision service with Azure OpenAI SDK
         
         Args:
             uploaded_file: Streamlit uploaded file object
@@ -184,9 +157,9 @@ class GPT41ForVision:
                 pages_count = 1
             
             # Step 3: Prepare the prompts and content
-            system_prompt = "You are an AI assistant that extracts data from BIR (Bureau of Internal Revenue) tax documents."
+            system_prompt = "You are an AI assistant that extracts data from the given documents."
             
-            user_text_prompt = """Extract the data from this BIR tax document.
+            user_text_prompt = """Extract the data from this document.
 - If a value is not present, provide null.
 - Dates should be in the format MM/DD/YYYY.
 - Extract TIN in format XXX-XXX-XXX-XXXXX or variations."""
@@ -217,16 +190,21 @@ class GPT41ForVision:
                     "content": user_content
                 }
             ]
-            
+
+            # deployment is deployment_gpt5 if service_name contains the word 'GPT-5' else deployment_gpt41
+            self.deployment = self.deployment_gpt5 if self.service_name and 'gpt-5' in self.service_name.lower() else self.deployment_gpt41
+
+            # temperature is 1 for GPT-5 and 0 for GPT-4-1
+            temperature = 1 if self.deployment == self.deployment_gpt5 else 0
+
             # Step 4: Send request to Azure OpenAI SDK
-            with st.spinner(f"Analyzing document with Azure OpenAI GPT-4.1 Vision..."):
+            with st.spinner(f"Analyzing document with Azure OpenAI {self.deployment} Vision..."):
                 completion = self.client.beta.chat.completions.parse(
                     model=self.deployment,
                     messages=chat_prompt,
                     response_format=BIR2303Document,
-                    temperature=0,
-                    top_p=1,
-                    logprobs=True  # Enabled to determine the confidence of the response
+                    temperature=temperature,
+                    top_p=1
                 )
             
             # Calculate processing time
@@ -235,10 +213,8 @@ class GPT41ForVision:
             # Step 5: Extract and save data
             parsed_data = completion.choices[0].message.parsed
             
-            # Calculate overall confidence from logprobs
-            overall_confidence = self._calculate_confidence_from_logprobs(
-                completion.choices[0].logprobs
-            )
+            # Set overall confidence to 0.0 (GPT doesn't provide per-field confidence)
+            overall_confidence = 0.0
             
             # Build extracted data structure
             extracted_data = {
@@ -314,7 +290,7 @@ class GPT41ForVision:
             import traceback
             return {
                 "service": self.service_name,
-                "error": f"GPT-4.1 Vision extraction failed: {str(e)}",
+                "error": f"GPT Vision extraction failed: {str(e)}",
                 "error_details": traceback.format_exc(),
                 "file_info": {
                     "name": uploaded_file.name if uploaded_file else "Unknown",
