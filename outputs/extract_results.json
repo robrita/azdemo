@@ -132,7 +132,7 @@
       "service_name": "ADI-Template",
       "pages_count": 2,
       "document_confidence": 0.774,
-      "processing_time": 13.315,
+      "processing_time": 11.05,
       "fields": [
         {
           "name": "taxpayerName",
@@ -210,7 +210,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 15.79,
+      "processing_time": 12.233,
       "fields": [
         {
           "name": "language",
@@ -789,6 +789,182 @@
           "name": "businessType",
           "value": "RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
           "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-45.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.642,
+      "processing_time": 9.257,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
+          "confidence": 0.943
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TAN, CRYSTAL ROSE GENOVA",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "247-098-232-00000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredAddress",
+          "value": "21 A TRDC BLDG DR A SANTOS AVE SAN ANTONIO, CITY OF PARAÑAQUE NCR, FOURTH DISTRICT PHILIPPINES 1715",
+          "confidence": 0.958
+        },
+        {
+          "name": "registeredDate",
+          "value": "August 22, 2006",
+          "confidence": 0.957
+        },
+        {
+          "name": "tradeName",
+          "value": "JOB EMPLOYMENT SERVICES",
+          "confidence": 0.892
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-02.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 9.323,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) in the Philippines. It contains details such as the TIN, taxpayer's name, registered address, line of business, and other relevant information.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "161-225-173-0000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TORIAGA, MA. LUZA ERVAS",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "12/29/1999",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "124 Poblacion Central 4712 Barcelona, Sorsogon, Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Package Tour Reservation",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Package Tour Reservation",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 6.728,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Republic of the Philippines' Bureau of Internal Revenue. It certifies that the taxpayer, Napole G. Deolito Delantar, is registered under the National Internal Revenue Code.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Napole G. Deolito Delantar",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 Unit H NIOG Road, NIOG II 4102 Bacoor Cavite Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Not specified",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Not specified",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.851,
+      "processing_time": 8.708,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.984
+        },
+        {
+          "name": "taxpayerName",
+          "value": "NAPOLES, DEOLITO DELANTAR",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "",
+          "confidence": 0.984
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
+          "confidence": 0.943
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "July 18, 2022",
+          "confidence": 0.943
         }
       ]
     }

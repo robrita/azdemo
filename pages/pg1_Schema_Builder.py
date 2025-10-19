@@ -140,23 +140,23 @@ def main():
     # Initialize session state
     initialize_session_state()
 
-    # Create two main sections
-    col1, col2 = st.columns([1, 2], gap="large")
+    # Create configuration section
+    with st.container(border=True):
+        col1, col2 = st.columns([1, 2], gap="large")
 
-    with col1:
-        st.markdown("### ⚙️ Field Configuration")
+        with col1:
+            st.markdown("### 1️⃣ Field Configuration")
 
-        # Add field button
-        if st.button("➕ Add Field", width="stretch"):
-            add_field()
-            st.rerun()
+            # Add field button
+            if st.button("➕ Add Field", width="stretch"):
+                add_field()
+                st.rerun()
 
-        st.markdown(f"**Total Fields:** {len(st.session_state.fields)}")
+            st.markdown(f"**Total Fields:** {len(st.session_state.fields)}")
 
-    with col2:
-        st.markdown("### 📋 Schema Configuration")
+        with col2:
+            st.markdown("### 2️⃣ Schema Configuration")
 
-        with st.container(border=True):
             st.markdown("**Schema Details**")
 
             # Schema name input
@@ -178,8 +178,7 @@ def main():
             st.session_state.schema_description = schema_description
 
     # Fields Management Section
-    st.markdown("---")
-    st.markdown("### 🔧 Field Manager")
+    st.markdown("### 3️⃣ Field Manager")
 
     if st.session_state.fields:
         for idx, field in enumerate(st.session_state.fields):
@@ -236,8 +235,7 @@ def main():
         st.info("No fields added yet. Click 'Add Field' to get started.")
 
     # Generate Schema Section
-    st.markdown("---")
-    st.markdown("### 📥 Generate & Export")
+    st.markdown("### 4️⃣ Generate & Export")
 
     col_generate, _ = st.columns([1, 2])
     with col_generate:

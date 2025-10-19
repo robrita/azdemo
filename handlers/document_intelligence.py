@@ -116,6 +116,7 @@ class DocumentIntelligence:
                 "pages_processed": len(result.pages) if result.pages else 0,
                 "documents_found": len(result.documents) if result.documents else 0,
                 "tables_found": len(result.tables) if result.tables else 0,
+                "processing_time_seconds": round(processing_time, 3),
             }
 
             # Save results to JSON file using common utility function

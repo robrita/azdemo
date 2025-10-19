@@ -42,7 +42,8 @@ def render_sidebar():
         with st.container(border=True):
             st.page_link("app.py", label="Document Extraction", icon="📑")
             st.page_link("pages/pg1_Schema_Builder.py", label="Schema Builder", icon="🏗️")
-            st.page_link("pages/pg2_Pricing.py", label="Pricing", icon="💰")
+            st.page_link("pages/pg2_Demo_Form_PreFill.py", label="Demo Form Pre-Fill", icon="📝")
+            st.page_link("pages/pg3_Pricing.py", label="Pricing", icon="💰")
 
         st.image(
             "https://miro.medium.com/1*zBt3FbYHV2-CWcBnkYoQRA.png",

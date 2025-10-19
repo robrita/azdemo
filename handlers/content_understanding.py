@@ -200,6 +200,7 @@ class ContentUnderstanding:
                 "api_version": result_data.get("apiVersion", "N/A"),
                 "created_at": result_data.get("createdAt", "N/A"),
                 "warnings": result_data.get("warnings", []),
+                "processing_time_seconds": round(processing_time, 3),
             }
 
             # Save results to JSON file using common utility function
