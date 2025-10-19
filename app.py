@@ -2,6 +2,7 @@
 import asyncio
 import concurrent.futures
 import json
+import logging
 import os
 import sys
 import time
@@ -23,6 +24,37 @@ from utils import keep_state, render_sidebar
 
 # Load environment variables
 load_dotenv()
+
+# Valid service names - only these are allowed
+VALID_SERVICE_NAMES = {
+    "ADI-Template",
+    "ADI-Neural",
+    "Content-Understanding",
+    "Mistral-Doc-AI",
+    "GPT-4.1-Vision",
+    "GPT-5-Vision",
+}
+
+
+# Configure logging with custom formatter to show milliseconds
+class MillisecondFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):  # noqa: N802
+        # Get the base time format
+        ct = self.converter(record.created)
+        s = time.strftime(datefmt, ct) if datefmt else time.strftime("%Y-%m-%d %H:%M:%S", ct)
+        # Append milliseconds
+        s = f"{s}.{int(record.msecs):03d}"
+        return s
+
+
+# Create formatter instance
+formatter = MillisecondFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+# Configure logging
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+logger = logging.getLogger(__name__)
 
 
 def is_valid_file_type(file):
@@ -65,10 +97,17 @@ async def extract_with_service_async(svc_name, svc_class, file):
     try:
         # Run the potentially blocking extraction in a thread pool
         loop = asyncio.get_event_loop()
+        # Suppress ScriptRunContext warnings in thread pool
         with concurrent.futures.ThreadPoolExecutor() as executor:
             # Create service instance and run extraction in executor
             svc = svc_class(svc_name)
-            result = await loop.run_in_executor(executor, svc.extract, file)
+            # Suppress logging temporarily while running in executor
+            old_level = logging.getLogger("streamlit").level
+            logging.getLogger("streamlit").setLevel(logging.ERROR)
+            try:
+                result = await loop.run_in_executor(executor, svc.extract, file)
+            finally:
+                logging.getLogger("streamlit").setLevel(old_level)
 
         processing_time = time.time() - start_time
 
@@ -76,6 +115,7 @@ async def extract_with_service_async(svc_name, svc_class, file):
 
     except Exception as e:
         processing_time = time.time() - start_time
+        logger.error(f"Extraction failed: {svc_name} | {file.name} | {str(e)}", exc_info=True)
         error_result = {
             "service": svc_name,
             "error": f"Async extraction failed: {str(e)}",
@@ -113,6 +153,7 @@ async def process_file_with_services_async(file, selected_services):
     for result in results:
         if isinstance(result, Exception):
             # Handle any unexpected exceptions
+            logger.error(f"Parallel extraction exception: {str(result)}")
             file_results["Unknown Service"] = {"error": f"Unexpected error: {str(result)}"}
         else:
             svc_name, extraction, proc_time = result
@@ -135,6 +176,7 @@ async def process_file_with_services_async(file, selected_services):
 
 
 def main():
+    logger.info("Document Extraction application started")
     render_sidebar()
     st.header("📑 Document Extraction")
 
@@ -198,6 +240,18 @@ def main():
         # Use keep_state to persist selected_services across page navigation
         keep_state(selected_services, "selected_services")
 
+        # Validate service names
+        invalid_services = [
+            svc_name for svc_name, _ in selected_services if svc_name not in VALID_SERVICE_NAMES
+        ]
+
+        if invalid_services:
+            st.error(
+                f"❌ Invalid service name(s) detected: {', '.join(invalid_services)}. "
+                f"Only the following services are allowed: {', '.join(sorted(VALID_SERVICE_NAMES))}"
+            )
+            logger.error(f"Invalid service names attempted: {invalid_services}")
+
         # Check for stored valid files from session state
         stored_valid_files = st.session_state.get("valid_files", [])
 
@@ -251,9 +305,16 @@ def main():
                 "💡 Please select at least one extraction service above to enable document processing."
             )
 
-        # Only show Extract button if files are valid AND services are selected
-        if valid_files and selected_services and st.button("🚀 Extract Documents"):
-            # No need to check for selected_services again since button only shows when services are selected
+        # Only show Extract button if files are valid AND services are selected AND no invalid services
+        if (
+            valid_files
+            and selected_services
+            and not invalid_services
+            and st.button("🚀 Extract Documents")
+        ):
+            logger.info(
+                f"Extraction started: {len(valid_files)} files x {len(selected_services)} services"
+            )
             with st.spinner(
                 f"Extracting {len(valid_files)} document(s) with {len(selected_services)} services in parallel..."
             ):
@@ -299,6 +360,9 @@ def main():
                                         st.json(extraction)
 
                     except Exception as e:
+                        logger.error(
+                            f"File extraction error: {file.name} | {str(e)}", exc_info=True
+                        )
                         st.error(f"❌ Failed to process {file.name}: {str(e)}")
                         continue
 
@@ -325,6 +389,8 @@ def main():
 
                     # Extract results array from JSON
                     results = data.get("results", [])
+
+                    logger.info(f"Loaded {len(results)} result(s) from {selected_json}")
 
                     if not results:
                         st.warning("No results found in the selected JSON file.")
@@ -384,7 +450,7 @@ def main():
 
                         # Display the table
                         st.markdown(f"### {view_type} Table")
-                        st.dataframe(df, width="stretch", hide_index=True, use_container_width=True)
+                        st.dataframe(df, width="stretch", hide_index=True)
 
                         # Add Processing Time Trends Graph
                         st.markdown("---")
@@ -447,9 +513,10 @@ def main():
                             height=400,
                         )
 
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, config={"responsive": True})
 
                 except Exception as e:
+                    logger.error(f"JSON load error: {json_path} | {str(e)}", exc_info=True)
                     st.error(f"Error loading JSON file: {str(e)}")
 
 

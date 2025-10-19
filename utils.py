@@ -1,4 +1,9 @@
+import logging
+
 import streamlit as st
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def render_sidebar():
@@ -73,6 +78,11 @@ def save_extraction_to_json(
     import json
     from pathlib import Path
 
+    logger.info(
+        f"Saving extraction results: file={file_name}, service={service_name}, "
+        f"fields_count={len(fields) if fields else 0}"
+    )
+
     try:
         results_file = Path(results_file_path)
 
@@ -83,8 +93,10 @@ def save_extraction_to_json(
         if results_file.exists():
             with open(results_file, encoding="utf-8") as f:
                 data = json.load(f)
+            logger.debug(f"Loaded existing results file: {results_file_path}")
         else:
             data = {"results": []}
+            logger.debug(f"Creating new results file: {results_file_path}")
 
         # Build fields array with name, value, and confidence
         fields_array = []
@@ -134,6 +146,9 @@ def save_extraction_to_json(
         with open(results_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
+        logger.info(f"Saved results: {file_name} | {service_name} | {results_file_path}")
+
     except Exception as e:
+        logger.error(f"JSON save error: {file_name} | {service_name} | {str(e)}", exc_info=True)
         st.warning(f"Failed to save results to JSON: {str(e)}")
         print(f"Error details: {e}")

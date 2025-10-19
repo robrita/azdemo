@@ -1,13 +1,16 @@
+import logging
 import os
 import sys
 import time
 from typing import Any
 
 import requests
-import streamlit as st
 
 sys.path.append("..")
 from utils import save_extraction_to_json
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class ContentUnderstanding:
@@ -25,6 +28,9 @@ class ContentUnderstanding:
         self.api_version = os.environ.get(
             "AZURE_CONTENT_UNDERSTANDING_API_VERSION", "2025-05-01-preview"
         )
+
+        if not self.endpoint or not self.subscription_key or not self.analyzer_id:
+            logger.error(f"Missing Content Understanding credentials for {self.service_name}")
 
     def _get_headers(self) -> dict[str, str]:
         """Build request headers with authentication"""
@@ -76,6 +82,11 @@ class ContentUnderstanding:
             elapsed_time = time.time() - start_time
 
             if elapsed_time > timeout_seconds:
+                logger.error(
+                    f"Content Understanding polling timeout | {timeout_seconds}s | "
+                    f"{operation_location[:40]}",
+                    exc_info=False,
+                )
                 raise TimeoutError(f"Operation timed out after {timeout_seconds} seconds")
 
             response = requests.get(operation_location, headers=headers)
@@ -83,9 +94,14 @@ class ContentUnderstanding:
             result = response.json()
 
             status = result.get("status", "").lower()
+
             if status == "succeeded":
                 return result
             if status == "failed":
+                logger.error(
+                    f"Content Understanding polling failed | {operation_location[:40]} | {result}",
+                    exc_info=False,
+                )
                 raise RuntimeError(f"Analysis failed: {result}")
 
             time.sleep(polling_interval_seconds)
@@ -100,6 +116,7 @@ class ContentUnderstanding:
         Returns:
             Dict containing extracted data
         """
+        logger.info(f"Content Understanding extraction started: {uploaded_file.name}")
         try:
             # Start timing
             start_time = time.time()
@@ -117,17 +134,17 @@ class ContentUnderstanding:
                 }
 
             # Begin analyze document operation
-            with st.spinner("Analyzing document with Content Understanding..."):
-                response = self._begin_analyze(file_bytes)
-                operation_location = response.headers.get("operation-location", "")
+            logger.debug("Analyzing document with Content Understanding...")
+            response = self._begin_analyze(file_bytes)
+            operation_location = response.headers.get("operation-location", "")
 
-                if not operation_location:
-                    raise ValueError("Operation location not found in response headers")
+            if not operation_location:
+                raise ValueError("Operation location not found in response headers")
 
-                # Poll for result
-                result = self._poll_result(
-                    operation_location, timeout_seconds=120, polling_interval_seconds=2
-                )
+            # Poll for result
+            result = self._poll_result(
+                operation_location, timeout_seconds=120, polling_interval_seconds=2
+            )
 
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -226,6 +243,11 @@ class ContentUnderstanding:
         except Exception as e:
             import traceback
 
+            logger.error(
+                f"Content Understanding error: {uploaded_file.name if 'uploaded_file' in locals() else 'unknown'} "
+                f"| {self.service_name} | {str(e)}",
+                exc_info=True,
+            )
             return {
                 "service": self.service_name,
                 "error": f"Content Understanding extraction failed: {str(e)}",

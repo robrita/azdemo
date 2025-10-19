@@ -48,7 +48,7 @@ def main():
         st.link_button(
             "View Pricing →",
             "https://azure.microsoft.com/en-us/pricing/details/ai-document-intelligence/",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Azure Content Understanding Card
@@ -69,7 +69,7 @@ def main():
         st.link_button(
             "View Pricing →",
             "https://azure.microsoft.com/en-us/pricing/details/content-understanding/",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Azure OpenAI Card
@@ -90,7 +90,7 @@ def main():
         st.link_button(
             "View Pricing →",
             "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Additional Information Section

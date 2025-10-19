@@ -1,16 +1,19 @@
 import base64
 import json
+import logging
 import os
 import sys
 import time
 from typing import Any
 
 import requests
-import streamlit as st
 
 sys.path.append("..")
 from schemas.mistral_schema import get_mistral_json_schema
 from utils import save_extraction_to_json
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class MistralDocumentAI:
@@ -25,6 +28,9 @@ class MistralDocumentAI:
         # Initialize Mistral Document AI configuration
         self.endpoint = os.environ.get("AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT")
         self.key = os.environ.get("AZURE_MISTRAL_DOCUMENT_AI_KEY")
+
+        if not self.endpoint or not self.key:
+            logger.error(f"Missing Mistral Document AI credentials for {self.service_name}")
 
         # Request headers
         self.headers = {
@@ -42,6 +48,7 @@ class MistralDocumentAI:
         Returns:
             Dict containing extracted data
         """
+        logger.info(f"Mistral Document AI extraction started: {uploaded_file.name}")
         try:
             # Start timing
             start_time = time.time()
@@ -90,14 +97,15 @@ class MistralDocumentAI:
             # Make API request to Mistral Document AI
             # Increased timeout for PDF processing which may take longer
             timeout_duration = 120 if "pdf" in file_type.lower() else 60
-            with st.spinner("Analyzing document with Mistral Document AI..."):
-                response = requests.post(
-                    url=self.endpoint,
-                    json=document_annotation_payload,
-                    headers=self.headers,
-                    timeout=timeout_duration,
-                )
-                response.raise_for_status()
+
+            logger.debug("Analyzing document with Mistral Document AI...")
+            response = requests.post(
+                url=self.endpoint,
+                json=document_annotation_payload,
+                headers=self.headers,
+                timeout=timeout_duration,
+            )
+            response.raise_for_status()
 
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -177,6 +185,11 @@ class MistralDocumentAI:
         except requests.exceptions.RequestException as e:
             import traceback
 
+            logger.error(
+                f"Mistral error: {uploaded_file.name if 'uploaded_file' in locals() else 'unknown'} "
+                f"| {self.service_name} | {str(e)}",
+                exc_info=True,
+            )
             return {
                 "service": self.service_name,
                 "error": f"Mistral Document AI API request failed: {str(e)}",
@@ -189,6 +202,11 @@ class MistralDocumentAI:
         except Exception as e:
             import traceback
 
+            logger.error(
+                f"Mistral error: {uploaded_file.name if 'uploaded_file' in locals() else 'unknown'} "
+                f"| {self.service_name} | {str(e)}",
+                exc_info=True,
+            )
             return {
                 "service": self.service_name,
                 "error": f"Mistral Document AI extraction failed: {str(e)}",

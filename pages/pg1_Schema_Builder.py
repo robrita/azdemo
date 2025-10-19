@@ -147,7 +147,7 @@ def main():
         st.markdown("### ⚙️ Field Configuration")
 
         # Add field button
-        if st.button("➕ Add Field", use_container_width=True):
+        if st.button("➕ Add Field", width="stretch"):
             add_field()
             st.rerun()
 
@@ -195,7 +195,7 @@ def main():
                         "🗑️",
                         key=f"delete_field_{field['id']}",
                         help="Delete this field",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         remove_field(field["id"])
                         st.rerun()
@@ -241,7 +241,7 @@ def main():
 
     col_generate, _ = st.columns([1, 2])
     with col_generate:
-        if st.button("🚀 Generate Schema", use_container_width=True):
+        if st.button("🚀 Generate Schema", width="stretch"):
             generated_schema = generate_json_schema()
 
             # Store in session state for download

@@ -1,18 +1,21 @@
 import base64
 import io
+import logging
 import os
 import sys
 import time
 from typing import Any
 
 import fitz  # PyMuPDF
-import streamlit as st
 from openai import AzureOpenAI
 from PIL import Image
 
 sys.path.append("..")
 from schemas.gpt_schema import DocSchema
 from utils import save_extraction_to_json
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class GPTForVision:
@@ -32,15 +35,19 @@ class GPTForVision:
         self.api_version = "2025-01-01-preview"
 
         # Initialize Azure OpenAI client with key-based authentication
-        try:
-            self.client = AzureOpenAI(
-                azure_endpoint=self.endpoint,
-                api_key=self.subscription_key,
-                api_version=self.api_version,
-            )
-        except Exception as e:
-            self.client = None
-            st.warning(f"Failed to initialize Azure OpenAI client: {str(e)}")
+        self.client = None
+        if self.endpoint and self.subscription_key:
+            try:
+                self.client = AzureOpenAI(
+                    azure_endpoint=self.endpoint,
+                    api_key=self.subscription_key,
+                    api_version=self.api_version,
+                )
+            except Exception as e:
+                logger.error(f"GPT Vision init error: {service_name} | {str(e)}", exc_info=True)
+                logger.warning(f"Failed to initialize Azure OpenAI client: {str(e)}")
+        else:
+            logger.error(f"Missing GPT Vision credentials for {service_name}")
 
     def _convert_pdf_to_images(self, file_bytes: bytes) -> list:
         """
@@ -75,7 +82,7 @@ class GPTForVision:
             return images
 
         except Exception as e:
-            st.error(f"Failed to convert PDF to images: {str(e)}")
+            logger.error(f"PDF conversion error | {str(e)}", exc_info=True)
             return []
 
     def _image_to_base64(self, image) -> str:
@@ -103,6 +110,7 @@ class GPTForVision:
         Returns:
             Dict containing extracted data
         """
+        logger.info(f"GPT for Vision extraction started: {uploaded_file.name}")
         try:
             # Start timing
             start_time = time.time()
@@ -120,28 +128,28 @@ class GPTForVision:
             file_name = uploaded_file.name
             file_type = uploaded_file.type
 
-            # Step 2: Check file type and convert PDF to images if necessary
+            # Check file type and convert PDF to images if necessary
             images_to_process = []
             pages_count = 1
 
             if "pdf" in file_type.lower():
-                with st.spinner("Converting PDF to images..."):
-                    images = self._convert_pdf_to_images(file_bytes)
-                    if not images:
-                        return {
-                            "service": self.service_name,
-                            "error": "Failed to convert PDF to images",
-                            "file_info": {"name": file_name, "type": file_type},
-                        }
-                    images_to_process = images
-                    pages_count = len(images)
+                logger.debug("Converting PDF to images...")
+                images = self._convert_pdf_to_images(file_bytes)
+                if not images:
+                    return {
+                        "service": self.service_name,
+                        "error": "Failed to convert PDF to images",
+                        "file_info": {"name": file_name, "type": file_type},
+                    }
+                images_to_process = images
+                pages_count = len(images)
             else:
                 # For image files, use directly
                 image = Image.open(io.BytesIO(file_bytes))
                 images_to_process = [image]
                 pages_count = 1
 
-            # Step 3: Prepare the prompts and content
+            # Prepare the prompts and content
             system_prompt = "You are an AI assistant that extracts data from the given documents."
 
             user_text_prompt = """Extract the data from this document.
@@ -149,7 +157,7 @@ class GPTForVision:
 - Dates should be in the format MM/DD/YYYY.
 - Extract TIN in format XXX-XXX-XXX-XXXXX or variations."""
 
-            # Process first page/image (can be extended to handle multiple pages)
+            # Process first page/image
             base64_image = self._image_to_base64(images_to_process[0])
 
             user_content = [
@@ -178,20 +186,20 @@ class GPTForVision:
             # temperature is 1 for GPT-5 and 0 for GPT-4-1
             temperature = 1 if self.deployment == self.deployment_gpt5 else 0
 
-            # Step 4: Send request to Azure OpenAI SDK
-            with st.spinner(f"Analyzing document with Azure OpenAI {self.deployment} Vision..."):
-                completion = self.client.beta.chat.completions.parse(
-                    model=self.deployment,
-                    messages=chat_prompt,
-                    response_format=DocSchema,
-                    temperature=temperature,
-                    top_p=1,
-                )
+            # Send request to Azure OpenAI SDK
+            logger.debug(f"Analyzing document with Azure OpenAI {self.deployment} Vision...")
+            completion = self.client.beta.chat.completions.parse(
+                model=self.deployment,
+                messages=chat_prompt,
+                response_format=DocSchema,
+                temperature=temperature,
+                top_p=1,
+            )
 
             # Calculate processing time
             processing_time = time.time() - start_time
 
-            # Step 5: Extract and save data
+            # Extract and save data
             parsed_data = completion.choices[0].message.parsed
 
             # Set overall confidence to 0.0 (GPT doesn't provide per-field confidence)
@@ -263,6 +271,11 @@ class GPTForVision:
         except Exception as e:
             import traceback
 
+            logger.error(
+                f"GPT Vision error: {uploaded_file.name if 'uploaded_file' in locals() else 'unknown'} "
+                f"| {self.service_name} | {str(e)}",
+                exc_info=True,
+            )
             return {
                 "service": self.service_name,
                 "error": f"GPT Vision extraction failed: {str(e)}",

@@ -1,8 +1,7 @@
+import logging
 import os
 import sys
 from typing import Any
-
-import streamlit as st
 
 sys.path.append("..")
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -10,6 +9,9 @@ from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 
 from utils import save_extraction_to_json
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class DocumentIntelligence:
@@ -32,6 +34,8 @@ class DocumentIntelligence:
             self.client = DocumentIntelligenceClient(
                 endpoint=self.endpoint, credential=AzureKeyCredential(self.key)
             )
+        else:
+            logger.error(f"Missing Document Intelligence credentials for {service_name}")
 
     def extract(self, uploaded_file) -> dict[str, Any]:
         """
@@ -45,6 +49,7 @@ class DocumentIntelligence:
         """
         import time
 
+        logger.info(f"Document Intelligence extraction started: {uploaded_file.name}")
         try:
             # Start timing
             start_time = time.time()
@@ -62,11 +67,11 @@ class DocumentIntelligence:
             )
 
             # Begin analyze document operation
-            with st.spinner(f"Analyzing document with model '{model_id}'..."):
-                poller = self.client.begin_analyze_document(
-                    model_id, AnalyzeDocumentRequest(bytes_source=file_bytes)
-                )
-                result = poller.result()
+            logger.debug(f"Analyzing document with model '{model_id}'...")
+            poller = self.client.begin_analyze_document(
+                model_id, AnalyzeDocumentRequest(bytes_source=file_bytes)
+            )
+            result = poller.result()
 
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -133,6 +138,11 @@ class DocumentIntelligence:
         except Exception as e:
             import traceback
 
+            logger.error(
+                f"Extraction error: {file_name if 'file_name' in locals() else 'unknown'} | "
+                f"{self.service_name} | {str(e)}",
+                exc_info=True,
+            )
             return {
                 "service": self.service_name,
                 "error": f"Template extraction failed: {str(e)}",

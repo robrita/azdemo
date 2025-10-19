@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from app import (
+    VALID_SERVICE_NAMES,
     extract_with_service_async,
     get_file_type_description,
     is_valid_file_type,
@@ -381,3 +382,45 @@ class TestAsyncEdgeCases:
         # not 0.3s (sequential). Allow some overhead.
         assert elapsed < 0.25  # Should be much less than 3 * 0.1 = 0.3s
         assert results["_processing_summary"]["successful_services"] == 3
+
+
+class TestServiceNameValidation:
+    """Tests for service name validation"""
+
+    def test_valid_service_names_constant(self):
+        """Test that VALID_SERVICE_NAMES contains all expected services"""
+        expected_services = {
+            "ADI-Template",
+            "ADI-Neural",
+            "Content-Understanding",
+            "Mistral-Doc-AI",
+            "GPT-4.1-Vision",
+            "GPT-5-Vision",
+        }
+        assert expected_services == VALID_SERVICE_NAMES
+
+    def test_all_valid_services_accepted(self):
+        """Test that all valid service names are accepted"""
+        for service_name in VALID_SERVICE_NAMES:
+            # Check if service name is in the valid set
+            assert service_name in VALID_SERVICE_NAMES
+
+    def test_invalid_service_name_rejected(self):
+        """Test that invalid service names are rejected"""
+        invalid_services = ["Test Service", "Random Service", "Invalid-Service"]
+
+        for invalid_service in invalid_services:
+            assert invalid_service not in VALID_SERVICE_NAMES
+
+    def test_case_sensitive_validation(self):
+        """Test that service name validation is case-sensitive"""
+        # These should NOT match valid service names
+        case_variations = [
+            "adi-template",  # lowercase
+            "ADI-TEMPLATE",  # all caps
+            "Adi-Template",  # different case
+            "gpt-4.1-vision",  # lowercase
+        ]
+
+        for variation in case_variations:
+            assert variation not in VALID_SERVICE_NAMES

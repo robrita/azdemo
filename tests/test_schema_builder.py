@@ -9,7 +9,6 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -88,9 +87,7 @@ class TestJsonSchemaGeneration:
         """Test generating a basic JSON schema."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        fields = [
-            {"id": 0, "name": "field_one", "type": "string", "description": "First field"}
-        ]
+        fields = [{"id": 0, "name": "field_one", "type": "string", "description": "First field"}]
         schema_name = "test_schema"
         schema_description = "Test schema description"
 
@@ -133,9 +130,7 @@ class TestJsonSchemaGeneration:
         """Test schema converts field names to snake_case."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        fields = [
-            {"id": 0, "name": "taxPayerName", "type": "string", "description": "Name"}
-        ]
+        fields = [{"id": 0, "name": "taxPayerName", "type": "string", "description": "Name"}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
         properties = schema["schema"]["properties"]
@@ -305,9 +300,7 @@ class TestPydanticModelGeneration:
             "name": "test",
             "description": "Test",
             "schema": {
-                "properties": {
-                    "field": {"type": "string", "description": "Field with 'quotes'"}
-                }
+                "properties": {"field": {"type": "string", "description": "Field with 'quotes'"}}
             },
         }
 
@@ -391,11 +384,7 @@ class TestPythonFunctionGeneration:
         schema = {
             "name": "test",
             "description": "Test",
-            "schema": {
-                "properties": {
-                    "field": {"type": "string", "description": "A field"}
-                }
-            },
+            "schema": {"properties": {"field": {"type": "string", "description": "A field"}}},
         }
 
         code = generate_python_function_code(schema)
@@ -546,11 +535,7 @@ class TestSchemaExportFormats:
         schema = {
             "name": "test",
             "description": "Test",
-            "schema": {
-                "properties": {
-                    "field": {"type": "string", "description": "Field"}
-                }
-            },
+            "schema": {"properties": {"field": {"type": "string", "description": "Field"}}},
         }
 
         code = generate_pydantic_model_code(schema)
@@ -598,9 +583,7 @@ class TestSchemaValidation:
         """Test schema handles fields with whitespace names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        fields = [
-            {"id": 0, "name": "  field_name  ", "type": "string", "description": "Test"}
-        ]
+        fields = [{"id": 0, "name": "  field_name  ", "type": "string", "description": "Test"}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
 
@@ -613,9 +596,7 @@ class TestSchemaValidation:
         """Test schema handles special characters in field names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        fields = [
-            {"id": 0, "name": "field@name#1", "type": "string", "description": "Test"}
-        ]
+        fields = [{"id": 0, "name": "field@name#1", "type": "string", "description": "Test"}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
 
@@ -699,9 +680,7 @@ class TestSchemaNameHandling:
         """Test schema name handling with special characters."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        schema = generate_json_schema_basic(
-            [], "schema-with-special@chars#123", "test"
-        )
+        schema = generate_json_schema_basic([], "schema-with-special@chars#123", "test")
 
         # Should handle or strip special characters
         assert schema["name"] is not None
@@ -734,10 +713,10 @@ class TestCodeGenerationIntegration:
 
         # Should have DocSchema class
         assert "DocSchema" in namespace
-        DocSchema = namespace["DocSchema"]
+        doc_schema = namespace["DocSchema"]
 
         # Should be able to instantiate
-        instance = DocSchema(name="Test", age=30)
+        instance = doc_schema(name="Test", age=30)
         assert instance.name == "Test"
         assert instance.age == 30
 
@@ -748,11 +727,7 @@ class TestCodeGenerationIntegration:
         schema = {
             "name": "test_schema",
             "description": "Test",
-            "schema": {
-                "properties": {
-                    "field": {"type": "string", "description": "Field"}
-                }
-            },
+            "schema": {"properties": {"field": {"type": "string", "description": "Field"}}},
         }
 
         code = generate_python_function_code(schema)
@@ -779,9 +754,7 @@ class TestEdgeCasesAndBoundaries:
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
         long_name = "field_" + "x" * 500
-        fields = [
-            {"id": 0, "name": long_name, "type": "string", "description": "Test"}
-        ]
+        fields = [{"id": 0, "name": long_name, "type": "string", "description": "Test"}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
         properties = schema["schema"]["properties"]
@@ -793,9 +766,7 @@ class TestEdgeCasesAndBoundaries:
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
         long_desc = "A" * 5000
-        fields = [
-            {"id": 0, "name": "field", "type": "string", "description": long_desc}
-        ]
+        fields = [{"id": 0, "name": "field", "type": "string", "description": long_desc}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
         properties = schema["schema"]["properties"]
@@ -806,9 +777,7 @@ class TestEdgeCasesAndBoundaries:
         """Test Unicode characters in field names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
 
-        fields = [
-            {"id": 0, "name": "名前", "type": "string", "description": "Japanese name"}
-        ]
+        fields = [{"id": 0, "name": "名前", "type": "string", "description": "Japanese name"}]
 
         schema = generate_json_schema_basic(fields, "test", "test")
         properties = schema["schema"]["properties"]
@@ -832,4 +801,3 @@ class TestEdgeCasesAndBoundaries:
         properties = schema["schema"]["properties"]
 
         assert "émojis" in properties["field"]["description"]
-
