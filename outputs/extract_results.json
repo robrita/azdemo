@@ -791,6 +791,1135 @@
           "confidence": 0.0
         }
       ]
+    },
+    {
+      "file_name": "bir2303-true-02.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 15.366,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) in the Philippines. It includes details such as the taxpayer's name, TIN, registered address, line of business, and the date of issuance.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "101-225-173-0000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TORIAGA, MA. LUZA ERVAS",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "12/29/1999",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "124 Poblacion Central 4712 Barcelona, Sorsogon, Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Not specified",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Package Tour Reservation",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-02.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 45.677,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Certificate of Registration (Form 2303) for Ma. Liza Ervas, issued by the Sorsogon Revenue District Office. It certifies the registration of the taxpayer for the business activity 'Package Tour Reservation Activities.' The TIN was issued on December 29, 1999, and the registered address is in Barcelona, Sorsogon, Philippines.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "161-225-173-0000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TORIAGA, MA. LIZA ERVAS",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "12/29/1999",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "124 POBLACION CENTRAL 4712 BARCELONA SORSOGON PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "PACKAGE TOUR RESERVATION ACTIVITIES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-02.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 25.972,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "161-225-173-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TORIAGA. MA LIZA ERVAS",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "12/29/1999",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "124 POBLACION CENTRAL 4712 BARCELONA SORSOGON PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "PACKAGE TOUR RESERVATION ACTIVITIES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.056,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for a taxpayer in the Philippines. It certifies the registration of the taxpayer with the Bureau of Internal Revenue, including details such as TIN, name, address, and date of issuance.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "NAPOLES, DIOCITO DELANTAR",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 UNIT H NIOG ROAD NIOG II 4102 BACOOR CAVITE PHILIPPINES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 9.375,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Republic of the Philippines' Bureau of Internal Revenue. It certifies that the taxpayer, Napole G. Deolito Delantar, is registered under the National Internal Revenue Code.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Napole G. Deolito Delantar",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 Unit H NIOG Road, NIOG II 4102 Bacoor Cavite Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Not specified",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Not specified",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 20.952,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "NAPOLES, DEOLITO DELANTAR",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-29.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.008,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It includes details such as the TIN, taxpayer name, registered address, and other relevant information.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "240-135-045-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "ACTIVASIA INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2005",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "291 Saint Joseph Street, Oranbo Drive, Oranbo 1603 City of Pasig NCR, Second District",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "ACTIVASIA INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Not specified in the document",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-29.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 7.642,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Certificate of Registration (Form 2303) for ACTIVASIA INC., issued by the Philippine Bureau of Internal Revenue. It certifies the registration of the taxpayer, provides the TIN, registered address, and date of issuance, and outlines obligations for business registration and tax compliance.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "240-135-045-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "ACTIVASIA INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2005",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "291 SAINT JOSEPH STREET ORANDO DRIVE ORANDO 1603 CITY OF PASIG NCR, SECOND DISTRICT PHILIPPINES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-29.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 12.535,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "240-135-045-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "ACTIVASIA INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/18/2005",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "291 SAINT JOSEPH STREET ORANBO DRIVE ORANBO 1603 CITY OF PASIG NCR, SECOND DISTRICT PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-32.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.664,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Certificate of Registration (Form 2303) for Hannan International Manpower Corporation, issued on May 25, 2016. It certifies the registration of the corporation for various tax types including VAT, withholding tax, and corporate income tax. The registered address is in Moonwalk, City of Parañaque, and the line of business is labor recruitment and provision of personnel overseas.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "009-260-783-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "HANNAN INTERNATIONAL MANPOWER CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/25/2016",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "59 Q BLDG MULTINATIONAL AVE, MOONWALK, CITY OF PARAÑAQUE, PHILIPPINES 1700",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "HANNAN INTERNATIONAL MANPOWER CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-32.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.271,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies the registration of Hannan International Manpower Corporation with the BIR. The document includes details such as the Taxpayer Identification Number (TIN), registered address, types of taxes, and the line of business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "009-260-783-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Hannan International Manpower Corporation",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/25/2016",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "59 Q BLDG Multinational Ave, Moonwalk, City of Paranaque, NCR, Fourth District, Philippines 1700",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Hannan International Manpower Corporation",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 Labor Recruitment and Provision of Personnel, Overseas",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-32.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 17.237,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-260-783-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "HANNAN INTERNATIONAL MANPOWER CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/25/2016",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "59 Q BLDG MULTINATIONAL AVE MOONWALK, CITY OF PARAÑAQUE NCR, FOURTH DISTRICT, PHILIPPINES 1700",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "HANNAN INTERNATIONAL MANPOWER CORPORATION",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-45.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 10.456,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) in the Philippines. It includes details such as the taxpayer's TIN, name, registered address, tax types, form types, filing start dates, trade name, line of business, and registration date.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "247-098-232-0000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Tan, Crystal Rose Genova",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/22/2006",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "21 A Troc Bldg Dr A Santos Ave, San Antonio, City of Parañaque, NCR, Fourth District, Philippines 1715",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Job Employment Services",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 Labor Recruitment and Provision of Personnel Overseas",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-45.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 12.944,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "247-098-232-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TAN, CRYSTAL ROSE GENOVA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/22/2006",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "21 A TRDC BLDG DR A SANTOS AVE SAN ANTONIO, CITY OF PARAÑAQUE NCR, FOURTH DISTRICT PHILIPPINES 1715",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "JOB EMPLOYMENT SERVICES",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-45.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 13.46,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Certificate of Registration (Form 2303) for Crystal Rose Genova Tan, a single proprietorship engaged in job employment services, specifically labor recruitment and provision of personnel overseas. The certificate includes the taxpayer's TIN, registered address, business type, trade name, and relevant tax types and registration dates.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "247-098-232-000000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "TAN, CRYSTAL ROSE GENOVA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "08/22/2006",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "21 A TROC BLDG DR A SANTOS AVE, SAN ANTONIO, CITY OF PARANAQUE NCR, FOURTH DISTRICT PHILIPPINES 1715",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "JOB EMPLOYMENT SERVICES",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-60.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 9.222,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies that CM Philippines Inc. is registered under the National Internal Revenue Code. The document includes the taxpayer's TIN, registered address, and other relevant details.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "621-435-819-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CM PHILIPPINES INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2023",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "Lot 6 Blk 1 Champaca St. Greenland Subd. San Juan 1900 Caintra Rizal Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "CM PHILIPPINES INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Head Office",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-60.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 9.296,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for CM Philippines Inc., issued by the Bureau of Internal Revenue in the Philippines. It certifies the registration of the taxpayer and provides details such as TIN, registered address, and issuance date.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "621-435-819-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CM PHILIPPINES INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2023",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LOT 6 BLK. 1 CHAMPACA ST. GREENLAND SUBD. SAN JUAN 1900 CAINTA RIZAL PHILIPPINES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-60.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 13.608,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "621-435-819-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CM PHILIPPINES INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "02/09/2023",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "LOT 6 BLK. 1 CHAMPACA ST. GREENLAND SUBD. SAN JUAN 1900 CAINTA RIZAL PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-61.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 13.766,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "009-188-339-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/15/2016",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "WHOLESALE/RETAIL TRADE OF ELECTRO-MECHANICAL EQUIPMENT, INSTALLATION SERVICES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-61.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 14.709,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This document is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) in the Philippines. It contains details about the taxpayer, including the TIN, registered address, trade name, and business type.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "009-188-339-0000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "04/15/2016",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY, ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "WHOLESALE OF OTHER MACHINERY AND EQUIPMENT, N.E.C.; WHOLESALE/RETAIL TRADE OF ELECTRO-MECHANICAL EQUIPMENT; OTHER BUSINESS SUPPORT SERVICE ACTIVITIES, N.E.C.; INSTALLATION SERVICES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-64.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.847,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This document is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) of the Philippines. It certifies the registration of a taxpayer named Lancabo Incorporated, with a TIN number of 602-734-518-00000, issued on November 3, 2021. The registered address is B1 L1 Dreamville 6, Anabu I-E 4103 Imus, Cavite, Philippines. The document outlines various tax obligations and requirements for the registered entity.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "602-734-518-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Lancabo Incorporated",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/03/2021",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 L1 Dreamville 6, Anabu I-E 4103 Imus, Cavite, Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Lancabo Incorporated",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Incorporated Entity",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-64.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.408,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "602-734-518-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "LANCABO INCORPORATED",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/03/2021",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 L1 DREAMVILLE 6 ANABU I-E 4103 IMUS CAVITE PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-64.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 14.826,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration for LANCABO INCORPORATED, issued by the Philippine Bureau of Internal Revenue. It certifies the registration of the taxpayer, provides the TIN, registered address, and date of issuance, and outlines requirements for tax return filing and other tax-related obligations.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "602-734-518-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "LANCABO INCORPORATED",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "11/03/2021",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "B1 L1 DREAMVILLE 6 ANABU I-E 4103 IMUS CAVITE PHILIPPINES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-65.png",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 7.942,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) of the Philippines to Arwen Dela Peña Dorlaogdan. It certifies the taxpayer's registration, including TIN, registered address, and date of issuance. The certificate must be displayed at the place of business.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "313-992-090-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DORLAOGDAN, ARWEN DELA PEÑA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/02/2013",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNIT C RENESSES BLDG. ROTARY LANE CORNER DON PABLO SUBD. TAGAPO 4026 CITY OF SANTA ROSA LAGUNA PHILIPPINES",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-65.png",
+      "service_name": "Content-Understanding",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.047,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "013-992-050-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DORLAGDAN, ARWEN DCLA PEÑA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/02/2013",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNIT C RENESES BLDG. ROTARY LANE CORNER DON PABLO SUBD. TAGAPO 4026 CITY OF SANTA ROSA LAGUNA PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "{'type': 'string'}",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-65.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 11.534,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration issued by the Bureau of Internal Revenue (BIR) of the Philippines. It includes details such as the taxpayer's name, TIN, registered address, and the date of TIN issuance.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "013-892-000-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DORLAGDAN, ARWEN DELA PEÑA",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "05/02/2013",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNIT C RENESSES BLDG, ROTARY LANE CORNER DON PABLO SUBD. TAGAPO 4028 CITY OF SANTA ROSA LAGUNA, PHILIPPINES",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Not specified",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Not specified",
+          "confidence": 0.0
+        }
+      ]
     }
   ]
 }

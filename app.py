@@ -148,37 +148,37 @@ def main():
                                      value=st.session_state.get("svc_template", False))
             svc_neural = st.checkbox("Document Intelligence - Neural", 
                                    value=st.session_state.get("svc_neural", False))
-            svc_mistral = st.checkbox("Mistral Document AI", 
-                                    value=st.session_state.get("svc_mistral", False))
-        with col2:
             svc_content = st.checkbox("Content Understanding", 
                                     value=st.session_state.get("svc_content", False))
-            svc_gpt5 = st.checkbox("GPT-5 for Vision", 
-                                 value=st.session_state.get("svc_gpt5", False))
+        with col2:
+            svc_mistral = st.checkbox("Mistral Document AI", 
+                                    value=st.session_state.get("svc_mistral", False))
             svc_gpt41 = st.checkbox("GPT-4.1 for Vision", 
                                   value=st.session_state.get("svc_gpt41", False))
+            svc_gpt5 = st.checkbox("GPT-5 for Vision", 
+                                 value=st.session_state.get("svc_gpt5", False))
 
         # Store checkbox states in session
         st.session_state["svc_template"] = svc_template
         st.session_state["svc_neural"] = svc_neural
-        st.session_state["svc_mistral"] = svc_mistral
         st.session_state["svc_content"] = svc_content
-        st.session_state["svc_gpt5"] = svc_gpt5
+        st.session_state["svc_mistral"] = svc_mistral
         st.session_state["svc_gpt41"] = svc_gpt41
+        st.session_state["svc_gpt5"] = svc_gpt5
 
         selected_services = []
         if svc_template:
             selected_services.append(("ADI-Template", DocumentIntelligence))
         if svc_neural:
             selected_services.append(("ADI-Neural", DocumentIntelligence))
-        if svc_mistral:
-            selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
         if svc_content:
             selected_services.append(("Content-Understanding", ContentUnderstanding))
-        if svc_gpt5:
-            selected_services.append(("GPT-5-Vision", GPTForVision))
+        if svc_mistral:
+            selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
         if svc_gpt41:
             selected_services.append(("GPT-4.1-Vision", GPTForVision))
+        if svc_gpt5:
+            selected_services.append(("GPT-5-Vision", GPTForVision))
 
         # Use keep_state to persist selected_services across page navigation
         keep_state(selected_services, "selected_services")
@@ -310,36 +310,44 @@ def main():
                         
                         # Prepare data for tables
                         table_data = []
-                        
+
+                        # Dynamically collect all field names across results (exclude language, summary)
+                        dynamic_field_names = set()
+                        for result in results:
+                            for field in result.get("fields", []):
+                                fname = field.get("name", "")
+                                if fname and fname not in ("language", "summary"):
+                                    dynamic_field_names.add(fname)
+
+                        # Sort for consistent column ordering
+                        dynamic_field_names = sorted(dynamic_field_names)
+
                         for result in results:
                             file_name = result.get("file_name", "")
                             service_name = result.get("service_name", "")
                             processing_time = result.get("processing_time", 0.0)
-                            
-                            # Create a dictionary to store field values or confidences
+
+                            # Base row with required metadata
                             row = {
                                 "file_name": file_name,
                                 "service_name": service_name,
                                 "processing_time": f"{processing_time:.3f}s" if processing_time else "0.000s",
-                                "tin": "",
-                                "taxpayerName": "",
-                                "registeredDate": "",
-                                "registeredAddress": "",
-                                "tradeName": "",
-                                "businessType": ""
                             }
-                            
-                            # Extract fields based on view type
-                            fields = result.get("fields", [])
-                            for field in fields:
+
+                            # Initialize dynamic fields as empty
+                            for fname in dynamic_field_names:
+                                row[fname] = ""
+
+                            # Populate values or confidence
+                            for field in result.get("fields", []):
                                 field_name = field.get("name", "")
-                                if field_name in row:
+                                if field_name in row and field_name not in ("language", "summary"):
                                     if view_type == "Values":
                                         row[field_name] = field.get("value", "")
-                                    else:  # Confidence Scores
+                                    else:  # Confidence view
                                         confidence = field.get("confidence", 0)
                                         row[field_name] = f"{confidence:.3f}" if confidence else ""
-                            
+
                             table_data.append(row)
                         
                         # Create DataFrame and sort by file_name, then service_name

@@ -1,28 +1,16 @@
 import streamlit as st
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import io
 import os
 import sys
 import time
 import base64
-from pydantic import BaseModel, Field
 from openai import AzureOpenAI
 import fitz  # PyMuPDF
 from PIL import Image
 sys.path.append('..')
 from utils import save_extraction_to_json
-
-# Define Pydantic model for BIR document extraction
-class BIR2303Document(BaseModel):
-    """Pydantic model for BIR 2303 document extraction"""
-    language: Optional[str] = Field(None, description="The language of the document.")
-    summary: Optional[str] = Field(None, description="A brief summary of the document in English.")
-    tin: Optional[str] = Field(None, description="The taxpayer identification number (TIN) in format XXX-XXX-XXX-XXXXX or XXX-XXX-XXX-XXXX or XXX-XXX-XXX-XXX.")
-    taxpayerName: Optional[str] = Field(None, description="The full name of the taxpayer or business entity as registered with the tax authority.")
-    registeredDate: Optional[str] = Field(None, description="The date the TIN was issued or registered in MM/DD/YYYY format.")
-    registeredAddress: Optional[str] = Field(None, description="The complete registered address of the taxpayer or business.")
-    tradeName: Optional[str] = Field(None, description="The registered trade name or business name of the taxpayer.")
-    businessType: Optional[str] = Field(None, description="The line of business or business activities")
+from schemas.gpt_schema import DocSchema
 
 class GPTForVision:
     """
@@ -202,7 +190,7 @@ class GPTForVision:
                 completion = self.client.beta.chat.completions.parse(
                     model=self.deployment,
                     messages=chat_prompt,
-                    response_format=BIR2303Document,
+                    response_format=DocSchema,
                     temperature=temperature,
                     top_p=1
                 )

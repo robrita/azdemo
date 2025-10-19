@@ -14,7 +14,7 @@ All extraction services implement a unified interface in `handlers/`:
 
 **Key implementations:**
 - `document_intelligence.py` - Uses `model_template` vs `model_neural` based on service_name
-- `gpt_vision.py` - Converts PDFs to images via PyMuPDF, uses Pydantic `BIR2303Document` for structured output
+- `gpt_vision.py` - Converts PDFs to images via PyMuPDF, uses Pydantic `DocSchema` for structured output
 - `mistral_document_ai.py` - Distinguishes `image_url` vs `document_url` based on MIME type
 - `content_understanding.py` - Implements polling pattern for async Azure operations
 
@@ -124,7 +124,7 @@ Loads Google Fonts (Gasoek One, Oswald) via `style.css`.
 
 ### Modifying BIR Document Schema
 Update both:
-1. Pydantic model `BIR2303Document` in `gpt_vision.py` (for OpenAI structured output)
+1. Pydantic model `DocSchema` in `schemas/gpt_schema.py` (for OpenAI structured output)
 2. JSON schema `properties` in `mistral_document_ai.py` (for Mistral Document AI)
 3. Table columns in `app.py` tab2 DataFrame (`row = {...}` initialization)
 
