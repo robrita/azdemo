@@ -417,9 +417,7 @@ class TestRenderSidebar:
     @patch("builtins.open", mock_open(read_data="body { color: red; }"))
     @patch("streamlit.markdown")
     @patch("streamlit.sidebar")
-    def test_render_sidebar_loads_css(
-        self, mock_sidebar, mock_markdown, mock_logo, mock_config
-    ):
+    def test_render_sidebar_loads_css(self, mock_sidebar, mock_markdown, mock_logo, mock_config):
         """Test render_sidebar loads CSS file."""
         from utils import render_sidebar
 
@@ -436,9 +434,7 @@ class TestRenderSidebar:
     @patch("builtins.open", mock_open(read_data=""))
     @patch("streamlit.markdown")
     @patch("streamlit.sidebar")
-    def test_render_sidebar_sets_logo(
-        self, mock_sidebar, mock_markdown, mock_logo, mock_config
-    ):
+    def test_render_sidebar_sets_logo(self, mock_sidebar, mock_markdown, mock_logo, mock_config):
         """Test render_sidebar sets Azure AI logo."""
         from utils import render_sidebar
 

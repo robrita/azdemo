@@ -5,7 +5,6 @@ Tests Pydantic models used for structured extraction.
 """
 
 
-
 class TestDocSchema:
     """Test suite for DocSchema Pydantic model."""
 
@@ -267,12 +266,12 @@ class TestSchemaCompatibility:
         }
 
         # Both schemas should have all common fields
-        assert common_fields.issubset(
-            gpt_fields
-        ), f"GPT schema missing: {common_fields - gpt_fields}"
-        assert common_fields.issubset(
-            mistral_fields
-        ), f"Mistral schema missing: {common_fields - mistral_fields}"
+        assert common_fields.issubset(gpt_fields), (
+            f"GPT schema missing: {common_fields - gpt_fields}"
+        )
+        assert common_fields.issubset(mistral_fields), (
+            f"Mistral schema missing: {common_fields - mistral_fields}"
+        )
 
     def test_schemas_accept_same_data(self):
         """Test both schemas accept the same data structure."""

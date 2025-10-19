@@ -201,7 +201,9 @@ def real_env_vars():
     env_path = Path(__file__).parent.parent / ".env"
 
     if not env_path.exists():
-        pytest.skip(f".env file not found at {env_path}. Integration tests require real credentials.")
+        pytest.skip(
+            f".env file not found at {env_path}. Integration tests require real credentials."
+        )
 
     # Load environment variables from .env
     load_dotenv(env_path, override=True)
@@ -210,8 +212,12 @@ def real_env_vars():
     env_vars = {
         "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"),
         "AZURE_DOCUMENT_INTELLIGENCE_KEY": os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY"),
-        "AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL": os.getenv("AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL"),
-        "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL": os.getenv("AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL"),
+        "AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL": os.getenv(
+            "AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL"
+        ),
+        "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL": os.getenv(
+            "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL"
+        ),
         "AZURE_OPENAI_ENDPOINT": os.getenv("AZURE_OPENAI_ENDPOINT"),
         "AZURE_OPENAI_API_KEY": os.getenv("AZURE_OPENAI_API_KEY"),
         "AZURE_OPENAI_DEPLOYMENT_GPT4-1": os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4-1"),
@@ -219,14 +225,22 @@ def real_env_vars():
         "AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT": os.getenv("AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT"),
         "AZURE_MISTRAL_DOCUMENT_AI_KEY": os.getenv("AZURE_MISTRAL_DOCUMENT_AI_KEY"),
         "AZURE_CONTENT_UNDERSTANDING_ENDPOINT": os.getenv("AZURE_CONTENT_UNDERSTANDING_ENDPOINT"),
-        "AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY": os.getenv("AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY"),
-        "AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID": os.getenv("AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID"),
-        "AZURE_CONTENT_UNDERSTANDING_API_VERSION": os.getenv("AZURE_CONTENT_UNDERSTANDING_API_VERSION"),
+        "AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY": os.getenv(
+            "AZURE_CONTENT_UNDERSTANDING_SUBSCRIPTION_KEY"
+        ),
+        "AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID": os.getenv(
+            "AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID"
+        ),
+        "AZURE_CONTENT_UNDERSTANDING_API_VERSION": os.getenv(
+            "AZURE_CONTENT_UNDERSTANDING_API_VERSION"
+        ),
     }
 
     # Verify at least some credentials are loaded
     if not any(env_vars.values()):
-        pytest.skip("No Azure credentials found in .env file. Integration tests require valid credentials.")
+        pytest.skip(
+            "No Azure credentials found in .env file. Integration tests require valid credentials."
+        )
 
     return env_vars
 
@@ -314,8 +328,9 @@ def reset_streamlit_session():
     # Import here to avoid issues when streamlit is not available
     try:
         import streamlit as st
+
         # Clear session state
-        if hasattr(st, 'session_state'):
+        if hasattr(st, "session_state"):
             st.session_state.clear()
     except (ImportError, AttributeError):
         # Streamlit not available or session_state not initialized
@@ -336,9 +351,5 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "integration: mark test as integration test (requires Azure services)"
     )
-    config.addinivalue_line(
-        "markers", "unit: mark test as unit test (no external dependencies)"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running test"
-    )
+    config.addinivalue_line("markers", "unit: mark test as unit test (no external dependencies)")
+    config.addinivalue_line("markers", "slow: mark test as slow running test")

@@ -2,8 +2,8 @@ from typing import Any
 
 
 def get_mistral_json_schema() -> dict[str, Any]:
-    """Return the JSON schema object for Mistral Document AI extraction.
-    This mirrors the previous contents of `mistral.json`.
+    """
+    Return the JSON schema object for Mistral Document AI extraction.
     """
     return {
         "name": "bir_document_extraction",

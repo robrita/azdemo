@@ -35,10 +35,7 @@ class TestDocumentIntelligenceHandler:
         handler = DocumentIntelligence(service_name="Test Service")
 
         assert handler.service_name == "Test Service"
-        assert (
-            handler.endpoint
-            == "https://test-endpoint.cognitiveservices.azure.com/"
-        )
+        assert handler.endpoint == "https://test-endpoint.cognitiveservices.azure.com/"
         assert handler.key == "test_key_12345"
         assert handler.model_template == "prebuilt-document"
         assert handler.model_neural == "prebuilt-layout"
@@ -81,9 +78,7 @@ class TestDocumentIntelligenceHandler:
         model_arg = handler_template.client.begin_analyze_document.call_args[0][0]
         assert model_arg == "prebuilt-document"
 
-    def test_extract_uses_neural_model_for_neural_service(
-        self, handler_neural, sample_image_file
-    ):
+    def test_extract_uses_neural_model_for_neural_service(self, handler_neural, sample_image_file):
         """Test extract uses neural model when service name doesn't contain 'template'."""
         # Mock the client and poller
         mock_result = Mock()
@@ -188,9 +183,7 @@ class TestDocumentIntelligenceHandler:
     def test_extract_handles_exception(self, handler_template, sample_image_file):
         """Test extract handles exceptions and returns error dict."""
         # Mock exception
-        handler_template.client.begin_analyze_document = Mock(
-            side_effect=Exception("API Error")
-        )
+        handler_template.client.begin_analyze_document = Mock(side_effect=Exception("API Error"))
 
         # Execute
         with patch("streamlit.spinner"):
@@ -308,9 +301,7 @@ class TestGPTForVisionHandler:
         mock_completion = Mock()
         mock_completion.choices = [mock_choice]
 
-        handler_gpt4.client.beta.chat.completions.parse = Mock(
-            return_value=mock_completion
-        )
+        handler_gpt4.client.beta.chat.completions.parse = Mock(return_value=mock_completion)
 
         # Execute
         with patch("streamlit.spinner"), patch("utils.save_extraction_to_json"):
@@ -336,9 +327,7 @@ class TestGPTForVisionHandler:
         mock_completion = Mock()
         mock_completion.choices = [mock_choice]
 
-        handler_gpt5.client.beta.chat.completions.parse = Mock(
-            return_value=mock_completion
-        )
+        handler_gpt5.client.beta.chat.completions.parse = Mock(return_value=mock_completion)
 
         # Execute
         with patch("streamlit.spinner"), patch("utils.save_extraction_to_json"):
@@ -365,9 +354,7 @@ class TestGPTForVisionHandler:
         mock_completion = Mock()
         mock_completion.choices = [mock_choice]
 
-        handler_gpt4.client.beta.chat.completions.parse = Mock(
-            return_value=mock_completion
-        )
+        handler_gpt4.client.beta.chat.completions.parse = Mock(return_value=mock_completion)
 
         # Execute
         with patch("streamlit.spinner"), patch("utils.save_extraction_to_json"):
@@ -384,9 +371,7 @@ class TestGPTForVisionHandler:
         assert len(result["documents"]) == 1
         assert "tin" in result["documents"][0]["fields"]
 
-    def test_extract_handles_client_not_initialized(
-        self, mock_env_vars, sample_image_file
-    ):
+    def test_extract_handles_client_not_initialized(self, mock_env_vars, sample_image_file):
         """Test extract handles case when client is not initialized."""
         from handlers.gpt_vision import GPTForVision
 
@@ -400,9 +385,7 @@ class TestGPTForVisionHandler:
 
     def test_extract_handles_exception(self, handler_gpt4, sample_image_file):
         """Test extract handles exceptions gracefully."""
-        handler_gpt4.client.beta.chat.completions.parse = Mock(
-            side_effect=Exception("API Error")
-        )
+        handler_gpt4.client.beta.chat.completions.parse = Mock(side_effect=Exception("API Error"))
 
         with patch("streamlit.spinner"):
             result = handler_gpt4.extract(sample_image_file)
@@ -410,9 +393,7 @@ class TestGPTForVisionHandler:
         assert "error" in result
         assert "API Error" in result["error"]
 
-    def test_extract_calls_save_extraction_to_json(
-        self, handler_gpt4, sample_image_file
-    ):
+    def test_extract_calls_save_extraction_to_json(self, handler_gpt4, sample_image_file):
         """Test extract calls save_extraction_to_json with correct parameters."""
         # Mock the client
         mock_parsed = Mock()
@@ -427,14 +408,13 @@ class TestGPTForVisionHandler:
         mock_completion = Mock()
         mock_completion.choices = [mock_choice]
 
-        handler_gpt4.client.beta.chat.completions.parse = Mock(
-            return_value=mock_completion
-        )
+        handler_gpt4.client.beta.chat.completions.parse = Mock(return_value=mock_completion)
 
         # Execute with mocked save function
-        with patch("streamlit.spinner"), patch(
-            "handlers.gpt_vision.save_extraction_to_json"
-        ) as mock_save:
+        with (
+            patch("streamlit.spinner"),
+            patch("handlers.gpt_vision.save_extraction_to_json") as mock_save,
+        ):
             handler_gpt4.extract(sample_image_file)
 
             # Verify save was called
@@ -459,9 +439,7 @@ class TestHandlerEdgeCases:
         corrupted_file.type = "image/png"
         corrupted_file.getvalue.return_value = b"\x89PNG\r\n\x1a\n"  # Partial PNG header
 
-        handler.client.begin_analyze_document = Mock(
-            side_effect=Exception("Invalid image")
-        )
+        handler.client.begin_analyze_document = Mock(side_effect=Exception("Invalid image"))
 
         with patch("streamlit.spinner"):
             result = handler.extract(corrupted_file)
@@ -514,9 +492,7 @@ class TestHandlerEdgeCases:
         multi_page_file.type = "application/pdf"
         multi_page_file.getvalue.return_value = b"mock_pdf_content"
 
-        with patch("streamlit.spinner"), patch(
-            "utils.save_extraction_to_json"
-        ) as mock_save:
+        with patch("streamlit.spinner"), patch("utils.save_extraction_to_json") as mock_save:
             result = handler.extract(multi_page_file)
 
             # Verify pages count
@@ -612,7 +588,9 @@ class TestContentUnderstandingHandler:
             mock_get.return_value = mock_response
 
             with pytest.raises(TimeoutError, match="timed out"):
-                handler._poll_result(operation_location, timeout_seconds=1, polling_interval_seconds=0.1)
+                handler._poll_result(
+                    operation_location, timeout_seconds=1, polling_interval_seconds=0.1
+                )
 
     def test_poll_result_failed_status(self, handler):
         """Test polling handles failed status."""
@@ -643,11 +621,12 @@ class TestContentUnderstandingHandler:
 
     def test_extract_success_with_contents(self, handler, sample_image_file):
         """Test successful extraction with contents."""
-        with patch("requests.post") as mock_post, \
-             patch("requests.get") as mock_get, \
-             patch("streamlit.spinner"), \
-             patch("handlers.content_understanding.save_extraction_to_json") as mock_save:
-
+        with (
+            patch("requests.post") as mock_post,
+            patch("requests.get") as mock_get,
+            patch("streamlit.spinner"),
+            patch("handlers.content_understanding.save_extraction_to_json") as mock_save,
+        ):
             # Mock begin_analyze response
             mock_post_response = Mock()
             mock_post_response.headers = {"operation-location": "https://test-location.com/status"}
@@ -668,7 +647,7 @@ class TestContentUnderstandingHandler:
                             "kind": "document",
                             "startPageNumber": 1,
                             "endPageNumber": 1,
-                               "pages": [{"pageNumber": 1}],
+                            "pages": [{"pageNumber": 1}],
                             "fields": {
                                 "tin": {"type": "string", "valueString": "123-456-789"},
                                 "taxpayerName": {"type": "string", "valueString": "Test Corp"},
@@ -688,9 +667,7 @@ class TestContentUnderstandingHandler:
 
     def test_extract_missing_operation_location(self, handler, sample_image_file):
         """Test extract handles missing operation-location header."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_post_response = Mock()
             mock_post_response.headers = {}  # No operation-location
             mock_post.return_value = mock_post_response
@@ -702,9 +679,7 @@ class TestContentUnderstandingHandler:
 
     def test_extract_handles_exception(self, handler, sample_image_file):
         """Test extract handles exceptions gracefully."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_post.side_effect = Exception("Network error")
 
             result = handler.extract(sample_image_file)
@@ -730,7 +705,10 @@ class TestMistralDocumentAIHandler:
 
         handler = MistralDocumentAI(service_name="Test-Mistral")
         assert handler.service_name == "Test-Mistral"
-        assert handler.endpoint == "https://test-mistral-endpoint.inference.ai.azure.com/v1/chat/completions"
+        assert (
+            handler.endpoint
+            == "https://test-mistral-endpoint.inference.ai.azure.com/v1/chat/completions"
+        )
         assert handler.key == "test_mistral_key_12345"
 
     def test_extract_with_png_image(self, handler):
@@ -740,9 +718,7 @@ class TestMistralDocumentAIHandler:
         mock_file.type = "image/png"
         mock_file.getvalue.return_value = b"fake_png_data"
 
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_response = Mock()
             mock_response.json.return_value = {
                 "document_annotation": '{"properties": {"tin": "123-456-789"}}'
@@ -765,9 +741,7 @@ class TestMistralDocumentAIHandler:
         mock_file.type = "application/pdf"
         mock_file.getvalue.return_value = b"fake_pdf_data"
 
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_response = Mock()
             mock_response.json.return_value = {
                 "document_annotation": '{"properties": {"tin": "123-456-789"}}'
@@ -789,13 +763,9 @@ class TestMistralDocumentAIHandler:
         mock_file.type = "image/jpeg"
         mock_file.getvalue.return_value = b"fake_jpeg_data"
 
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_response = Mock()
-            mock_response.json.return_value = {
-                "document_annotation": '{"properties": {}}'
-            }
+            mock_response.json.return_value = {"document_annotation": '{"properties": {}}'}
             mock_post.return_value = mock_response
 
             handler.extract(mock_file)
@@ -808,9 +778,7 @@ class TestMistralDocumentAIHandler:
 
     def test_extract_request_exception(self, handler, sample_image_file):
         """Test extract handles request exceptions."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_post.side_effect = Exception("Connection timeout")
 
             result = handler.extract(sample_image_file)
@@ -822,11 +790,11 @@ class TestMistralDocumentAIHandler:
         """Test extract handles HTTP errors."""
         import requests
 
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_response = Mock()
-            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("401 Unauthorized")
+            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+                "401 Unauthorized"
+            )
             mock_post.return_value = mock_response
 
             result = handler.extract(sample_image_file)
@@ -836,10 +804,11 @@ class TestMistralDocumentAIHandler:
 
     def test_extract_saves_results_when_properties_exist(self, handler, sample_image_file):
         """Test that results are saved when properties are extracted."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"), \
-             patch("handlers.mistral_document_ai.save_extraction_to_json") as mock_save:
-
+        with (
+            patch("requests.post") as mock_post,
+            patch("streamlit.spinner"),
+            patch("handlers.mistral_document_ai.save_extraction_to_json") as mock_save,
+        ):
             mock_response = Mock()
             mock_response.json.return_value = {
                 "document_annotation": '{"properties": {"tin": "123-456-789", "taxpayerName": "Test Corp"}}'
@@ -856,14 +825,13 @@ class TestMistralDocumentAIHandler:
 
     def test_extract_empty_properties(self, handler, sample_image_file):
         """Test extraction with empty properties."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"), \
-             patch("utils.save_extraction_to_json") as mock_save:
-
+        with (
+            patch("requests.post") as mock_post,
+            patch("streamlit.spinner"),
+            patch("utils.save_extraction_to_json") as mock_save,
+        ):
             mock_response = Mock()
-            mock_response.json.return_value = {
-                "document_annotation": '{"properties": {}}'
-            }
+            mock_response.json.return_value = {"document_annotation": '{"properties": {}}'}
             mock_post.return_value = mock_response
 
             result = handler.extract(sample_image_file)
@@ -875,9 +843,7 @@ class TestMistralDocumentAIHandler:
 
     def test_extract_no_document_annotation(self, handler, sample_image_file):
         """Test extraction when document_annotation is missing."""
-        with patch("requests.post") as mock_post, \
-             patch("streamlit.spinner"):
-
+        with patch("requests.post") as mock_post, patch("streamlit.spinner"):
             mock_response = Mock()
             mock_response.json.return_value = {}  # No document_annotation
             mock_post.return_value = mock_response

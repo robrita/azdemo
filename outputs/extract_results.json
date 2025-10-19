@@ -929,36 +929,21 @@
       "service_name": "GPT-4.1-Vision",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 11.056,
+      "processing_time": 0.166,
       "fields": [
         {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This is a BIR Form 2303 Certificate of Registration for a taxpayer in the Philippines. It certifies the registration of the taxpayer with the Bureau of Internal Revenue, including details such as TIN, name, address, and date of issuance.",
-          "confidence": 0.0
-        },
-        {
           "name": "tin",
-          "value": "245-208-083-00001",
+          "value": "123-456-789-00000",
           "confidence": 0.0
         },
         {
           "name": "taxpayerName",
-          "value": "NAPOLES, DIOCITO DELANTAR",
+          "value": "Sample Corp",
           "confidence": 0.0
         },
         {
           "name": "registeredDate",
-          "value": "07/18/2022",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 UNIT H NIOG ROAD NIOG II 4102 BACOOR CAVITE PHILIPPINES",
+          "value": "01/15/2024",
           "confidence": 0.0
         }
       ]
@@ -1917,6 +1902,61 @@
         {
           "name": "businessType",
           "value": "Not specified",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "GPT-5-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 0.16,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "123-456-789-00000",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Sample Corp",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "multipage.pdf",
+      "service_name": "Test Service",
+      "pages_count": 3,
+      "document_confidence": 0.95,
+      "processing_time": 0.0,
+      "fields": []
+    },
+    {
+      "file_name": "test.png",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 0.0,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "123-456-789",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "test.pdf",
+      "service_name": "Mistral-Doc-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 0.0,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "123-456-789",
           "confidence": 0.0
         }
       ]

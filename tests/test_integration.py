@@ -155,12 +155,8 @@ class TestMultipleServicesComparison:
             "ADI-Template": DocumentIntelligence(service_name="ADI-Template"),
             "ADI-Neural": DocumentIntelligence(service_name="ADI-Neural"),
             "GPT-4.1-Vision": GPTForVision(service_name="GPT-4.1-Vision"),
-            "Content-Understanding": ContentUnderstanding(
-                service_name="Content-Understanding"
-            ),
-            "Mistral-Document-AI": MistralDocumentAI(
-                service_name="Mistral-Document-AI"
-            ),
+            "Content-Understanding": ContentUnderstanding(service_name="Content-Understanding"),
+            "Mistral-Document-AI": MistralDocumentAI(service_name="Mistral-Document-AI"),
         }
 
         results = {}
@@ -301,9 +297,7 @@ class TestBatchProcessing:
 
         # Save parallel results
         parallel_file = tmp_path / "parallel_results.json"
-        results_data = [
-            r if not isinstance(r, Exception) else {"error": str(r)} for r in results
-        ]
+        results_data = [r if not isinstance(r, Exception) else {"error": str(r)} for r in results]
 
         with open(parallel_file, "w", encoding="utf-8") as f:
             json.dump(results_data, f, indent=2, ensure_ascii=False)
@@ -390,9 +384,7 @@ class TestErrorRecovery:
 
         # This test demonstrates retry logic would be needed
         # Current implementation doesn't retry, so it will fail
-        with patch.object(
-            handler.client, "begin_analyze_document", side_effect=side_effect
-        ):
+        with patch.object(handler.client, "begin_analyze_document", side_effect=side_effect):
             result = handler.extract(sample_image_file)
 
         # Current implementation will show error on first failure
