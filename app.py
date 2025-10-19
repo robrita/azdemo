@@ -25,16 +25,6 @@ from utils import keep_state, render_sidebar
 # Load environment variables
 load_dotenv()
 
-# Valid service names - only these are allowed
-VALID_SERVICE_NAMES = {
-    "ADI-Template",
-    "ADI-Neural",
-    "Content-Understanding",
-    "Mistral-Doc-AI",
-    "GPT-4.1-Vision",
-    "GPT-5-Vision",
-}
-
 
 # Configure logging with custom formatter to show milliseconds
 class MillisecondFormatter(logging.Formatter):
@@ -240,18 +230,6 @@ def main():
         # Use keep_state to persist selected_services across page navigation
         keep_state(selected_services, "selected_services")
 
-        # Validate service names
-        invalid_services = [
-            svc_name for svc_name, _ in selected_services if svc_name not in VALID_SERVICE_NAMES
-        ]
-
-        if invalid_services:
-            st.error(
-                f"❌ Invalid service name(s) detected: {', '.join(invalid_services)}. "
-                f"Only the following services are allowed: {', '.join(sorted(VALID_SERVICE_NAMES))}"
-            )
-            logger.error(f"Invalid service names attempted: {invalid_services}")
-
         # Check for stored valid files from session state
         stored_valid_files = st.session_state.get("valid_files", [])
 
@@ -305,13 +283,8 @@ def main():
                 "💡 Please select at least one extraction service above to enable document processing."
             )
 
-        # Only show Extract button if files are valid AND services are selected AND no invalid services
-        if (
-            valid_files
-            and selected_services
-            and not invalid_services
-            and st.button("🚀 Extract Documents")
-        ):
+        # Only show Extract button if files are valid AND services are selected
+        if valid_files and selected_services and st.button("🚀 Extract Documents"):
             logger.info(
                 f"Extraction started: {len(valid_files)} files x {len(selected_services)} services"
             )

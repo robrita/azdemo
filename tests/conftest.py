@@ -120,7 +120,7 @@ def temp_output_dir(tmp_path):
 def mock_extraction_result():
     """Provide a mock extraction result structure."""
     return {
-        "service": "Test Service",
+        "service": "ADI-Template",
         "file_info": {
             "name": "test_file.png",
             "type": "image/png",

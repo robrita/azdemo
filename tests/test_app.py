@@ -9,12 +9,12 @@ from unittest.mock import Mock
 import pytest
 
 from app import (
-    VALID_SERVICE_NAMES,
     extract_with_service_async,
     get_file_type_description,
     is_valid_file_type,
     process_file_with_services_async,
 )
+from utils import VALID_SERVICE_NAMES
 
 
 class TestIsValidFileType:

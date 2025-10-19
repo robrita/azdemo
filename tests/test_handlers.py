@@ -32,9 +32,9 @@ class TestDocumentIntelligenceHandler:
         """Test handler initializes correctly with environment variables."""
         from handlers.document_intelligence import DocumentIntelligence
 
-        handler = DocumentIntelligence(service_name="Test Service")
+        handler = DocumentIntelligence(service_name="ADI-Template")
 
-        assert handler.service_name == "Test Service"
+        assert handler.service_name == "ADI-Template"
         assert handler.endpoint == "https://test-endpoint.cognitiveservices.azure.com/"
         assert handler.key == "test_key_12345"
         assert handler.model_template == "prebuilt-document"
@@ -45,9 +45,9 @@ class TestDocumentIntelligenceHandler:
         """Test handler handles missing environment variables gracefully."""
         from handlers.document_intelligence import DocumentIntelligence
 
-        handler = DocumentIntelligence(service_name="Test Service")
+        handler = DocumentIntelligence(service_name="ADI-Template")
 
-        assert handler.service_name == "Test Service"
+        assert handler.service_name == "ADI-Template"
         assert handler.endpoint is None
         assert handler.key is None
         assert handler.client is None
@@ -236,9 +236,9 @@ class TestGPTForVisionHandler:
         """Test handler initializes with correct configuration."""
         from handlers.gpt_vision import GPTForVision
 
-        handler = GPTForVision(service_name="Test Service")
+        handler = GPTForVision(service_name="ADI-Template")
 
-        assert handler.service_name == "Test Service"
+        assert handler.service_name == "ADI-Template"
         assert handler.endpoint == "https://test-openai.openai.azure.com/"
         assert handler.deployment_gpt41 == "gpt-4-vision"
         assert handler.deployment_gpt5 == "gpt-5-vision"
@@ -249,7 +249,7 @@ class TestGPTForVisionHandler:
         from handlers.gpt_vision import GPTForVision
 
         with patch("streamlit.warning"):
-            handler = GPTForVision(service_name="Test Service")
+            handler = GPTForVision(service_name="ADI-Template")
 
         # Should not crash, client should be None
         assert handler.client is None
@@ -375,7 +375,7 @@ class TestGPTForVisionHandler:
         """Test extract handles case when client is not initialized."""
         from handlers.gpt_vision import GPTForVision
 
-        handler = GPTForVision(service_name="Test Service")
+        handler = GPTForVision(service_name="ADI-Template")
         handler.client = None
 
         result = handler.extract(sample_image_file)
@@ -431,7 +431,7 @@ class TestHandlerEdgeCases:
         """Test handlers handle corrupted image files."""
         from handlers.document_intelligence import DocumentIntelligence
 
-        handler = DocumentIntelligence(service_name="Test Service")
+        handler = DocumentIntelligence(service_name="ADI-Template")
 
         # Create corrupted image file
         corrupted_file = Mock()
@@ -450,7 +450,7 @@ class TestHandlerEdgeCases:
         """Test handlers correctly measure processing time."""
         from handlers.document_intelligence import DocumentIntelligence
 
-        handler = DocumentIntelligence(service_name="Test Service")
+        handler = DocumentIntelligence(service_name="ADI-Template")
 
         # Mock slow operation
         def slow_result():
@@ -473,7 +473,7 @@ class TestHandlerEdgeCases:
         """Test handlers handle multi-page documents."""
         from handlers.document_intelligence import DocumentIntelligence
 
-        handler = DocumentIntelligence(service_name="Test Service")
+        handler = DocumentIntelligence(service_name="ADI-Template")
 
         # Mock multi-page result
         mock_result = Mock()

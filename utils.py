@@ -5,6 +5,16 @@ import streamlit as st
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Valid service names - must match app.py
+VALID_SERVICE_NAMES = {
+    "ADI-Template",
+    "ADI-Neural",
+    "Content-Understanding",
+    "Mistral-Doc-AI",
+    "GPT-4.1-Vision",
+    "GPT-5-Vision",
+}
+
 
 def render_sidebar():
     """
@@ -74,9 +84,21 @@ def save_extraction_to_json(
         overall_confidence: Overall document confidence score (if None, defaults to 0.0)
         processing_time: Time taken to process the file in seconds (if None, defaults to 0.0)
         results_file_path: Path to the JSON results file (default: outputs/extract_results.json)
+
+    Raises:
+        ValueError: If service_name is not in VALID_SERVICE_NAMES
     """
     import json
     from pathlib import Path
+
+    # Validate service name
+    if service_name not in VALID_SERVICE_NAMES:
+        error_msg = (
+            f"Invalid service name '{service_name}'. "
+            f"Allowed: {', '.join(sorted(VALID_SERVICE_NAMES))}"
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     logger.info(
         f"Saving extraction results: file={file_name}, service={service_name}, "

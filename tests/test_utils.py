@@ -25,7 +25,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -43,7 +43,7 @@ class TestSaveExtractionToJson:
         assert "results" in data
         assert len(data["results"]) == 1
         assert data["results"][0]["file_name"] == "test_file.png"
-        assert data["results"][0]["service_name"] == "Test Service"
+        assert data["results"][0]["service_name"] == "ADI-Template"
         assert data["results"][0]["pages_count"] == 1
         assert data["results"][0]["document_confidence"] == 0.95
         assert data["results"][0]["processing_time"] == 2.5
@@ -59,7 +59,7 @@ class TestSaveExtractionToJson:
             "results": [
                 {
                     "file_name": "existing_file.png",
-                    "service_name": "Existing Service",
+                    "service_name": "Content-Understanding",
                     "pages_count": 1,
                     "document_confidence": 0.90,
                     "processing_time": 1.5,
@@ -76,7 +76,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="new_file.png",
-            service_name="New Service",
+            service_name="ADI-Neural",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -103,7 +103,7 @@ class TestSaveExtractionToJson:
             "results": [
                 {
                     "file_name": "test_file.png",
-                    "service_name": "Test Service",
+                    "service_name": "ADI-Template",
                     "pages_count": 1,
                     "document_confidence": 0.80,
                     "processing_time": 1.0,
@@ -120,7 +120,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -149,7 +149,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.956789,
@@ -183,7 +183,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=None,
@@ -211,7 +211,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -241,7 +241,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -266,7 +266,7 @@ class TestSaveExtractionToJson:
 
         save_extraction_to_json(
             file_name="test_file.png",
-            service_name="Test Service",
+            service_name="ADI-Template",
             pages_count=1,
             fields=fields,
             overall_confidence=0.95,
@@ -293,7 +293,7 @@ class TestSaveExtractionToJson:
         with patch("builtins.open", side_effect=PermissionError("Permission denied")):
             save_extraction_to_json(
                 file_name="test_file.png",
-                service_name="Test Service",
+                service_name="ADI-Template",
                 pages_count=1,
                 fields=fields,
                 overall_confidence=0.95,
