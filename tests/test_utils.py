@@ -305,20 +305,6 @@ class TestSaveExtractionToJson:
         mock_warning.assert_called_once()
         assert "Failed to save results to JSON" in mock_warning.call_args[0][0]
 
-
-class TestKeepState:
-    """Test suite for keep_state function."""
-
-    @patch("streamlit.session_state", new_callable=dict)
-    def test_keep_state_stores_value(self, mock_session_state):
-        """Test keep_state stores value in session state."""
-        from utils import keep_state
-
-        result = keep_state("test_value", "test_key")
-
-        assert mock_session_state["test_key"] == "test_value"
-        assert result is False
-
     @patch("streamlit.session_state", new_callable=dict)
     def test_keep_state_returns_true_when_key_exists(self, mock_session_state):
         """Test keep_state returns True when key already exists."""

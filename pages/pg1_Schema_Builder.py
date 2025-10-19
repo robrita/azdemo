@@ -48,8 +48,19 @@ def initialize_session_state():
         st.session_state.next_field_id = 1
 
 
-def generate_json_schema() -> dict[str, Any]:
-    """Generate JSON schema object from collected fields."""
+def generate_json_schema_basic(
+    fields: list[dict[str, Any]], schema_name: str, schema_description: str
+) -> dict[str, Any]:
+    """Generate JSON schema object from field definitions.
+
+    Args:
+        fields: List of field dictionaries with name, type, and description
+        schema_name: Name of the schema
+        schema_description: Description of the schema
+
+    Returns:
+        Dictionary containing the generated schema
+    """
     properties = {
         "language": {
             "title": "Language",
@@ -63,24 +74,33 @@ def generate_json_schema() -> dict[str, Any]:
         },
     }
 
-    for field in st.session_state.fields:
-        field_name = field["name"].strip()
+    for field in fields:
+        field_name = field.get("name", "").strip()
         if not field_name:
             continue
 
         properties[field_name] = {
             "title": field_name.replace("_", " ").title(),
-            "type": field["type"],
-            "description": field["description"],
+            "type": field.get("type", "string"),
+            "description": field.get("description", ""),
         }
 
     schema = {
-        "name": st.session_state.schema_name.replace(" ", "_").lower(),
-        "description": st.session_state.schema_description,
+        "name": schema_name.replace(" ", "_").lower(),
+        "description": schema_description,
         "schema": {"properties": properties},
     }
 
     return schema
+
+
+def generate_json_schema() -> dict[str, Any]:
+    """Generate JSON schema object from collected fields."""
+    return generate_json_schema_basic(
+        st.session_state.fields,
+        st.session_state.schema_name,
+        st.session_state.schema_description,
+    )
 
 
 def add_field():

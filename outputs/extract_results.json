@@ -929,21 +929,36 @@
       "service_name": "GPT-4.1-Vision",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 0.166,
+      "processing_time": 16.387,
       "fields": [
         {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a BIR Form 2303 Certificate of Registration issued to Dicolito Delantar Napoles, indicating the taxpayer's TIN, registered address, and date of issuance.",
+          "confidence": 0.0
+        },
+        {
           "name": "tin",
-          "value": "123-456-789-00000",
+          "value": "245-208-083-00001",
           "confidence": 0.0
         },
         {
           "name": "taxpayerName",
-          "value": "Sample Corp",
+          "value": "Napoles, Dicolito Delantar",
           "confidence": 0.0
         },
         {
           "name": "registeredDate",
-          "value": "01/15/2024",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 Unit H Niog Road, Niog II, 4102 Bacoor, Cavite, Philippines",
           "confidence": 0.0
         }
       ]
@@ -1002,7 +1017,7 @@
       "service_name": "Content-Understanding",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 20.952,
+      "processing_time": 12.481,
       "fields": [
         {
           "name": "tin",
@@ -1026,7 +1041,7 @@
         },
         {
           "name": "tradeName",
-          "value": "{'type': 'string'}",
+          "value": "LUWIE",
           "confidence": 0.0
         },
         {
@@ -1911,16 +1926,36 @@
       "service_name": "GPT-5-Vision",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 0.16,
+      "processing_time": 18.216,
       "fields": [
         {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "BIR Form 2303 Certificate of Registration for a taxpayer. TIN 245-200-085-00001 was issued on 07/18/2022. Registering office indicated as Branch. Registered address listed in Bacoor, Cavite, Philippines.",
+          "confidence": 0.0
+        },
+        {
           "name": "tin",
-          "value": "123-456-789-00000",
+          "value": "245-200-085-00001",
           "confidence": 0.0
         },
         {
           "name": "taxpayerName",
-          "value": "Sample Corp",
+          "value": "NAPOL G. DJ OLITO D LANTAR",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 Unit 1 Niog Road, Niog II 4102, Bacoor, Cavite, Philippines",
           "confidence": 0.0
         }
       ]
@@ -1957,6 +1992,211 @@
         {
           "name": "tin",
           "value": "123-456-789",
+          "confidence": 0.0
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.851,
+      "processing_time": 8.463,
+      "fields": [
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.984
+        },
+        {
+          "name": "taxpayerName",
+          "value": "NAPOLES, DEOLITO DELANTAR",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "",
+          "confidence": 0.984
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
+          "confidence": 0.943
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredDate",
+          "value": "July 18, 2022",
+          "confidence": 0.943
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-30.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.198,
+      "processing_time": 5.645,
+      "fields": [
+        {
+          "name": "taxpayerName",
+          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
+          "confidence": 0.663
+        },
+        {
+          "name": "registeredAddress",
+          "value": "REGISTERED ACTIVITY(IES)",
+          "confidence": 0.496
+        },
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.024
+        },
+        {
+          "name": "registeredDate",
+          "value": "01/01/1997",
+          "confidence": 0.843
+        },
+        {
+          "name": "tin",
+          "value": "003-944-350-000",
+          "confidence": 0.99
+        },
+        {
+          "name": "businessType",
+          "value": "INCOME TAX\nCORHI PARTIASSOC",
+          "confidence": 0.538
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-61.png",
+      "service_name": "ADI-Template",
+      "pages_count": 1,
+      "document_confidence": 0.94,
+      "processing_time": 5.481,
+      "fields": [
+        {
+          "name": "businessType",
+          "value": "INSTALLATION SERVICES",
+          "confidence": 0.944
+        },
+        {
+          "name": "taxpayerName",
+          "value": "CENTRIFUGAL MACHINERY AND\nSERVICES, INC.",
+          "confidence": 0.99
+        },
+        {
+          "name": "tin",
+          "value": "009-188-339-00000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredAddress",
+          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
+          "confidence": 0.942
+        },
+        {
+          "name": "registeredDate",
+          "value": "April 15. 2016",
+          "confidence": 0.941
+        },
+        {
+          "name": "tradeName",
+          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
+          "confidence": 0.892
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "ADI-Neural",
+      "pages_count": 1,
+      "document_confidence": 0.999,
+      "processing_time": 8.38,
+      "fields": [
+        {
+          "name": "tin",
+          "value": "245-208-083-00001",
+          "confidence": 0.89
+        },
+        {
+          "name": "taxpayerName",
+          "value": "NAPOLES, DEOLITO DELANTAR",
+          "confidence": 0.694
+        },
+        {
+          "name": "registeredDate",
+          "value": "July 18, 2022",
+          "confidence": 0.845
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
+          "confidence": 0.092
+        },
+        {
+          "name": "tradeName",
+          "value": "",
+          "confidence": 0.981
+        },
+        {
+          "name": "businessType",
+          "value": "",
+          "confidence": 0.97
+        }
+      ]
+    },
+    {
+      "file_name": "bir2303-true-10.png",
+      "service_name": "Mistral-Document-AI",
+      "pages_count": 1,
+      "document_confidence": 0.0,
+      "processing_time": 8.808,
+      "fields": [
+        {
+          "name": "language",
+          "value": "English",
+          "confidence": 0.0
+        },
+        {
+          "name": "summary",
+          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Republic of the Philippines' Bureau of Internal Revenue. It certifies that the taxpayer, Napole G. Deolito Delantar, is registered under the National Internal Revenue Code.",
+          "confidence": 0.0
+        },
+        {
+          "name": "tin",
+          "value": "245-208-083-0001",
+          "confidence": 0.0
+        },
+        {
+          "name": "taxpayerName",
+          "value": "Napole G. Deolito Delantar",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredDate",
+          "value": "07/18/2022",
+          "confidence": 0.0
+        },
+        {
+          "name": "registeredAddress",
+          "value": "9132 Unit H NIOG Road, NIOG II 4102 Bacoor Cavite Philippines",
+          "confidence": 0.0
+        },
+        {
+          "name": "tradeName",
+          "value": "Not specified",
+          "confidence": 0.0
+        },
+        {
+          "name": "businessType",
+          "value": "Not specified",
           "confidence": 0.0
         }
       ]

@@ -16,7 +16,7 @@ class TestDocumentIntelligenceIntegration:
     """Integration tests for DocumentIntelligence handler with real images."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, real_env_vars):
+    def setup(self, real_env_vars):  # noqa: F811, ARG002
         """Setup with real environment variables from .env file."""
         pass
 
@@ -93,7 +93,7 @@ class TestGPTForVisionIntegration:
     """Integration tests for GPTForVision handler with real images."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, real_env_vars):
+    def setup(self, real_env_vars):  # noqa: F811, ARG002
         """Setup with real environment variables from .env file."""
         pass
 
@@ -140,7 +140,7 @@ class TestMultipleServicesComparison:
     """Integration tests comparing multiple extraction services."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, real_env_vars):
+    def setup(self, real_env_vars):  # noqa: F811, ARG002
         """Setup with real environment variables from .env file."""
         pass
 
@@ -215,7 +215,7 @@ class TestBatchProcessing:
     """Integration tests for batch processing multiple files."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, real_env_vars):
+    def setup(self, real_env_vars):  # noqa: F811, ARG002
         """Setup with real environment variables from .env file."""
         pass
 
@@ -308,7 +308,7 @@ class TestErrorRecovery:
     """Integration tests for error handling and recovery."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, real_env_vars):
+    def setup(self, real_env_vars):  # noqa: F811, ARG002
         """Setup with real environment variables from .env file."""
         pass
 
