@@ -51,6 +51,9 @@ AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key-here
 AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL=your-template-model
 AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL=your-neural-model
 
+# Azure Document Intelligence Classification
+AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL=your-classification-model-id
+
 # Azure OpenAI (GPT-4.1 & GPT-5 deployments)
 AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-openai-api-key

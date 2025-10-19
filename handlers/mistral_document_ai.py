@@ -182,23 +182,6 @@ class MistralDocumentAI:
 
             return extracted_data
 
-        except requests.exceptions.RequestException as e:
-            import traceback
-
-            logger.error(
-                f"Mistral error: {uploaded_file.name if 'uploaded_file' in locals() else 'unknown'} "
-                f"| {self.service_name} | {str(e)}",
-                exc_info=True,
-            )
-            return {
-                "service": self.service_name,
-                "error": f"Mistral Document AI API request failed: {str(e)}",
-                "error_details": traceback.format_exc(),
-                "file_info": {
-                    "name": uploaded_file.name if uploaded_file else "Unknown",
-                    "type": uploaded_file.type if uploaded_file else "Unknown",
-                },
-            }
         except Exception as e:
             import traceback
 

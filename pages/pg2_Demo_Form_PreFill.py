@@ -19,6 +19,7 @@ from PIL import Image
 
 sys.path.append("..")
 from handlers.content_understanding import ContentUnderstanding
+from handlers.document_classification import DocumentClassification
 from handlers.document_intelligence import DocumentIntelligence
 from handlers.gpt_vision import GPTForVision
 from handlers.mistral_document_ai import MistralDocumentAI
@@ -30,6 +31,8 @@ load_dotenv()
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Default service for form pre-fill
+DEFAULT_SERVICE = "Document Intelligence - Template"
 
 # Service configuration mapping
 SERVICE_CONFIG = {
@@ -127,6 +130,53 @@ async def extract_with_service_async(svc_name: str, svc_class, file) -> dict[str
         }
 
 
+async def classify_document_async(file) -> dict[str, Any]:
+    """
+    Asynchronously classify document type before extraction.
+
+    Args:
+        file: File to classify
+
+    Returns:
+        Dictionary containing classification results with docType and confidence
+    """
+    start_time = time.time()
+
+    try:
+        # Run the potentially blocking classification in a thread pool
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Create classification service instance
+            classifier = DocumentClassification()
+            # Suppress logging temporarily while running in executor
+            old_level = logging.getLogger("streamlit").level
+            logging.getLogger("streamlit").setLevel(logging.ERROR)
+            try:
+                result = await loop.run_in_executor(executor, classifier.classify, file)
+            finally:
+                logging.getLogger("streamlit").setLevel(old_level)
+
+        processing_time = time.time() - start_time
+        logger.info(
+            f"Classification completed: {file.name} | "
+            f"Type: {result.get('docType', 'unknown')} | "
+            f"{processing_time:.3f}s"
+        )
+
+        return result
+
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"Classification failed: {file.name} | {str(e)}", exc_info=True)
+        return {
+            "service": "Document Classification",
+            "error": f"Classification failed: {str(e)}",
+            "processing_time": processing_time,
+            "docType": "unknown",
+            "confidence": 0.0,
+        }
+
+
 def extract_field_value(extraction_result: dict[str, Any], field_name: str) -> str:
     """
     Extract a specific field value from extraction results.
@@ -167,14 +217,17 @@ def extract_field_value(extraction_result: dict[str, Any], field_name: str) -> s
 
 def initialize_session_state():
     """Initialize session state variables for the form pre-fill page."""
-    if "prefill_uploaded_file" not in st.session_state:
-        st.session_state.prefill_uploaded_file = None
-
-    if "prefill_selected_service" not in st.session_state:
-        st.session_state.prefill_selected_service = None
-
     if "prefill_selected_service_display" not in st.session_state:
-        st.session_state.prefill_selected_service_display = "-- Select a service --"
+        st.session_state.prefill_selected_service_display = DEFAULT_SERVICE
+
+    if "prefill_uploaded_file_name" not in st.session_state:
+        st.session_state.prefill_uploaded_file_name = None
+
+    if "prefill_invalid_file_name" not in st.session_state:
+        st.session_state.prefill_invalid_file_name = None
+
+    if "prefill_classification_result" not in st.session_state:
+        st.session_state.prefill_classification_result = None
 
     if "prefill_extraction_result" not in st.session_state:
         st.session_state.prefill_extraction_result = None
@@ -194,11 +247,16 @@ def main():
     logger.info("Demo Form Pre-Fill page loaded")
     render_sidebar()
 
-    st.header("📝 Demo Form Pre-Fill")
+    st.title("📝 Demo Form Pre-Fill")
     st.markdown(
         """
-        Upload a document and select an extraction service to automatically pre-fill the form below.
-        """
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <p style="font-size: 1.2rem; color: var(--text-secondary);">
+            Upload a document and select an extraction service to automatically pre-fill the form below
+        </p>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
 
     # Initialize session state
@@ -206,142 +264,187 @@ def main():
 
     # Section 1 & 2: Upload Document and Select Extraction Service
     with st.container(border=True):
-        col_upload, col_service = st.columns(2, gap="medium")
+        col_service, col_upload = st.columns(2, gap="medium")
 
-        # LEFT COLUMN: Upload Document
+        # LEFT COLUMN: Select Extraction Service
+        with col_service:
+            st.subheader("1️⃣ Select Extraction Service")
+
+            selected_service_display = st.selectbox(
+                "Choose an extraction service",
+                options=list(SERVICE_CONFIG.keys()),
+                index=(list(SERVICE_CONFIG.keys())).index(
+                    st.session_state.prefill_selected_service_display
+                )
+                if st.session_state.prefill_selected_service_display
+                in list(SERVICE_CONFIG.keys())
+                else 0,
+                key="prefill_service_selector",
+            )
+
+            # Update display state
+            st.session_state.prefill_selected_service_display = selected_service_display
+
+        # RIGHT COLUMN: Upload Document
         with col_upload:
-            st.subheader("1️⃣ Upload Document")
+            st.subheader("2️⃣ Upload Document")
             uploaded_file = st.file_uploader(
                 "Choose a file (PDF or image)",
                 type=["pdf", "png", "jpg", "jpeg"],
                 key="prefill_file_uploader",
             )
 
-            # Validate and store uploaded file
-            if uploaded_file:
-                if is_valid_file_type(uploaded_file):
-                    st.session_state.prefill_uploaded_file = uploaded_file
-                    st.success(f"✅ **{uploaded_file.name}** uploaded successfully!")
-                else:
-                    st.error(
-                        "❌ Invalid file type. Please upload PDF, PNG, JPG, or JPEG files only."
-                    )
-                    st.session_state.prefill_uploaded_file = None
-            elif st.session_state.prefill_uploaded_file:
-                # Show previously uploaded file
-                st.info(
-                    f"📁 Using previously uploaded file: **{st.session_state.prefill_uploaded_file.name}**"
+            # Validate and handle uploaded file
+            if uploaded_file and not is_valid_file_type(uploaded_file):
+                st.error(
+                    "❌ Invalid file type. Please upload PDF, PNG, JPG, or JPEG files only."
                 )
 
-        # RIGHT COLUMN: Select Extraction Service
-        with col_service:
-            st.subheader("2️⃣ Select Extraction Service")
+    # Get current uploaded file from uploader widget
+    uploaded_file = st.session_state.get("prefill_file_uploader")
+    has_valid_file = uploaded_file is not None and is_valid_file_type(uploaded_file)
 
-            selected_service_display = st.selectbox(
-                "Choose an extraction service",
-                options=["-- Select a service --"] + list(SERVICE_CONFIG.keys()),
-                index=(["-- Select a service --"] + list(SERVICE_CONFIG.keys())).index(
-                    st.session_state.prefill_selected_service_display
-                )
-                if st.session_state.prefill_selected_service_display
-                in ["-- Select a service --"] + list(SERVICE_CONFIG.keys())
-                else 0,
-                key="prefill_service_selector",
+    # Section 3: Auto-trigger classification when a new file is uploaded
+    if uploaded_file and uploaded_file.name != st.session_state.prefill_uploaded_file_name:
+        # New file detected - check if it was previously marked as invalid
+        if uploaded_file.name == st.session_state.prefill_invalid_file_name:
+            # File was previously invalid - show persistent warning
+            st.warning(
+                f"⚠️ **File Previously Invalid**\n\n"
+                f"The file `{uploaded_file.name}` was previously rejected due to validation issues. "
+                f"Please upload a different valid document or ensure the file meets requirements."
             )
+            # Don't proceed with classification for previously invalid files
+        elif not has_valid_file:
+            # New file is invalid - mark it and show error
+            st.session_state.prefill_invalid_file_name = uploaded_file.name
+            st.error(
+                f"❌ **Invalid File Uploaded**\n\n"
+                f"The file `{uploaded_file.name}` is not valid for processing. "
+                f"Please upload a valid PDF, PNG, JPG, or JPEG file."
+            )
+            # Reset classification and extraction results
+            st.session_state.prefill_classification_result = None
+            st.session_state.prefill_extraction_result = None
+        else:
+            # Valid file - proceed with classification
+            with st.spinner("🔍 Classifying document type..."):
+                try:
+                    # Run classification asynchronously
+                    classification_result = asyncio.run(classify_document_async(uploaded_file))
 
-            if selected_service_display != "-- Select a service --":
-                st.session_state.prefill_selected_service = selected_service_display
-                st.session_state.prefill_selected_service_display = selected_service_display
-                st.success(f"✅ Selected: **{selected_service_display}**")
-            else:
-                st.session_state.prefill_selected_service = None
-                st.session_state.prefill_selected_service_display = "-- Select a service --"
+                    # Store classification result
+                    st.session_state.prefill_classification_result = classification_result
+                    st.session_state.prefill_uploaded_file_name = uploaded_file.name
 
-    # Section 3: Pre-Fill Button (appears when file and service are selected)
-    has_valid_file = st.session_state.prefill_uploaded_file is not None
+                    # Reset extraction result when new file is uploaded
+                    st.session_state.prefill_extraction_result = None
+
+                    # Check for classification errors
+                    if "error" in classification_result:
+                        st.error(
+                            f"❌ Classification failed: {classification_result.get('error', 'Unknown error')}"
+                        )
+                    else:
+                        # Get docType from classification
+                        doc_type = classification_result.get("docType", "unknown")
+                        confidence = classification_result.get("confidence", 0.0)
+
+                        # Validate docType - reject "bir2303-null"
+                        if doc_type == "bir2303-null":
+                            st.error(
+                                f"❌ **Invalid Document Type Detected**\n\n"
+                                f"The uploaded document was classified as `{doc_type}`, "
+                                f"which is not supported for form pre-fill.\n\n"
+                                f"**Confidence:** {confidence:.2%}\n\n"
+                                f"Please upload a valid BIR 2303 document."
+                            )
+                            # Mark as invalid due to classification
+                            st.session_state.prefill_invalid_file_name = uploaded_file.name
+                        else:
+                            # Show classification success
+                            st.success(
+                                f"✅ Document classified as: **{doc_type}** (confidence: {confidence:.2%})"
+                            )
+
+                except Exception as e:
+                    logger.error(f"Classification error: {str(e)}", exc_info=True)
+                    st.error(f"❌ Classification failed: {str(e)}")
+                    st.session_state.prefill_classification_result = None
+                    # Mark as invalid due to classification error
+                    st.session_state.prefill_invalid_file_name = uploaded_file.name
+
+    # Section 4: Auto-trigger extraction when service is selected (after classification)
     has_valid_service = (
-        st.session_state.prefill_selected_service is not None
-        and st.session_state.prefill_selected_service in SERVICE_CONFIG
+        st.session_state.prefill_selected_service_display != DEFAULT_SERVICE
+        and st.session_state.prefill_selected_service_display in SERVICE_CONFIG
     )
 
-    if has_valid_file and has_valid_service:
-        # Pre-Fill Form Section
-        st.markdown("### 3️⃣ Pre-Fill Form")
+    # Only extract if we have:
+    # 1. A valid file
+    # 2. A valid service selected
+    # 3. Classification completed successfully
+    # 4. No extraction result yet (to avoid re-extraction on rerun)
+    should_extract = (
+        has_valid_file
+        and has_valid_service
+        and st.session_state.prefill_classification_result is not None
+        and "error" not in st.session_state.prefill_classification_result
+        and st.session_state.prefill_classification_result.get("docType") != "bir2303-null"
+        and st.session_state.prefill_extraction_result is None
+    )
 
-        col_button, col_clear = st.columns([3, 1])
+    if should_extract:
+        # Get service configuration
+        service_name, service_class = SERVICE_CONFIG[
+            st.session_state.prefill_selected_service_display
+        ]
 
-        with col_button:
-            if st.button("🚀 Pre-Fill Form", type="primary", width="stretch"):
-                # Get service configuration
-                service_name, service_class = SERVICE_CONFIG[
-                    st.session_state.prefill_selected_service
-                ]
+        with st.spinner(
+            f"📄 Extracting data using {st.session_state.prefill_selected_service_display}..."
+        ):
+            try:
+                # Run extraction asynchronously
+                extraction_result = asyncio.run(
+                    extract_with_service_async(service_name, service_class, uploaded_file)
+                )
 
-                with st.spinner(
-                    f"Extracting data using {st.session_state.prefill_selected_service}..."
-                ):
-                    try:
-                        # Run extraction asynchronously
-                        extraction_result = asyncio.run(
-                            extract_with_service_async(
-                                service_name, service_class, st.session_state.prefill_uploaded_file
-                            )
-                        )
+                # Store extraction result
+                st.session_state.prefill_extraction_result = extraction_result
 
-                        # Store extraction result
-                        st.session_state.prefill_extraction_result = extraction_result
+                # Check for errors
+                if "error" in extraction_result:
+                    st.error(
+                        f"❌ Extraction failed: {extraction_result.get('error', 'Unknown error')}"
+                    )
+                else:
+                    # Extract field values and populate form data
+                    st.session_state.prefill_form_data["tin"] = extract_field_value(
+                        extraction_result, "tin"
+                    )
+                    st.session_state.prefill_form_data["taxpayerName"] = extract_field_value(
+                        extraction_result, "taxpayerName"
+                    )
+                    st.session_state.prefill_form_data["registeredDate"] = extract_field_value(
+                        extraction_result, "registeredDate"
+                    )
+                    st.session_state.prefill_form_data["registeredAddress"] = extract_field_value(
+                        extraction_result, "registeredAddress"
+                    )
+                    st.session_state.prefill_form_data["tradeName"] = extract_field_value(
+                        extraction_result, "tradeName"
+                    )
+                    st.session_state.prefill_form_data["businessType"] = extract_field_value(
+                        extraction_result, "businessType"
+                    )
 
-                        # Check for errors
-                        if "error" in extraction_result:
-                            st.error(
-                                f"❌ Extraction failed: {extraction_result.get('error', 'Unknown error')}"
-                            )
-                        else:
-                            # Extract field values and populate form data
-                            st.session_state.prefill_form_data["tin"] = extract_field_value(
-                                extraction_result, "tin"
-                            )
-                            st.session_state.prefill_form_data["taxpayerName"] = (
-                                extract_field_value(extraction_result, "taxpayerName")
-                            )
-                            st.session_state.prefill_form_data["registeredDate"] = (
-                                extract_field_value(extraction_result, "registeredDate")
-                            )
-                            st.session_state.prefill_form_data["registeredAddress"] = (
-                                extract_field_value(extraction_result, "registeredAddress")
-                            )
-                            st.session_state.prefill_form_data["tradeName"] = extract_field_value(
-                                extraction_result, "tradeName"
-                            )
-                            st.session_state.prefill_form_data["businessType"] = (
-                                extract_field_value(extraction_result, "businessType")
-                            )
+                    st.success("✅ Form pre-filled successfully!")
 
-                            st.success("✅ Form pre-filled successfully!")
-                            st.rerun()
+            except Exception as e:
+                logger.error(f"Pre-fill extraction error: {str(e)}", exc_info=True)
+                st.error(f"❌ Extraction failed: {str(e)}")
 
-                    except Exception as e:
-                        logger.error(f"Pre-fill extraction error: {str(e)}", exc_info=True)
-                        st.error(f"❌ Extraction failed: {str(e)}")
-
-        with col_clear:
-            if st.button("🗑️ Clear", width="stretch"):
-                # Reset session state
-                st.session_state.prefill_uploaded_file = None
-                st.session_state.prefill_selected_service = None
-                st.session_state.prefill_selected_service_display = "-- Select a service --"
-                st.session_state.prefill_extraction_result = None
-                st.session_state.prefill_form_data = {
-                    "tin": "",
-                    "taxpayerName": "",
-                    "registeredDate": "",
-                    "registeredAddress": "",
-                    "tradeName": "",
-                    "businessType": "",
-                }
-                st.rerun()
-
-    # Section 4: Display Form (always visible, pre-filled after extraction)
+    # Section 5: Display Form (always visible, pre-filled after extraction)
     st.markdown("---")
     st.subheader("📋 Document Information Form")
 
@@ -352,9 +455,11 @@ def main():
     ):
         processing_info = st.session_state.prefill_extraction_result.get("processing_info", {})
         if processing_info:
+            uploaded_file = st.session_state.get("prefill_file_uploader")
+            file_name = uploaded_file.name if uploaded_file else "Unknown"
             st.caption(
-                f"🔍 Extracted from **{st.session_state.prefill_uploaded_file.name}** "
-                f"using **{st.session_state.prefill_selected_service}** "
+                f"🔍 Extracted from **{file_name}** "
+                f"using **{st.session_state.prefill_selected_service_display}** "
                 f"in {processing_info.get('processing_time_seconds', 0):.3f}s"
             )
 
@@ -409,17 +514,18 @@ def main():
 
     # RIGHT COLUMN: File preview
     with col_preview:
-        if st.session_state.prefill_uploaded_file:
+        uploaded_file = st.session_state.get("prefill_file_uploader")
+        if uploaded_file:
             with st.container(border=True):
                 st.markdown("**📄 Document Preview**")
 
-                file_name = st.session_state.prefill_uploaded_file.name
+                file_name = uploaded_file.name
                 file_extension = file_name.lower().split(".")[-1]
 
                 try:
                     if file_extension == "pdf":
                         # For PDF files, render all pages in tabs
-                        pdf_bytes = st.session_state.prefill_uploaded_file.getvalue()
+                        pdf_bytes = uploaded_file.getvalue()
                         file_size_mb = len(pdf_bytes) / (1024 * 1024)
 
                         # Open PDF to get page count
@@ -448,7 +554,7 @@ def main():
                     elif file_extension in ["png", "jpg", "jpeg"]:
                         # For image files, display the image
                         st.image(
-                            st.session_state.prefill_uploaded_file,
+                            uploaded_file,
                             caption=f"Image: {file_name}",
                         )
 

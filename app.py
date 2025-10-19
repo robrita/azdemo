@@ -173,7 +173,17 @@ async def process_file_with_services_async(file, selected_services):
 def main():
     logger.info("Document Extraction application started")
     render_sidebar()
-    st.header("📑 Document Extraction")
+    st.title("📑 Document Extraction")
+    st.markdown(
+        """
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <p style="font-size: 1.2rem; color: var(--text-secondary);">
+            Extract structured data from documents using multiple Azure AI services
+        </p>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
     tab1, tab2 = st.tabs(["📤 Upload & Extract", "🔍 Analyze Output"])
 

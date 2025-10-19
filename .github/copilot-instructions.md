@@ -1,95 +1,254 @@
-# Document Extraction Dashboard - AI Agent Guide
+# Document Extraction Dashboard - AI Agent Instructions
 
-## Architecture Overview
+## Project Overview
 
-**Streamlit Multi-Page App**: Main entry point is `app.py` (Document Extraction page) with additional pages in `pages/` directory (Schema Builder, Pricing). The app uses async parallel processing to extract document data via multiple Azure AI services simultaneously.
+Multi-service document extraction platform built with **Streamlit 1.50.0**, connecting to 6+ Azure AI services via pluggable handlers. Extracts structured data from PDFs/images, saves normalized JSON results, and visualizes extraction performance across services.
 
-**Handler Pattern**: All extraction services (`handlers/*.py`) implement a **concrete pattern** (no base class). Each handler must:
-- Provide `__init__(service_name: str = None)` with lazy Azure client initialization
-- Implement `extract(uploaded_file) -> dict[str, Any]` that returns `{'service': name, 'error'?: msg, ...}` on failure
-- Track `processing_time` using `time.time()` for performance metrics
-- Reference: `handlers/document_intelligence.py` is the canonical implementation
+**Tech Stack**: Python 3.11+ | Streamlit | uv/pyproject.toml | Azure AI Services | Ruff | pytest (100% coverage)
 
-**Async Parallel Execution**: `app.py` uses `asyncio.run(process_file_with_services_async())` to process files with all selected services concurrently via `concurrent.futures.ThreadPoolExecutor`, dramatically reducing total extraction time.
+## Architecture
 
-**Pydantic Schemas**: Vision-based services (GPT, Mistral) use Pydantic models in `schemas/` to enforce structured JSON extraction. These schemas allow camelCase field names (`schemas/gpt_schema.py` ignores `N815` lint rule to match JSON output format).
+### Core Components
+- **`app.py`**: Main Streamlit app with async parallel extraction (`asyncio.run`)
+- **`handlers/`**: Service adapters following duck-typed contract (no base class)
+- **`utils.py`**: Shared utilities (`save_extraction_to_json`, `keep_state`, `render_sidebar`)
+- **`schemas/`**: Pydantic models for structured extraction (e.g., `gpt_schema.py`)
+- **`pages/`**: Streamlit multi-page components (Schema Builder, Form PreFill, Pricing)
+
+### Handler Contract (Duck-Typed Pattern)
+Every handler in `handlers/` must implement:
+
+```python
+class ServiceHandler:
+    def __init__(self, service_name: str = None):
+        self.service_name = service_name
+        self.endpoint = os.environ.get("AZURE_*_ENDPOINT")
+        self.key = os.environ.get("AZURE_*_KEY")
+        # Lazy init: only create client if credentials exist
+        
+    def extract(self, uploaded_file) -> dict[str, Any]:
+        """Returns {'service': name, 'error'?: msg, ...data}"""
+        start_time = time.time()
+        try:
+            # Process file, return results with processing_time
+        except Exception as e:
+            return {"service": self.service_name, "error": str(e)}
+```
+
+**Critical Rules**:
+- Always return `dict[str, Any]` (never raise exceptions)
+- Include `'service'` key in all responses
+- Return `{'error': str}` on failure for graceful UI handling
+- Track `processing_time` for performance metrics
+- See `handlers/document_intelligence.py` as reference implementation
+
+### Data Flow
+1. **Upload**: User selects files + services in `app.py` → stored in `st.session_state`
+2. **Parallel Extraction**: `process_file_with_services_async()` runs handlers concurrently via `asyncio.gather()`
+3. **Normalization**: `save_extraction_to_json()` writes to `outputs/extract_results.json` (deduplicates by `file_name + service_name`)
+4. **Analysis**: Tab 2 loads JSON, generates tables/charts with Plotly
 
 ## Development Workflow
 
-**Package Manager**: Use `uv` (modern, fast alternative to pip) - NOT pip directly:
-- `uv sync` - Install/sync dependencies from `pyproject.toml`
-- `uv run streamlit run app.py` - Run the app
-- `uv add package_name` - Add new dependency
-- `uv run ruff check --fix . && uv run ruff format .` - Lint + format
+### Commands (Makefile + uv)
+```bash
+make install       # Install deps (uv sync)
+make format        # Ruff auto-fix + format (REQUIRED before commit)
+make lint          # Check code style only
+make check-and-run # Lint gate → run app
+make test-unit     # Fast tests (no Azure calls)
+make test-cov      # Generate htmlcov/index.html
+uv run streamlit run app.py  # Direct app launch
+```
 
-**Makefile Commands** (requires `make` on Windows via chocolatey or WSL):
-- `make check-and-run` - **Primary workflow**: Lint, then start app (stops if linting fails)
-- `make test-unit` - Run fast unit tests only (no Azure API calls)
-- `make test-cov` - Generate HTML coverage report in `htmlcov/`
-- `make format` - Auto-fix + format (idempotent, run before every commit)
+**Pre-commit Rule**: Always run `make format` (enforced by Ruff config in `pyproject.toml`)
 
-**Code Quality**: Ruff enforces 100-char lines, Python 3.11+ syntax, double quotes. Always run `make format` before committing. Test coverage target is 100%.
+### Testing Strategy
+- **Unit Tests** (`-m "not integration"`): Mock Azure clients, fast, isolated
+- **Integration Tests** (`-m integration`): Require `.env` credentials
+- **Fixtures**: Defined in `tests/conftest.py` (`sample_image_file`, `mock_env_vars`, etc.)
+- **Coverage Target**: 100% (enforced by `make test-cov`)
 
-## Testing Strategy
-
-**Test Markers** (defined in `pytest.ini`):
-- `@pytest.mark.unit` - Fast, mocked tests (use fixtures from `conftest.py`)
-- `@pytest.mark.integration` - Real Azure API calls (requires `.env` credentials)
-- `@pytest.mark.slow` - Long-running tests
-
-**Running Tests**:
-- `make test-unit` - Default for development (fast, no external deps)
-- `uv run pytest -m integration` - Integration tests (needs valid `.env`)
-- `uv run pytest -k "test_name"` - Run specific test
-
-**Fixtures** (`tests/conftest.py`): Use provided fixtures like `mock_pdf_file`, `sample_image_file`, `mock_env_vars` (unit), `real_env_vars` (integration) instead of creating test data inline.
-
-## Adding New Services
-
-Follow this exact sequence (see `.github/instructions/adding-services.instructions.md`):
-1. Create `handlers/new_service.py` with `__init__` + `extract()` methods
-2. Add env vars to README `.env` section with comments
-3. Import in `handlers/__init__.py` and `app.py`
-4. Add UI checkbox in `app.py` main tab
-5. Write unit tests in `tests/test_handlers.py` with `@pytest.mark.unit` marker
-6. Run `make test-unit` and `make format`
-
-## Key Patterns
-
-**Session State Persistence** (Streamlit multi-page):
+Example test pattern:
 ```python
+@pytest.mark.unit
+def test_handler_extract(mock_pdf_file, mock_env_vars):
+    handler = ServiceHandler("Test-Service")
+    result = handler.extract(mock_pdf_file)
+    assert "service" in result
+    assert "error" not in result  # Success case
+```
+
+### Code Quality (Ruff)
+- **Line length**: 100 chars
+- **Quotes**: Double quotes only
+- **Per-file ignores**:
+  - `__init__.py`: Allow unused imports (F401) for package exports
+  - `schemas/gpt_schema.py`: Allow camelCase (N815) to match JSON field names
+- **Config**: All rules in `pyproject.toml` [tool.ruff]
+
+## Key Conventions
+
+### Streamlit Patterns
+```python
+# Chart width (Streamlit 1.50.0+)
+st.line_chart(data, width="stretch")  # ✅ Modern
+st.plotly_chart(fig, config={"responsive": True})  # ✅ Plotly-specific
+
+# Session state persistence across pages
 from utils import keep_state
 keep_state(valid_files, "valid_files")  # Survives page navigation
 ```
 
-**Saving Extraction Results**:
+**Deprecated**: `use_container_width=True` (replaced by `width="stretch"`)
+
+### JSON Output Standardization
+Always use utility function to maintain schema consistency:
+
 ```python
 from utils import save_extraction_to_json
-save_extraction_to_json(file_name, service_name, pages_count, fields, 
-                       overall_confidence=0.95, processing_time=2.5)
-# Auto-deduplicates by (file_name, service_name) pairs
+save_extraction_to_json(
+    file_name="doc.pdf",
+    service_name="GPT-4.1-Vision",  # Must be in VALID_SERVICE_NAMES
+    pages_count=1,
+    fields={"tin": {"content": "123-456-789", "confidence": 0.98}},
+    overall_confidence=0.95,
+    processing_time=2.5
+)
 ```
 
-**Error Handling in Handlers**: Always catch exceptions and return dict with `'error'` key instead of raising - this allows the app to show partial results from other services.
+**Schema** (in `outputs/extract_results.json`):
+```json
+{
+  "results": [
+    {
+      "file_name": "doc.pdf",
+      "service_name": "GPT-4.1-Vision",
+      "pages_count": 1,
+      "document_confidence": 0.950,
+      "processing_time": 2.500,
+      "fields": [
+        {"name": "tin", "value": "123-456-789", "confidence": 0.980}
+      ]
+    }
+  ]
+}
+```
 
-## Environment Variables
+### Environment Variables
+All Azure credentials loaded from `.env` (not committed). Services gracefully degrade if credentials missing:
 
-All Azure credentials loaded from `.env` (use `.env.example` template from README). Services with missing credentials are marked unavailable in UI but don't crash the app due to lazy client initialization.
+```python
+# Pattern in handlers
+self.client = None
+if self.endpoint and self.key:
+    self.client = AzureClient(...)
+else:
+    logger.error(f"Missing credentials for {service_name}")
+```
 
-## Critical Files
+## Adding a New Service
 
-- `app.py` - Main entry point, async extraction orchestration
-- `handlers/document_intelligence.py` - Reference handler implementation
-- `utils.py` - `keep_state()`, `save_extraction_to_json()` utilities
-- `tests/conftest.py` - All test fixtures and mock data
-- `pyproject.toml` - Dependencies, Ruff config, coverage settings
-- `.github/instructions/*.instructions.md` - Detailed patterns (handler contract, testing, adding services)
+**Checklist**:
+1. ✅ Create `handlers/new_service.py` implementing contract
+2. ✅ Add env vars to `.env.example` and README
+3. ✅ Import in `handlers/__init__.py` and `app.py`
+4. ✅ Add checkbox in `app.py` UI (line ~205)
+5. ✅ Add to `VALID_SERVICE_NAMES` in `utils.py`
+6. ✅ Write unit tests in `tests/test_handlers.py` with `@pytest.mark.unit`
+7. ✅ Run `make format && make test-unit`
+
+**Reference**: See `.github/instructions/adding-services.instructions.md` for detailed guide
+
+## Project-Specific Quirks
+
+### Async Extraction Pattern
+`app.py` uses `asyncio.gather()` to run multiple handlers in parallel per file:
+
+```python
+async def process_file_with_services_async(file, selected_services):
+    tasks = [extract_with_service_async(svc_name, svc_class, file) 
+             for svc_name, svc_class in selected_services]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # Returns: {"ServiceName": result_dict, ...}
+```
+
+**Why**: Reduces total processing time from serial ~15s to parallel ~5s for 3 services.
+
+### Service Names Must Match
+The tuple in `app.py` must match `VALID_SERVICE_NAMES` in `utils.py`:
+
+```python
+# app.py
+selected_services.append(("GPT-4.1-Vision", GPTForVision))  # Key name
+
+# utils.py
+VALID_SERVICE_NAMES = {"GPT-4.1-Vision", ...}  # Must contain exact match
+```
+
+Mismatch causes validation error in `save_extraction_to_json()`.
+
+### Pydantic Schema Convention
+Use `Field(None, description=...)` for all optional fields. CamelCase allowed in `schemas/gpt_schema.py` to match Azure API responses (Ruff N815 ignored).
+
+### Logging Configuration
+Custom millisecond formatter in `app.py`:
+
+```python
+class MillisecondFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        # Formats as: 2024-01-15 10:30:45.123
+```
+
+Suppress verbose Azure SDK logs:
+```python
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+```
+
+## Documentation Standards
+
+- **No separate docs files**: Update `README.md` for new features (see `.github/instructions/documentation.instructions.md`)
+- **README structure**: Follows consistent pattern (Tech Stack → Installation → Usage → Testing)
+- **Code comments**: Use docstrings for public methods, inline comments for non-obvious logic
 
 ## Common Pitfalls
 
-- **Don't use `pip`** - always use `uv` for consistency with lock file
-- **Don't call handlers synchronously** - use the async executor pattern from `app.py`
-- **Don't hardcode Azure credentials** - use env vars with lazy initialization
-- **Don't skip `make format`** - Ruff formatting is enforced, not negotiable
-- **Don't create base classes for handlers** - use concrete pattern (independent implementations)
-- **Don't use camelCase in Python** except Pydantic schema fields matching JSON output (explicitly allowed in config)
+1. **Forgetting `make format`**: Causes CI failures (Ruff enforces strict formatting)
+2. **Hardcoding service names**: Always pass `service_name` parameter to handlers
+3. **Missing error handling**: Handlers must return `{'error': str}`, never raise
+4. **Session state loss**: Use `keep_state()` for data that survives page navigation
+5. **Outdated Streamlit syntax**: Use `width="stretch"`, not `use_container_width=True`
+
+## Files to Check Before Changes
+
+| Change Type | Files to Review |
+|-------------|-----------------|
+| Add service | `handlers/__init__.py`, `app.py` (checkboxes), `utils.py` (VALID_SERVICES), tests |
+| Modify extraction | Handler file, `utils.py` (JSON schema), tests |
+| UI changes | `app.py`, `style.css`, `pages/*.py` |
+| Testing | `conftest.py` (fixtures), `pytest.ini` (markers) |
+| Dependencies | `pyproject.toml` (both deps + dev-dependencies) |
+
+## Quick Reference
+
+```bash
+# Essential Commands
+make format          # Fix all style issues (idempotent)
+make test-unit       # Fast feedback loop (no Azure)
+make check-and-run   # Validate + launch app
+
+# Debugging
+uv run pytest tests/test_handlers.py::TestClassName::test_method -v -s
+uv run ruff check --diff .  # Preview changes without applying
+
+# Coverage
+make test-cov && start htmlcov/index.html  # Windows
+```
+
+## Further Reading
+
+- `.github/instructions/handler-pattern.instructions.md` - Handler implementation contract
+- `.github/instructions/testing.instructions.md` - Testing strategy and fixtures
+- `.github/instructions/streamlit.instructions.md` - Streamlit-specific patterns
+- `AGENTS.md` - Code quality standards (Ruff rules)
+- `README.md` - Complete setup and usage guide

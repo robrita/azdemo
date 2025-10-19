@@ -852,3 +852,162 @@ class TestMistralDocumentAIHandler:
 
             assert "documents" in result
             assert len(result["documents"]) == 0
+
+
+class TestDocumentClassificationHandler:
+    """Test suite for DocumentClassification handler."""
+
+    @pytest.fixture
+    def handler(self, mock_env_vars):
+        """Create a DocumentClassification handler."""
+        from handlers.document_classification import DocumentClassification
+
+        return DocumentClassification(service_name="Document Classification")
+
+    def test_handler_initialization_with_env_vars(self, mock_env_vars):
+        """Test handler initializes correctly with environment variables."""
+        from handlers.document_classification import DocumentClassification
+
+        handler = DocumentClassification(service_name="Document Classification")
+
+        assert handler.service_name == "Document Classification"
+        assert handler.endpoint == "https://test-endpoint.cognitiveservices.azure.com/"
+        assert handler.key == "test_key_12345"
+        assert handler.model_id is not None
+        assert handler.client is not None
+
+    def test_handler_initialization_without_env_vars(self, mock_missing_env_vars):
+        """Test handler handles missing environment variables gracefully."""
+        from handlers.document_classification import DocumentClassification
+
+        handler = DocumentClassification(service_name="Document Classification")
+
+        assert handler.service_name == "Document Classification"
+        assert handler.endpoint is None
+        assert handler.key is None
+        assert handler.client is None
+
+    @pytest.mark.unit
+    def test_classify_success_bir2303_new(self, handler, mock_pdf_file):
+        """Test successful document classification returning bir2303-new."""
+        # Mock the Azure Document Intelligence client response
+        mock_result = Mock()
+        mock_result.model_id = "bir2303-classifier"
+        mock_result.api_version = "2024-11-30"
+        mock_result.pages = [Mock()]
+        mock_result.documents = [Mock()]
+        mock_result.documents[0].doc_type = "bir2303-new"
+        mock_result.documents[0].confidence = 0.95
+
+        with patch.object(handler.client, "begin_classify_document") as mock_classify:
+            mock_poller = Mock()
+            mock_poller.result.return_value = mock_result
+            mock_classify.return_value = mock_poller
+
+            result = handler.classify(mock_pdf_file)
+
+            assert result["service"] == "Document Classification"
+            assert result["docType"] == "bir2303-new"
+            assert result["confidence"] == 0.95
+            assert "error" not in result
+            assert result["processing_info"]["documents_found"] == 1
+
+    @pytest.mark.unit
+    def test_classify_success_bir2303_null(self, handler, mock_pdf_file):
+        """Test successful classification but returning bir2303-null (should be rejected)."""
+        # Mock the Azure Document Intelligence client response
+        mock_result = Mock()
+        mock_result.model_id = "bir2303-classifier"
+        mock_result.api_version = "2024-11-30"
+        mock_result.pages = [Mock()]
+        mock_result.documents = [Mock()]
+        mock_result.documents[0].doc_type = "bir2303-null"
+        mock_result.documents[0].confidence = 0.85
+
+        with patch.object(handler.client, "begin_classify_document") as mock_classify:
+            mock_poller = Mock()
+            mock_poller.result.return_value = mock_result
+            mock_classify.return_value = mock_poller
+
+            result = handler.classify(mock_pdf_file)
+
+            assert result["service"] == "Document Classification"
+            assert result["docType"] == "bir2303-null"
+            assert result["confidence"] == 0.85
+            assert "error" not in result
+
+    @pytest.mark.unit
+    def test_classify_no_documents_found(self, handler, mock_pdf_file):
+        """Test classification when no documents are detected."""
+        # Mock response with no documents
+        mock_result = Mock()
+        mock_result.model_id = "bir2303-classifier"
+        mock_result.api_version = "2024-11-30"
+        mock_result.pages = [Mock()]
+        mock_result.documents = []
+
+        with patch.object(handler.client, "begin_classify_document") as mock_classify:
+            mock_poller = Mock()
+            mock_poller.result.return_value = mock_result
+            mock_classify.return_value = mock_poller
+
+            result = handler.classify(mock_pdf_file)
+
+            assert result["service"] == "Document Classification"
+            assert result["docType"] == "unknown"
+            assert result["confidence"] == 0.0
+            assert "error" not in result
+
+    @pytest.mark.unit
+    def test_classify_exception_handling(self, handler, mock_pdf_file):
+        """Test classification exception handling returns error dict."""
+        with patch.object(
+            handler.client, "begin_classify_document", side_effect=Exception("API Error")
+        ):
+            result = handler.classify(mock_pdf_file)
+
+            assert result["service"] == "Document Classification"
+            assert "error" in result
+            assert "Classification failed" in result["error"]
+            assert result["docType"] == "unknown"
+            assert result["confidence"] == 0.0
+
+    @pytest.mark.unit
+    def test_classify_missing_model_id(self, handler, mock_pdf_file):
+        """Test classification fails gracefully when model_id is not configured."""
+        # Set model_id to None to simulate missing env var
+        handler.model_id = None
+
+        result = handler.classify(mock_pdf_file)
+
+        assert result["service"] == "Document Classification"
+        assert "error" in result
+        assert "AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL" in result["error"]
+        assert result["docType"] == "unknown"
+        assert result["confidence"] == 0.0
+
+    @pytest.mark.unit
+    def test_classify_performance_timing(self, handler, mock_pdf_file):
+        """Test that processing time is tracked correctly."""
+        # Mock fast classification
+        mock_result = Mock()
+        mock_result.model_id = "bir2303-classifier"
+        mock_result.api_version = "2024-11-30"
+        mock_result.pages = [Mock()]
+        mock_result.documents = [Mock()]
+        mock_result.documents[0].doc_type = "bir2303-new"
+        mock_result.documents[0].confidence = 0.95
+
+        with patch.object(handler.client, "begin_classify_document") as mock_classify:
+            mock_poller = Mock()
+            mock_poller.result.return_value = mock_result
+            mock_classify.return_value = mock_poller
+
+            start = time.time()
+            result = handler.classify(mock_pdf_file)
+            elapsed = time.time() - start
+
+            assert "processing_info" in result
+            assert "processing_time_seconds" in result["processing_info"]
+            # Processing time should be close to actual elapsed time (within 0.5s)
+            assert abs(result["processing_info"]["processing_time_seconds"] - elapsed) < 0.5

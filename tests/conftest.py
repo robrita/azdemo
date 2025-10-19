@@ -170,6 +170,7 @@ def mock_env_vars(monkeypatch):
         "AZURE_DOCUMENT_INTELLIGENCE_KEY": "test_key_12345",
         "AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL": "prebuilt-document",
         "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL": "prebuilt-layout",
+        "AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL": "bir2303-classifier",
         "AZURE_OPENAI_ENDPOINT": "https://test-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "test_openai_key",
         "AZURE_OPENAI_DEPLOYMENT_GPT4-1": "gpt-4-vision",
@@ -218,6 +219,9 @@ def real_env_vars():
         "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL": os.getenv(
             "AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL"
         ),
+        "AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL": os.getenv(
+            "AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL"
+        ),
         "AZURE_OPENAI_ENDPOINT": os.getenv("AZURE_OPENAI_ENDPOINT"),
         "AZURE_OPENAI_API_KEY": os.getenv("AZURE_OPENAI_API_KEY"),
         "AZURE_OPENAI_DEPLOYMENT_GPT4-1": os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4-1"),
@@ -252,6 +256,7 @@ def mock_missing_env_vars(monkeypatch):
     azure_keys = [
         "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT",
         "AZURE_DOCUMENT_INTELLIGENCE_KEY",
+        "AZURE_DOCUMENT_INTELLIGENCE_CLASSIFICATION_MODEL",
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_OPENAI_API_KEY",
         "AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT",
