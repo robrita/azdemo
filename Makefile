@@ -1,7 +1,7 @@
 # Makefile for Document Extraction Dashboard
 # Note: On Windows, you may need to install 'make' via chocolatey or use WSL
 
-.PHONY: lint run check-and-run format install test test-unit test-integration test-cov test-fast help
+.PHONY: lint run check-and-run format install test test-unit test-integration test-cov test-fast push help
 
 # Default target
 help:
@@ -11,6 +11,7 @@ help:
 	@echo "  make run           - Start Streamlit app"
 	@echo "  make check-and-run - Run linter, then start app (stops if linting fails)"
 	@echo "  make install       - Install dependencies with uv"
+	@echo "  make push          - Stage, commit, and push changes (prompts for commit message)"
 	@echo ""
 	@echo "Testing commands:"
 	@echo "  make test          - Run all tests"
@@ -60,3 +61,7 @@ test-cov:
 # Run fast tests only (skip slow and integration tests)
 test-fast:
 	uv run pytest -m "not slow and not integration" -v
+
+# Stage, commit, and push changes
+push:
+	@powershell -Command "$$msg = Read-Host 'Enter commit message'; git add . ; git commit -m $$msg ; git push"
