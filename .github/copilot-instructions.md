@@ -1,155 +1,147 @@
 # AI Agent Instructions for Document Extraction Dashboard
 
 ## Project Overview
-Streamlit-based multi-service document extraction platform comparing Azure AI services (Document Intelligence, Content Understanding, OpenAI Vision, Mistral Document AI) for BIR tax document processing. Uses async parallel processing to benchmark multiple services simultaneously.
 
-## Architecture Patterns
+**Document Extraction Dashboard** is a Streamlit-based multi-service document extraction platform that compares results from 6 different Azure AI services in parallel. The application extracts structured data from PDF and image documents using a unified handler pattern.
 
-### Service Handler Pattern
-All extraction services implement a unified interface in `handlers/`:
-- `__init__(service_name)` - Initialize with service name for tracking
-- `extract(uploaded_file) -> Dict[str, Any]` - Returns standardized extraction dict
-- Must call `save_extraction_to_json()` from `utils.py` with fields dict
-- Error responses must include `"error"` key in returned dict
+### Key Architecture Decisions
 
-**Key implementations:**
-- `document_intelligence.py` - Uses `model_template` vs `model_neural` based on service_name
-- `gpt_vision.py` - Converts PDFs to images via PyMuPDF, uses Pydantic `DocSchema` for structured output
-- `mistral_document_ai.py` - Distinguishes `image_url` vs `document_url` based on MIME type
-- `content_understanding.py` - Implements polling pattern for async Azure operations
+- **Multi-handler pattern**: Each extraction service (DocumentIntelligence, GPT Vision, Mistral, Content Understanding) is a separate handler class implementing `extract(uploaded_file)` returning `dict[str, Any]`
+- **Async parallel processing**: Services run in parallel using `asyncio.gather()` to maximize throughput (see `process_file_with_services_async()`)
+- **Session persistence**: Use `st.session_state` and `keep_state()` helper to maintain uploaded files and service selections across page navigation
+- **Structured output**: All extractions normalize to JSON format in `outputs/extract_results.json` with standardized schema
 
-### Async Parallel Processing (app.py)
-```python
-# Process multiple services in parallel for each file
-async def process_file_with_services_async(file, selected_services):
-    tasks = [extract_with_service_async(name, cls, file) for name, cls in selected_services]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+## Critical Developer Workflows
+
+### Package Management (uv + pyproject.toml)
+```bash
+make install          # Install dependencies (recommended workflow)
+uv sync              # Manual install
+uv add package_name  # Add new dependency
+uv run pytest        # Run tests with project environment
 ```
-**Important:** Use `asyncio.run()` in Streamlit context, run blocking operations via `loop.run_in_executor()`.
+**Why uv?** 10-100x faster than pip; reproducible lock files; follows PEP 518/621 standards.
 
-### Results Persistence
-`save_extraction_to_json()` in `utils.py`:
-- Updates/appends to `outputs/extract_results.json`
-- Filters by `file_name` + `service_name` for uniqueness
-- Standardized fields: `name`, `value`, `confidence` (rounded to 3 decimals)
-- Always include `processing_time` and `overall_confidence` parameters
+### Local Development Loop
+```bash
+make check-and-run   # Lint + start app (GATE: stops if linting fails)
+make lint            # Ruff linting only
+make format          # Auto-fix + format
+```
+
+### Testing Strategy
+- **Unit tests** (fast, no Azure calls): `make test-unit` - uses mocked handlers and `mock_env_vars` fixture
+- **Integration tests** (requires `.env` with real credentials): `uv run pytest -m integration`
+- **Coverage reports**: `make test-cov` generates HTML in `htmlcov/index.html`
+- **Test markers**: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.slow`
+
+## Code Patterns & Conventions
+
+### Handler Implementation Pattern
+All service handlers follow this contract:
+
+```python
+from handlers.base import BaseHandler  # (or use as reference pattern)
+
+class NewServiceHandler:
+    def __init__(self, service_name: str = None):
+        self.service_name = service_name
+        self.endpoint = os.getenv("AZURE_SERVICE_ENDPOINT")
+        self.key = os.getenv("AZURE_SERVICE_KEY")
+        # Initialize client if credentials available
+        
+    def extract(self, uploaded_file) -> dict[str, Any]:
+        """Extract returns dict with service, file_info, model_info, documents keys"""
+        start_time = time.time()
+        # Process file
+        processing_time = time.time() - start_time
+        return {"service": self.service_name, ...}
+```
+
+### Session State Management
+Use `keep_state()` to persist data across Streamlit page navigations:
+```python
+keep_state(valid_files, "valid_files")      # Persist uploaded files
+keep_state(selected_services, "selected_services")  # Persist service selections
+```
+
+### JSON Result Normalization
+Use `save_extraction_to_json()` helper to append results (deduplicates by file_name + service_name):
+```python
+save_extraction_to_json(
+    file_name="doc.pdf",
+    service_name="GPT-4.1-Vision", 
+    pages_count=1,
+    fields={"field_name": {"content": "field_value", "confidence": 0.98}},
+    processing_time=2.5
+)
+```
+
+### Ruff Linting Rules
+- **Line length**: 100 characters (enforced)
+- **Target**: Python 3.11+
+- **Format**: Double quotes for strings; per-file ignores in `pyproject.toml`
+- **Pre-commit**: Always run `make format` before commits
 
 ## Environment Configuration
 
-### Required `.env` Variables (see `.env.example`)
-```bash
-# Document Intelligence - Two models (template vs neural)
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=
-AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL=
-AZURE_DOCUMENT_INTELLIGENCE_NEURAL_MODEL=
+### Required for Development
+Create `.env` file in project root (template in README). All Azure services are **optional**—unconfigured services show as unavailable in UI.
 
-# OpenAI - Two deployments (gpt-4.1 vs gpt-5)
-AZURE_OPENAI_ENDPOINT=
-AZURE_OPENAI_DEPLOYMENT_GPT4-1=
-AZURE_OPENAI_DEPLOYMENT_GPT5=
-
-# Mistral - REST API with base64 encoding
-AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT=
-
-# Content Understanding - Polling-based async
-AZURE_CONTENT_UNDERSTANDING_ENDPOINT=
-AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID=
+### Service Credentials (in `.env`)
+```env
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://...
+AZURE_DOCUMENT_INTELLIGENCE_TEMPLATE_MODEL=your-model-id
+AZURE_OPENAI_DEPLOYMENT_GPT4-1=gpt-4-deployment-name
+AZURE_MISTRAL_DOCUMENT_AI_ENDPOINT=https://...
+AZURE_CONTENT_UNDERSTANDING_ANALYZER_ID=your-analyzer-id
 ```
 
-**Service selection logic:** Service name determines model variant (e.g., "ADI-Template" uses template model, "GPT-5-Vision" uses gpt-5 deployment).
+### Test Fixtures for Mock Services
+- `mock_env_vars`: Mocked credentials for unit tests (no API calls)
+- `real_env_vars`: Loads `.env` for integration tests
+- `mock_missing_env_vars`: Tests graceful degradation when services unavailable
+- `sample_image_file` and `mock_pdf_file`: Sample documents for testing extraction handlers
 
-## Dependency Management
+## File Organization & Key Responsibilities
 
-Uses `uv` (modern Python package manager) + `pyproject.toml`:
-```bash
-uv sync                    # Install all dependencies
-uv add package_name        # Add new dependency
-uv run streamlit run app.py  # Run application
-```
+| Directory | Purpose |
+|-----------|---------|
+| `app.py` | Main Streamlit app entry point; renders file upload UI, service selection, extraction orchestration |
+| `handlers/` | Service handlers: `document_intelligence.py`, `gpt_vision.py`, `mistral_document_ai.py`, `content_understanding.py` |
+| `schemas/` | Pydantic models for structuring AI responses (`gpt_schema.py`, `mistral_schema.py`) |
+| `pages/` | Additional Streamlit pages (e.g., `1_Pricing.py`) |
+| `tests/` | Comprehensive pytest suite; `conftest.py` provides shared fixtures |
+| `outputs/` | JSON extraction results accumulate here |
 
-**Critical dependencies:**
-- `streamlit==1.50.0` - Session state via `st.session_state`
-- `azure-ai-documentintelligence>=1.0.2` - Uses `begin_analyze_document()` poller pattern
-- `pymupdf>=1.26.5` - PDF to image conversion (fitz module)
-- `pydantic>=2.10.6` - Structured extraction schemas for GPT Vision
+## Common Debugging Scenarios
 
-## Streamlit Conventions
+**Service returns error**: Check `.env` credentials; verify endpoint format; confirm Azure resource exists and isn't rate-limited.
 
-### Session State Management (`utils.py`)
-```python
-keep_state(value, "state_key")  # Persist across page navigations
-```
-Used for: `valid_files`, `selected_services`, checkbox states (`svc_template`, `svc_neural`, etc.)
+**Session state lost on page navigation**: Use `keep_state()` in page entry; see `app.py` for pattern.
 
-### Page Structure
-- `render_sidebar()` - MUST be called first on every page for navigation
-- Tab pattern: "📤 Upload & Extract" | "🔍 Analyze Output"
-- File validation: `is_valid_file_type()` checks `['pdf', 'png', 'jpg', 'jpeg']`
-- Process button only shows when `valid_files AND selected_services`
+**Test fails with missing test image**: Ensure sample images exist in `tests/data/`; tests skip gracefully if missing.
 
-### Custom CSS Loading
-```python
-with open('style.css') as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-```
-Loads Google Fonts (Gasoek One, Oswald) via `style.css`.
+**Import path issues**: Handlers use `sys.path.append("..")` to access utils; Streamlit app requires `from handlers import ClassName`.
 
-## Data Flow
+## Integration Points & Data Flow
 
-1. **Upload** → Validate file types → Store in `st.session_state["valid_files"]`
-2. **Service Selection** → Checkboxes create `[(service_name, ServiceClass)]` tuples
-3. **Extraction** → `process_file_with_services_async()` runs services in parallel
-4. **Save** → Each handler calls `save_extraction_to_json()` with standardized fields
-5. **Analysis** → Tab 2 loads JSON, creates DataFrame sorted by `file_name` + `service_name`
+1. **File Upload** → validated in `app.py` (allowed: pdf, png, jpg, jpeg)
+2. **Service Selection** → checkbox selections stored in session state
+3. **Async Extraction** → `process_file_with_services_async()` spawns handler tasks in parallel thread pool
+4. **Result Aggregation** → each handler returns dict; results keyed by service name
+5. **JSON Persistence** → `save_extraction_to_json()` appends to `outputs/extract_results.json`
+6. **Analysis Tab** → loads JSON, renders dataframes and processing time trends via Plotly
 
-**Output visualization:**
-- Switchable "Values" vs "Confidence" view
-- Processing time line chart using Plotly (`go.Scatter` with color palette)
-- Table fields: `tin`, `taxpayerName`, `registeredDate`, `registeredAddress`, `tradeName`, `businessType`
+## When Adding New Services
 
-## Common Tasks
+1. Create `handlers/new_service.py` following handler contract (init + extract method)
+2. Add environment variable configuration in `.env` template
+3. Update `conftest.py` with mock fixture if needed
+4. Add handler import to `handlers/__init__.py`
+5. Add UI checkbox in `app.py` for service selection
+6. Add tests in `tests/test_handlers.py` for handler initialization and error cases
 
-### Adding a New Extraction Service
-1. Create `handlers/new_service.py` implementing `extract(uploaded_file)`
-2. Add to `handlers/__init__.py` imports and `__all__`
-3. Add checkbox in `app.py` tab1 (follow pattern: `svc_newname = st.checkbox(...)`)
-4. Append to `selected_services` list with tuple `("Display-Name", NewServiceClass)`
-5. Extract fields, call `save_extraction_to_json()` with confidence scores
+---
 
-### Debugging Extraction Issues
-- Check `outputs/extract_results.json` for saved results structure
-- Errors must include `"error"` key to be caught by `failed_results` filter
-- Use `st.spinner()` context for long operations (user feedback)
-- `processing_time` calculated via `time.time() - start_time`
-
-### Modifying BIR Document Schema
-Update both:
-1. Pydantic model `DocSchema` in `schemas/gpt_schema.py` (for OpenAI structured output)
-2. JSON schema `properties` in `mistral_document_ai.py` (for Mistral Document AI)
-3. Table columns in `app.py` tab2 DataFrame (`row = {...}` initialization)
-
-## Development Workflow
-
-```bash
-# Setup
-git clone https://github.com/robrita/azdemo.git
-cd azdemo
-uv sync
-
-# Configure environment
-cp .env.example .env
-# Edit .env with Azure credentials
-
-# Run locally
-uv run streamlit run app.py
-
-# Outputs stored in
-outputs/extract_results.json  # All extraction results
-inputs/test/new/             # Test documents
-```
-
-**Troubleshooting:**
-- Missing credentials → Handlers return `{"error": "...not configured..."}` dict
-- PDF conversion fails → Check PyMuPDF/fitz installation (`uv sync`)
-- Async errors → Ensure `run_in_executor()` for blocking SDK calls
-- Session state loss → Verify `keep_state()` calls for stateful data
+**Last updated**: October 2024 | **Coverage**: 100% | **Python**: 3.11+ | **Framework**: Streamlit 1.50.0

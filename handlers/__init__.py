@@ -13,15 +13,15 @@ Each handler implements an extract() method that takes an uploaded file and retu
 structured extraction results.
 """
 
-from .document_intelligence import DocumentIntelligence
 from .content_understanding import ContentUnderstanding
-from .mistral_document_ai import MistralDocumentAI
+from .document_intelligence import DocumentIntelligence
 from .gpt_vision import GPTForVision
+from .mistral_document_ai import MistralDocumentAI
 
 __all__ = [
-    'DocumentIntelligence',
-    'DocumentIntelligenceNeural', 
-    'ContentUnderstanding',
-    'MistralDocumentAI',
-    'GPTForVision'
+    "DocumentIntelligence",
+    "DocumentIntelligenceNeural",
+    "ContentUnderstanding",
+    "MistralDocumentAI",
+    "GPTForVision",
 ]

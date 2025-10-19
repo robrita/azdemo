@@ -1,5 +1,6 @@
 import streamlit as st
 
+
 def render_sidebar():
     """
     Render the common sidebar navigation for all pages in the Document Processing application.
@@ -10,7 +11,7 @@ def render_sidebar():
         page_title="Document Processing Dashboard",
         page_icon="🚀",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="expanded",
     )
 
     st.logo(
@@ -19,8 +20,8 @@ def render_sidebar():
     )
 
     # Loading the CSS
-    with open('style.css') as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    with open("style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
     with st.sidebar:
         with st.container(border=True):
@@ -44,12 +45,21 @@ def keep_state(state_object, state_name):
         return True
     return False
 
-def save_extraction_to_json(file_name: str, service_name: str, pages_count: int, fields: dict, overall_confidence: float = None, processing_time: float = None, results_file_path: str = "outputs/extract_results.json") -> None:
+
+def save_extraction_to_json(
+    file_name: str,
+    service_name: str,
+    pages_count: int,
+    fields: dict,
+    overall_confidence: float = None,
+    processing_time: float = None,
+    results_file_path: str = "outputs/extract_results.json",
+) -> None:
     """
     Save extraction results to JSON file following standardized structure.
     This function handles loading existing data, filtering by file_name and service_name,
     and updating or appending new results.
-    
+
     Args:
         file_name: Name of the processed file
         service_name: Name of the extraction service used
@@ -61,40 +71,40 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
     """
     import json
     from pathlib import Path
-    
+
     try:
         results_file = Path(results_file_path)
-        
+
         # Ensure outputs directory exists
         results_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Load existing data or create new structure
         if results_file.exists():
-            with open(results_file, 'r', encoding='utf-8') as f:
+            with open(results_file, encoding="utf-8") as f:
                 data = json.load(f)
         else:
             data = {"results": []}
-        
+
         # Build fields array with name, value, and confidence
         fields_array = []
-        
+
         for field_name, field_data in fields.items():
             # Extract value from content (or fallback to value or empty string)
-            value = field_data.get('content', field_data.get('value', ''))
-            confidence = field_data.get('confidence', 0.0)
-            
-            fields_array.append({
-                "name": field_name,
-                "value": value,
-                "confidence": round(confidence, 3)
-            })
+            value = field_data.get("content", field_data.get("value", ""))
+            confidence = field_data.get("confidence", 0.0)
+
+            fields_array.append(
+                {"name": field_name, "value": value, "confidence": round(confidence, 3)}
+            )
 
         # Use provided overall_confidence or default to 0.0
-        document_confidence = round(overall_confidence, 3) if overall_confidence is not None else 0.0
-        
+        document_confidence = (
+            round(overall_confidence, 3) if overall_confidence is not None else 0.0
+        )
+
         # Use provided processing_time or default to 0.0
         proc_time = round(processing_time, 3) if processing_time is not None else 0.0
-        
+
         # Create new result entry
         new_result = {
             "file_name": file_name,
@@ -102,27 +112,27 @@ def save_extraction_to_json(file_name: str, service_name: str, pages_count: int,
             "pages_count": pages_count,
             "document_confidence": document_confidence,
             "processing_time": proc_time,
-            "fields": fields_array
+            "fields": fields_array,
         }
-        
+
         # Find and update existing entry or append new one
         existing_index = None
         for idx, result in enumerate(data["results"]):
             if result.get("file_name") == file_name and result.get("service_name") == service_name:
                 existing_index = idx
                 break
-        
+
         if existing_index is not None:
             # Update existing entry
             data["results"][existing_index] = new_result
         else:
             # Append new entry
             data["results"].append(new_result)
-        
+
         # Save back to file
-        with open(results_file, 'w', encoding='utf-8') as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-            
+
     except Exception as e:
         st.warning(f"Failed to save results to JSON: {str(e)}")
         print(f"Error details: {e}")
