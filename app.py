@@ -188,62 +188,137 @@ def main():
     tab1, tab2 = st.tabs(["📤 Upload & Extract", "🔍 Analyze Output"])
 
     with tab1:
-        st.subheader("Upload Documents for Extraction")
-        uploaded_files = st.file_uploader(
-            "Choose files (PDF or images)",
-            type=["pdf", "png", "jpg", "jpeg"],
-            accept_multiple_files=True,
-        )
-        st.caption("Supported: PDF, PNG, JPG, JPEG - Multiple files allowed")
+        with st.container(border=True):
+            st.subheader("1️⃣ Upload Documents")
 
-        st.markdown("**Select Extraction Services:**")
-        col1, col2 = st.columns(2)
-        with col1:
-            svc_template = st.checkbox(
-                "Document Intelligence - Template",
-                value=st.session_state.get("svc_template", False),
-            )
-            svc_neural = st.checkbox(
-                "Document Intelligence - Neural", value=st.session_state.get("svc_neural", False)
-            )
-            svc_content = st.checkbox(
-                "Content Understanding", value=st.session_state.get("svc_content", False)
-            )
-        with col2:
-            svc_mistral = st.checkbox(
-                "Mistral Document AI", value=st.session_state.get("svc_mistral", False)
-            )
-            svc_gpt41 = st.checkbox(
-                "GPT-4.1 for Vision", value=st.session_state.get("svc_gpt41", False)
-            )
-            svc_gpt5 = st.checkbox(
-                "GPT-5 for Vision", value=st.session_state.get("svc_gpt5", False)
+            # Define test directory path
+            test_dir = os.path.join(os.path.dirname(__file__), "inputs", "test")
+
+            # Add upload method selector
+            upload_method = st.radio(
+                "Select upload method:",
+                ["📁 Browse Test Folder", "💾 Upload from Computer"],
+                horizontal=True,
             )
 
-        # Store checkbox states in session
-        st.session_state["svc_template"] = svc_template
-        st.session_state["svc_neural"] = svc_neural
-        st.session_state["svc_content"] = svc_content
-        st.session_state["svc_mistral"] = svc_mistral
-        st.session_state["svc_gpt41"] = svc_gpt41
-        st.session_state["svc_gpt5"] = svc_gpt5
+            if upload_method == "📁 Browse Test Folder":
+                # List all files in test directory and subdirectories
+                available_files = []
+                if os.path.exists(test_dir):
+                    for root, _dirs, files in os.walk(test_dir):
+                        for file in files:
+                            if file.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
+                                full_path = os.path.join(root, file)
+                                # Get relative path for display
+                                rel_path = os.path.relpath(full_path, test_dir)
+                                available_files.append((rel_path, full_path))
 
-        selected_services = []
-        if svc_template:
-            selected_services.append(("ADI-Template", DocumentIntelligence))
-        if svc_neural:
-            selected_services.append(("ADI-Neural", DocumentIntelligence))
-        if svc_content:
-            selected_services.append(("Content-Understanding", ContentUnderstanding))
-        if svc_mistral:
-            selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
-        if svc_gpt41:
-            selected_services.append(("GPT-4.1-Vision", GPTForVision))
-        if svc_gpt5:
-            selected_services.append(("GPT-5-Vision", GPTForVision))
+                if available_files:
+                    # Sort files by name
+                    available_files.sort(key=lambda x: x[0])
 
-        # Use keep_state to persist selected_services across page navigation
-        keep_state(selected_services, "selected_services")
+                    # Multi-select for files
+                    selected_file_paths = st.multiselect(
+                        "Select files from test folder: (inputs/test/)",
+                        options=[f[0] for f in available_files],
+                        help="Select one or more files to extract",
+                    )
+
+                    if selected_file_paths:
+                        # Load selected files into memory
+                        from io import BytesIO
+
+                        uploaded_files = []
+                        for rel_path in selected_file_paths:
+                            # Find the full path
+                            full_path = next(f[1] for f in available_files if f[0] == rel_path)
+
+                            with open(full_path, "rb") as f:
+                                file_bytes = f.read()
+
+                            file_obj = BytesIO(file_bytes)
+                            file_obj.name = os.path.basename(full_path)
+
+                            # Add type attribute based on file extension
+                            # This mimics Streamlit's UploadedFile behavior
+                            file_ext = os.path.splitext(full_path)[1].lower()
+                            mime_types = {
+                                ".pdf": "application/pdf",
+                                ".png": "image/png",
+                                ".jpg": "image/jpeg",
+                                ".jpeg": "image/jpeg",
+                            }
+                            file_obj.type = mime_types.get(file_ext, "application/octet-stream")
+
+                            file_obj.seek(0)
+                            uploaded_files.append(file_obj)
+
+                        st.success(f"✅ {len(uploaded_files)} file(s) loaded from test folder")
+                    else:
+                        uploaded_files = None
+                else:
+                    st.warning(f"⚠️ No valid files found in: {test_dir}")
+                    uploaded_files = None
+
+            else:  # Upload from Computer
+                uploaded_files = st.file_uploader(
+                    "Choose files (PDF or images)",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    accept_multiple_files=True,
+                    help=f"Note: Browser file picker cannot default to {test_dir}",
+                )
+                st.caption("Supported: PDF, PNG, JPG, JPEG - Multiple files allowed")
+
+        with st.container(border=True):
+            st.subheader("2️⃣ Select Extraction Services")
+            col1, col2 = st.columns(2)
+            with col1:
+                svc_template = st.checkbox(
+                    "Document Intelligence - Template",
+                    value=st.session_state.get("svc_template", False),
+                )
+                svc_neural = st.checkbox(
+                    "Document Intelligence - Neural",
+                    value=st.session_state.get("svc_neural", False),
+                )
+                svc_content = st.checkbox(
+                    "Content Understanding", value=st.session_state.get("svc_content", False)
+                )
+            with col2:
+                svc_mistral = st.checkbox(
+                    "Mistral Document AI", value=st.session_state.get("svc_mistral", False)
+                )
+                svc_gpt41 = st.checkbox(
+                    "GPT-4.1 for Vision", value=st.session_state.get("svc_gpt41", False)
+                )
+                svc_gpt5 = st.checkbox(
+                    "GPT-5 for Vision", value=st.session_state.get("svc_gpt5", False)
+                )
+
+            # Store checkbox states in session
+            st.session_state["svc_template"] = svc_template
+            st.session_state["svc_neural"] = svc_neural
+            st.session_state["svc_content"] = svc_content
+            st.session_state["svc_mistral"] = svc_mistral
+            st.session_state["svc_gpt41"] = svc_gpt41
+            st.session_state["svc_gpt5"] = svc_gpt5
+
+            selected_services = []
+            if svc_template:
+                selected_services.append(("ADI-Template", DocumentIntelligence))
+            if svc_neural:
+                selected_services.append(("ADI-Neural", DocumentIntelligence))
+            if svc_content:
+                selected_services.append(("Content-Understanding", ContentUnderstanding))
+            if svc_mistral:
+                selected_services.append(("Mistral-Doc-AI", MistralDocumentAI))
+            if svc_gpt41:
+                selected_services.append(("GPT-4.1-Vision", GPTForVision))
+            if svc_gpt5:
+                selected_services.append(("GPT-5-Vision", GPTForVision))
+
+            # Use keep_state to persist selected_services across page navigation
+            keep_state(selected_services, "selected_services")
 
         # Check for stored valid files from session state
         stored_valid_files = st.session_state.get("valid_files", [])
@@ -284,7 +359,7 @@ def main():
                     st.write(f"{i + 1}. **{file.name}** ({get_file_type_description(file)})")
 
             with col_clear_files:
-                if st.button("🗑️ Clear Files"):
+                if st.button("🗑️ Clear Files", width="stretch"):
                     if "valid_files" in st.session_state:
                         del st.session_state["valid_files"]
                     st.rerun()
@@ -298,213 +373,230 @@ def main():
             )
 
         # Only show Extract button if files are valid AND services are selected
-        if valid_files and selected_services and st.button("🚀 Extract Documents"):
-            logger.info(
-                f"Extraction started: {len(valid_files)} files x {len(selected_services)} services"
-            )
-            with st.spinner(
-                f"Extracting {len(valid_files)} document(s) with {len(selected_services)} services in parallel..."
-            ):
-                os.makedirs("outputs", exist_ok=True)
+        if valid_files and selected_services:
+            col_spacer, _ = st.columns([1, 3])
+            with col_spacer:
+                if st.button("🚀 Extract Documents", width="stretch"):
+                    logger.info(
+                        f"Extraction started: {len(valid_files)} files x {len(selected_services)} services"
+                    )
+                    is_extracting = True
+                else:
+                    is_extracting = False
 
-                # Process each valid file with async parallel processing
-                for file in valid_files:
-                    # Run async processing for this file
-                    try:
-                        # Run the async function in Streamlit
-                        file_results = asyncio.run(
-                            process_file_with_services_async(file, selected_services)
-                        )
+            if is_extracting:
+                with st.spinner(
+                    f"Extracting {len(valid_files)} document(s) with {len(selected_services)} services in parallel..."
+                ):
+                    os.makedirs("outputs", exist_ok=True)
 
-                        # Remove processing summary from results
-                        file_results.pop("_processing_summary", {})
+                    # Process each valid file with async parallel processing
+                    for file in valid_files:
+                        # Run async processing for this file
+                        try:
+                            # Run the async function in Streamlit
+                            file_results = asyncio.run(
+                                process_file_with_services_async(file, selected_services)
+                            )
 
-                        # Display results for this file
-                        with st.expander(f"📄 Results for {file.name}", expanded=False):
-                            # Show successful extractions
-                            successful_results = {
-                                k: v
-                                for k, v in file_results.items()
-                                if isinstance(v, dict) and "error" not in v
-                            }
-                            failed_results = {
-                                k: v
-                                for k, v in file_results.items()
-                                if isinstance(v, dict) and "error" in v
-                            }
+                            # Remove processing summary from results
+                            file_results.pop("_processing_summary", {})
 
-                            if successful_results:
-                                st.markdown("**✅ Successful Extractions:**")
-                                for svc_name, extraction in successful_results.items():
-                                    with st.expander(f"🔍 {svc_name}", expanded=False):
-                                        st.json(extraction)
+                            # Display results for this file
+                            with st.expander(f"📄 Results for {file.name}", expanded=False):
+                                # Show successful extractions
+                                successful_results = {
+                                    k: v
+                                    for k, v in file_results.items()
+                                    if isinstance(v, dict) and "error" not in v
+                                }
+                                failed_results = {
+                                    k: v
+                                    for k, v in file_results.items()
+                                    if isinstance(v, dict) and "error" in v
+                                }
 
-                            if failed_results:
-                                st.markdown("**❌ Failed Extractions:**")
-                                for svc_name, extraction in failed_results.items():
-                                    with st.expander(f"⚠️ {svc_name} (Error)", expanded=False):
-                                        st.error(extraction.get("error", "Unknown error"))
-                                        st.json(extraction)
+                                if successful_results:
+                                    st.markdown("**✅ Successful Extractions:**")
+                                    for svc_name, extraction in successful_results.items():
+                                        with st.expander(f"🔍 {svc_name}", expanded=False):
+                                            st.json(extraction)
 
-                    except Exception as e:
-                        logger.error(
-                            f"File extraction error: {file.name} | {str(e)}", exc_info=True
-                        )
-                        st.error(f"❌ Failed to process {file.name}: {str(e)}")
-                        continue
+                                if failed_results:
+                                    st.markdown("**❌ Failed Extractions:**")
+                                    for svc_name, extraction in failed_results.items():
+                                        with st.expander(f"⚠️ {svc_name} (Error)", expanded=False):
+                                            st.error(extraction.get("error", "Unknown error"))
+                                            st.json(extraction)
+
+                        except Exception as e:
+                            logger.error(
+                                f"File extraction error: {file.name} | {str(e)}", exc_info=True
+                            )
+                            st.error(f"❌ Failed to process {file.name}: {str(e)}")
+                            continue
 
     with tab2:
         st.subheader("Analyze Output")
 
-        # Load JSON data from outputs folder
-        json_files = []
-        if os.path.exists("outputs"):
-            json_files = [f for f in os.listdir("outputs") if f.endswith(".json")]
+        with st.container(border=True):
+            # Load JSON data from outputs folder
+            json_files = []
+            if os.path.exists("outputs"):
+                json_files = [f for f in os.listdir("outputs") if f.endswith(".json")]
 
-        if not json_files:
-            st.info("No extraction results found in outputs folder.")
-        else:
-            # Allow user to select which JSON file to analyze
-            selected_json = st.selectbox("Select JSON file to analyze", json_files, index=0)
+            if not json_files:
+                st.info("No extraction results found in outputs folder.")
+            else:
+                # Create two columns for side-by-side selectors
+                col1, col2 = st.columns(2)
 
-            if selected_json:
-                json_path = os.path.join("outputs", selected_json)
+                with col1:
+                    # Allow user to select which JSON file to analyze
+                    selected_json = st.selectbox(
+                        "Select JSON file to analyze (outputs/)", json_files, index=0
+                    )
 
-                try:
-                    with open(json_path, encoding="utf-8") as f:
-                        data = json.load(f)
+                with col2:
+                    # Add filter to select value or confidence view
+                    view_type = st.selectbox("Select data view", ["Values", "Confidence"])
 
-                    # Extract results array from JSON
-                    results = data.get("results", [])
+        # Display results outside container
+        if json_files and selected_json:
+            json_path = os.path.join("outputs", selected_json)
 
-                    logger.info(f"Loaded {len(results)} result(s) from {selected_json}")
+            try:
+                with open(json_path, encoding="utf-8") as f:
+                    data = json.load(f)
 
-                    if not results:
-                        st.warning("No results found in the selected JSON file.")
-                    else:
-                        # Add filter to select value or confidence view
-                        view_type = st.selectbox("Select data view", ["Values", "Confidence"])
+                # Extract results array from JSON
+                results = data.get("results", [])
 
-                        # Prepare data for tables
-                        table_data = []
+                logger.info(f"Loaded {len(results)} result(s) from {selected_json}")
 
-                        # Dynamically collect all field names across results (exclude language, summary)
-                        dynamic_field_names = set()
-                        for result in results:
-                            for field in result.get("fields", []):
-                                fname = field.get("name", "")
-                                if fname and fname not in ("language", "summary"):
-                                    dynamic_field_names.add(fname)
+                if not results:
+                    st.warning("No results found in the selected JSON file.")
+                else:
+                    # Prepare data for tables
+                    table_data = []
 
-                        # Sort for consistent column ordering
-                        dynamic_field_names = sorted(dynamic_field_names)
+                    # Dynamically collect all field names across results (exclude language, summary)
+                    dynamic_field_names = set()
+                    for result in results:
+                        for field in result.get("fields", []):
+                            fname = field.get("name", "")
+                            if fname and fname not in ("language", "summary"):
+                                dynamic_field_names.add(fname)
 
-                        for result in results:
-                            file_name = result.get("file_name", "")
-                            service_name = result.get("service_name", "")
-                            processing_time = result.get("processing_time", 0.0)
+                    # Sort for consistent column ordering
+                    dynamic_field_names = sorted(dynamic_field_names)
 
-                            # Base row with required metadata
-                            row = {
+                    for result in results:
+                        file_name = result.get("file_name", "")
+                        service_name = result.get("service_name", "")
+                        processing_time = result.get("processing_time", 0.0)
+
+                        # Base row with required metadata
+                        row = {
+                            "file_name": file_name,
+                            "service_name": service_name,
+                            "processing_time": f"{processing_time:.3f}s"
+                            if processing_time
+                            else "0.000s",
+                        }
+
+                        # Initialize dynamic fields as empty
+                        for fname in dynamic_field_names:
+                            row[fname] = ""
+
+                        # Populate values or confidence
+                        for field in result.get("fields", []):
+                            field_name = field.get("name", "")
+                            if field_name in row and field_name not in ("language", "summary"):
+                                if view_type == "Values":
+                                    row[field_name] = field.get("value", "")
+                                else:  # Confidence view
+                                    confidence = field.get("confidence", 0)
+                                    row[field_name] = f"{confidence:.3f}" if confidence else ""
+
+                        table_data.append(row)
+
+                    # Create DataFrame and sort by file_name, then service_name
+                    df = pd.DataFrame(table_data)
+                    df = df.sort_values(
+                        by=["file_name", "service_name"], ascending=True
+                    ).reset_index(drop=True)
+
+                    # Display the table
+                    st.markdown(f"### {view_type} Table")
+                    st.dataframe(df, width="stretch", hide_index=True)
+
+                    # Add Processing Time Trends Graph
+                    st.markdown("---")
+                    st.subheader("Processing Time Trends")
+
+                    # Prepare data for line chart
+                    # Group by file_name and service_name, get processing times
+                    chart_data = []
+                    for result in results:
+                        file_name = result.get("file_name", "")
+                        service_name = result.get("service_name", "")
+                        processing_time = result.get("processing_time", 0.0)
+                        chart_data.append(
+                            {
                                 "file_name": file_name,
                                 "service_name": service_name,
-                                "processing_time": f"{processing_time:.3f}s"
-                                if processing_time
-                                else "0.000s",
+                                "processing_time": processing_time,
                             }
-
-                            # Initialize dynamic fields as empty
-                            for fname in dynamic_field_names:
-                                row[fname] = ""
-
-                            # Populate values or confidence
-                            for field in result.get("fields", []):
-                                field_name = field.get("name", "")
-                                if field_name in row and field_name not in ("language", "summary"):
-                                    if view_type == "Values":
-                                        row[field_name] = field.get("value", "")
-                                    else:  # Confidence view
-                                        confidence = field.get("confidence", 0)
-                                        row[field_name] = f"{confidence:.3f}" if confidence else ""
-
-                            table_data.append(row)
-
-                        # Create DataFrame and sort by file_name, then service_name
-                        df = pd.DataFrame(table_data)
-                        df = df.sort_values(
-                            by=["file_name", "service_name"], ascending=True
-                        ).reset_index(drop=True)
-
-                        # Display the table
-                        st.markdown(f"### {view_type} Table")
-                        st.dataframe(df, width="stretch", hide_index=True)
-
-                        # Add Processing Time Trends Graph
-                        st.markdown("---")
-                        st.markdown("### Processing Time Trends")
-
-                        # Prepare data for line chart
-                        # Group by file_name and service_name, get processing times
-                        chart_data = []
-                        for result in results:
-                            file_name = result.get("file_name", "")
-                            service_name = result.get("service_name", "")
-                            processing_time = result.get("processing_time", 0.0)
-                            chart_data.append(
-                                {
-                                    "file_name": file_name,
-                                    "service_name": service_name,
-                                    "processing_time": processing_time,
-                                }
-                            )
-
-                        chart_df = pd.DataFrame(chart_data)
-
-                        # Get unique services
-                        services = sorted(chart_df["service_name"].unique())
-
-                        # Create line chart with a line for each service
-                        fig = go.Figure()
-
-                        # Color palette for services
-                        colors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"]
-
-                        for idx, service in enumerate(services):
-                            service_data = chart_df[chart_df["service_name"] == service]
-                            # Sort by file_name to ensure proper line connection
-                            service_data = service_data.sort_values("file_name")
-
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=service_data["file_name"],
-                                    y=service_data["processing_time"],
-                                    mode="lines+markers",
-                                    name=service,
-                                    line={"color": colors[idx % len(colors)], "width": 2},
-                                    marker={"size": 8},
-                                )
-                            )
-
-                        fig.update_layout(
-                            hovermode="x unified",
-                            xaxis_title="File Name",
-                            yaxis_title="Processing Time (seconds)",
-                            yaxis={"rangemode": "tozero", "dtick": 2},
-                            legend={
-                                "orientation": "h",
-                                "yanchor": "bottom",
-                                "y": 1.02,
-                                "xanchor": "right",
-                                "x": 1,
-                            },
-                            height=400,
                         )
 
-                        st.plotly_chart(fig, config={"responsive": True})
+                    chart_df = pd.DataFrame(chart_data)
 
-                except Exception as e:
-                    logger.error(f"JSON load error: {json_path} | {str(e)}", exc_info=True)
-                    st.error(f"Error loading JSON file: {str(e)}")
+                    # Get unique services
+                    services = sorted(chart_df["service_name"].unique())
+
+                    # Create line chart with a line for each service
+                    fig = go.Figure()
+
+                    # Color palette for services
+                    colors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"]
+
+                    for idx, service in enumerate(services):
+                        service_data = chart_df[chart_df["service_name"] == service]
+                        # Sort by file_name to ensure proper line connection
+                        service_data = service_data.sort_values("file_name")
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=service_data["file_name"],
+                                y=service_data["processing_time"],
+                                mode="lines+markers",
+                                name=service,
+                                line={"color": colors[idx % len(colors)], "width": 2},
+                                marker={"size": 8},
+                            )
+                        )
+
+                    fig.update_layout(
+                        hovermode="x unified",
+                        xaxis_title="File Name",
+                        yaxis_title="Processing Time (seconds)",
+                        yaxis={"rangemode": "tozero", "dtick": 2},
+                        legend={
+                            "orientation": "h",
+                            "yanchor": "bottom",
+                            "y": 1.02,
+                            "xanchor": "right",
+                            "x": 1,
+                        },
+                        height=400,
+                    )
+
+                    st.plotly_chart(fig, config={"responsive": True})
+
+            except Exception as e:
+                logger.error(f"JSON load error: {json_path} | {str(e)}", exc_info=True)
+                st.error(f"Error loading JSON file: {str(e)}")
 
 
 if __name__ == "__main__":

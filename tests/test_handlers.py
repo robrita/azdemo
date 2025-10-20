@@ -914,7 +914,7 @@ class TestDocumentClassificationHandler:
 
     @pytest.mark.unit
     def test_classify_success_bir2303_null(self, handler, mock_pdf_file):
-        """Test successful classification but returning bir2303-null (should be rejected)."""
+        """Test successful classification but returning bir2303-null (should be rejected as unknown)."""
         # Mock the Azure Document Intelligence client response
         mock_result = Mock()
         mock_result.model_id = "bir2303-classifier"
@@ -932,9 +932,12 @@ class TestDocumentClassificationHandler:
             result = handler.classify(mock_pdf_file)
 
             assert result["service"] == "Document Classification"
-            assert result["docType"] == "bir2303-null"
-            assert result["confidence"] == 0.85
+            # doc_type containing "null" should be rejected and set to "unknown"
+            assert result["docType"] == "unknown"
+            assert result["confidence"] == 0.85  # Confidence is preserved
             assert "error" not in result
+            # Verify the original doc_type is preserved in documents array
+            assert result["documents"][0]["doc_type"] == "bir2303-null"
 
     @pytest.mark.unit
     def test_classify_no_documents_found(self, handler, mock_pdf_file):

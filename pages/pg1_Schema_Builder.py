@@ -145,7 +145,7 @@ def main():
         col1, col2 = st.columns([1, 2], gap="large")
 
         with col1:
-            st.markdown("### 1️⃣ Field Configuration")
+            st.subheader("1️⃣ Field Configuration")
 
             # Add field button
             if st.button("➕ Add Field", width="stretch"):
@@ -155,9 +155,7 @@ def main():
             st.markdown(f"**Total Fields:** {len(st.session_state.fields)}")
 
         with col2:
-            st.markdown("### 2️⃣ Schema Configuration")
-
-            st.markdown("**Schema Details**")
+            st.subheader("2️⃣ Schema Configuration")
 
             # Schema name input
             schema_name = st.text_input(
@@ -178,7 +176,7 @@ def main():
             st.session_state.schema_description = schema_description
 
     # Fields Management Section
-    st.markdown("### 3️⃣ Field Manager")
+    st.subheader("3️⃣ Field Manager")
 
     if st.session_state.fields:
         for idx, field in enumerate(st.session_state.fields):
@@ -235,9 +233,9 @@ def main():
         st.info("No fields added yet. Click 'Add Field' to get started.")
 
     # Generate Schema Section
-    st.markdown("### 4️⃣ Generate & Export")
+    st.subheader("4️⃣ Generate & Export")
 
-    col_generate, _ = st.columns([1, 2])
+    col_generate, _ = st.columns([1, 2], gap="large")
     with col_generate:
         if st.button("🚀 Generate Schema", width="stretch"):
             generated_schema = generate_json_schema()
@@ -250,7 +248,7 @@ def main():
     # Display generated schema
     if "generated_schema" in st.session_state:
         st.markdown("---")
-        st.markdown("### ✅ Generated Schema")
+        st.subheader("✅ Generated Schema")
 
         # Create tabs for different formats
         tab_pydantic, tab_function, tab_json_schema = st.tabs(
@@ -302,7 +300,7 @@ def main():
 
     # Help section
     st.markdown("---")
-    st.markdown("### 💡 Tips & Guidance")
+    st.subheader("💡 Tips & Guidance")
 
     col_tips1, col_tips2 = st.columns(2)
 

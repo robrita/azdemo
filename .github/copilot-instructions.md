@@ -79,28 +79,14 @@ def test_handler_extract(mock_pdf_file, mock_env_vars):
     assert "error" not in result  # Success case
 ```
 
-### Code Quality (Ruff)
-- **Line length**: 100 chars
-- **Quotes**: Double quotes only
-- **Per-file ignores**:
-  - `__init__.py`: Allow unused imports (F401) for package exports
-  - `schemas/gpt_schema.py`: Allow camelCase (N815) to match JSON field names
-- **Config**: All rules in `pyproject.toml` [tool.ruff]
-
 ## Key Conventions
 
-### Streamlit Patterns
+### Session State Persistence
 ```python
-# Chart width (Streamlit 1.50.0+)
-st.line_chart(data, width="stretch")  # ✅ Modern
-st.plotly_chart(fig, config={"responsive": True})  # ✅ Plotly-specific
-
 # Session state persistence across pages
 from utils import keep_state
 keep_state(valid_files, "valid_files")  # Survives page navigation
 ```
-
-**Deprecated**: `use_container_width=True` (replaced by `width="stretch"`)
 
 ### JSON Output Standardization
 Always use utility function to maintain schema consistency:
@@ -205,19 +191,11 @@ Suppress verbose Azure SDK logs:
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
 ```
 
-## Documentation Standards
-
-- **No separate docs files**: Update `README.md` for new features (see `.github/instructions/documentation.instructions.md`)
-- **README structure**: Follows consistent pattern (Tech Stack → Installation → Usage → Testing)
-- **Code comments**: Use docstrings for public methods, inline comments for non-obvious logic
-
 ## Common Pitfalls
 
-1. **Forgetting `make format`**: Causes CI failures (Ruff enforces strict formatting)
-2. **Hardcoding service names**: Always pass `service_name` parameter to handlers
-3. **Missing error handling**: Handlers must return `{'error': str}`, never raise
-4. **Session state loss**: Use `keep_state()` for data that survives page navigation
-5. **Outdated Streamlit syntax**: Use `width="stretch"`, not `use_container_width=True`
+1. **Hardcoding service names**: Always pass `service_name` parameter to handlers
+2. **Missing error handling**: Handlers must return `{'error': str}`, never raise
+3. **Session state loss**: Use `keep_state()` for data that survives page navigation
 
 ## Files to Check Before Changes
 
@@ -249,6 +227,5 @@ make test-cov && start htmlcov/index.html  # Windows
 
 - `.github/instructions/handler-pattern.instructions.md` - Handler implementation contract
 - `.github/instructions/testing.instructions.md` - Testing strategy and fixtures
-- `.github/instructions/streamlit.instructions.md` - Streamlit-specific patterns
-- `AGENTS.md` - Code quality standards (Ruff rules)
+- `AGENTS.md` - Code quality standards (Ruff), Streamlit patterns, and documentation guidelines
 - `README.md` - Complete setup and usage guide

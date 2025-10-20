@@ -32,7 +32,7 @@ def main():
 
     # Azure Document Intelligence Card
     with col1.container(key="container1"):
-        st.markdown("### Azure Document Intelligence")
+        st.subheader("Azure Document Intelligence")
         st.markdown("""
         Extract text, key-value pairs, tables, and structures from documents using pre-built and custom models.
         """)
@@ -53,7 +53,7 @@ def main():
 
     # Azure Content Understanding Card
     with col2.container(key="container2"):
-        st.markdown("### Azure Content Understanding")
+        st.subheader("Azure Content Understanding")
         st.markdown("""
         Advanced document analysis with deep understanding of content structure and semantic relationships.
         """)
@@ -74,7 +74,7 @@ def main():
 
     # Azure OpenAI Card
     with col3.container(key="container3"):
-        st.markdown("### Azure OpenAI Service")
+        st.subheader("Azure OpenAI Service")
         st.markdown("""
         Access GPT-4 Vision and other OpenAI models through Azure's enterprise-grade infrastructure.
         """)
@@ -95,7 +95,7 @@ def main():
 
     # Additional Information Section
     st.markdown("---")
-    st.markdown("### 📊 Pricing Comparison Tips")
+    st.subheader("📊 Pricing Comparison Tips")
 
     col_left, col_right = st.columns(2)
 

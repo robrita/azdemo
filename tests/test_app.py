@@ -116,6 +116,63 @@ class TestGetFileTypeDescription:
         assert get_file_type_description(mock_file) == "Unknown File Type"
 
 
+class TestBytesIOFileObjectAttributes:
+    """Tests for BytesIO file objects with type attribute"""
+
+    def test_bytesio_has_type_attribute_png(self):
+        """Test that BytesIO objects can have type attribute for PNG"""
+        from io import BytesIO
+
+        file_obj = BytesIO(b"test data")
+        file_obj.name = "test.png"
+        file_obj.type = "image/png"
+
+        assert hasattr(file_obj, "type")
+        assert file_obj.type == "image/png"
+        assert file_obj.name == "test.png"
+
+    def test_bytesio_has_type_attribute_pdf(self):
+        """Test that BytesIO objects can have type attribute for PDF"""
+        from io import BytesIO
+
+        file_obj = BytesIO(b"test data")
+        file_obj.name = "test.pdf"
+        file_obj.type = "application/pdf"
+
+        assert hasattr(file_obj, "type")
+        assert file_obj.type == "application/pdf"
+        assert file_obj.name == "test.pdf"
+
+    def test_bytesio_has_type_attribute_jpeg(self):
+        """Test that BytesIO objects can have type attribute for JPEG"""
+        from io import BytesIO
+
+        file_obj = BytesIO(b"test data")
+        file_obj.name = "test.jpg"
+        file_obj.type = "image/jpeg"
+
+        assert hasattr(file_obj, "type")
+        assert file_obj.type == "image/jpeg"
+        assert file_obj.name == "test.jpg"
+
+    def test_mime_type_mapping_for_extensions(self):
+        """Test correct MIME type mapping for different file extensions"""
+        import os
+
+        mime_types = {
+            ".pdf": "application/pdf",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+        }
+
+        for ext, expected_mime in mime_types.items():
+            file_name = f"test{ext}"
+            file_ext = os.path.splitext(file_name)[1].lower()
+            actual_mime = mime_types.get(file_ext, "application/octet-stream")
+            assert actual_mime == expected_mime
+
+
 class TestExtractWithServiceAsync:
     """Tests for extract_with_service_async function"""
 

@@ -8,6 +8,7 @@ import asyncio
 import concurrent.futures
 import io
 import logging
+import os
 import sys
 import time
 from typing import Any
@@ -33,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 # Default service for form pre-fill
 DEFAULT_SERVICE = "Document Intelligence - Template"
+
+# File selection placeholder
+DEFAULT_FILE_PLACEHOLDER = "-- Select a file --"
 
 # Service configuration mapping
 SERVICE_CONFIG = {
@@ -300,6 +304,131 @@ def extract_field_value(extraction_result: dict[str, Any], field_name: str) -> s
         return ""
 
 
+def populate_form_from_extraction(extraction_result: dict[str, Any]) -> None:
+    """
+    Populate session state form data from extraction results.
+
+    Args:
+        extraction_result: The extraction result dictionary
+    """
+    field_names = [
+        "tin",
+        "taxpayerName",
+        "registeredDate",
+        "registeredAddress",
+        "tradeName",
+        "businessType",
+    ]
+
+    for field_name in field_names:
+        st.session_state.prefill_form_data[field_name] = extract_field_value(
+            extraction_result, field_name
+        )
+
+
+def display_processing_results(consolidated_result: dict[str, Any], is_rerun: bool = False) -> bool:
+    """
+    Display processing results including classification and extraction status.
+
+    Args:
+        consolidated_result: Consolidated result from parallel processing
+        is_rerun: Whether this is a rerun operation (affects success message)
+
+    Returns:
+        True if processing was successful and form was populated, False otherwise
+    """
+    # Extract results
+    classification_result = consolidated_result.get("classification", {})
+    extraction_result = consolidated_result.get("extraction", {})
+    is_valid_document = consolidated_result.get("is_valid_document", False)
+    overall_time = consolidated_result.get("overall_processing_time", 0.0)
+    classification_time = consolidated_result.get("classification_time", 0.0)
+    extraction_time = consolidated_result.get("extraction_time", 0.0)
+
+    # Show processing time summary
+    st.info(
+        f"⏱️ **Processing Time Summary:**\n\n"
+        f"- Classification: {classification_time:.3f}s\n"
+        f"- Extraction: {extraction_time:.3f}s\n"
+        f"- **Overall (Parallel): {overall_time:.3f}s**"
+    )
+
+    # Check classification validity first
+    if "error" in classification_result:
+        st.error(f"❌ Classification failed: {classification_result.get('error', 'Unknown error')}")
+        return False
+
+    if not is_valid_document:
+        # Invalid document type (unknown)
+        doc_type = classification_result.get("docType", "unknown")
+        confidence = classification_result.get("confidence", 0.0)
+        st.error(
+            f"❌ **Invalid Document Type Detected**\n\n"
+            f"The uploaded document could not be classified. "
+            f"Please upload a valid document.\n\n"
+            f"**Type:** {doc_type} | **Confidence:** {confidence:.2%}"
+        )
+        return False
+
+    # Valid document - show classification success
+    doc_type = classification_result.get("docType", "unknown")
+    confidence = classification_result.get("confidence", 0.0)
+    st.success(f"✅ Document classified as: **{doc_type}** (confidence: {confidence:.2%})")
+
+    # Check extraction results
+    if "error" in extraction_result:
+        st.error(f"❌ Extraction failed: {extraction_result.get('error', 'Unknown error')}")
+        return False
+
+    # Populate form data
+    populate_form_from_extraction(extraction_result)
+
+    # Show success message
+    success_msg = (
+        "✅ Form re-filled successfully!" if is_rerun else "✅ Form pre-filled successfully!"
+    )
+    st.success(success_msg)
+
+    return True
+
+
+def handle_document_processing(
+    uploaded_file, service_name: str, service_class, is_rerun: bool = False
+) -> None:
+    """
+    Handle the complete document processing workflow including classification and extraction.
+
+    Args:
+        uploaded_file: File to process
+        service_name: Name of the extraction service
+        service_class: Service class to instantiate
+        is_rerun: Whether this is a rerun operation
+    """
+    with st.spinner("⏳ Processing document (Classification + Extraction in parallel)..."):
+        try:
+            # Run classification and extraction in parallel
+            consolidated_result = asyncio.run(
+                process_document_parallel(uploaded_file, service_name, service_class)
+            )
+
+            # Store consolidated result
+            st.session_state.prefill_consolidated_result = consolidated_result
+            st.session_state.prefill_uploaded_file_name = uploaded_file.name
+
+            # Display results and check if processing was successful
+            processing_successful = display_processing_results(consolidated_result, is_rerun)
+
+            # Mark file as invalid if processing failed
+            if not processing_successful:
+                st.session_state.prefill_invalid_file_name = uploaded_file.name
+
+        except Exception as e:
+            logger.error(f"Parallel processing error: {str(e)}", exc_info=True)
+            st.error(f"❌ Processing failed: {str(e)}")
+            st.session_state.prefill_consolidated_result = None
+            st.session_state.prefill_invalid_file_name = uploaded_file.name
+
+
 def initialize_session_state():
     """Initialize session state variables for the form pre-fill page."""
     if "prefill_selected_service_display" not in st.session_state:
@@ -313,6 +442,9 @@ def initialize_session_state():
 
     if "prefill_consolidated_result" not in st.session_state:
         st.session_state.prefill_consolidated_result = None
+
+    if "prefill_trigger_rerun" not in st.session_state:
+        st.session_state.prefill_trigger_rerun = False
 
     if "prefill_form_data" not in st.session_state:
         st.session_state.prefill_form_data = {
@@ -366,21 +498,137 @@ def main():
             # Update display state
             st.session_state.prefill_selected_service_display = selected_service_display
 
+            # Section 3️⃣: Rerun Document Processing
+            st.subheader("3️⃣ Rerun Document Processing")
+
+            if st.button(
+                "🔄 Rerun Processing",
+                help="Execute document processing again with the same file and service",
+                use_container_width=True,
+                key="prefill_rerun_button",
+            ):
+                # Set flag to trigger rerun processing outside the container
+                st.session_state.prefill_trigger_rerun = True
+
         # RIGHT COLUMN: Upload Document
         with col_upload:
             st.subheader("2️⃣ Upload Document")
-            uploaded_file = st.file_uploader(
-                "Choose a file (PDF or image)",
-                type=["pdf", "png", "jpg", "jpeg"],
-                key="prefill_file_uploader",
+
+            # Define test directory path
+            test_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "inputs", "test")
+
+            # Add upload method selector
+            upload_method = st.radio(
+                "Select upload method:",
+                ["📁 Browse Test Folder", "💾 Upload from Computer"],
+                horizontal=True,
+                key="prefill_upload_method",
             )
 
-            # Validate and handle uploaded file
+            if upload_method == "📁 Browse Test Folder":
+                # List all files in test directory and subdirectories
+                available_files = []
+                if os.path.exists(test_dir):
+                    for root, _dirs, files in os.walk(test_dir):
+                        for file in files:
+                            if file.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
+                                full_path = os.path.join(root, file)
+                                # Get relative path for display
+                                rel_path = os.path.relpath(full_path, test_dir)
+                                available_files.append((rel_path, full_path))
+
+                if available_files:
+                    # Sort files by name
+                    available_files.sort(key=lambda x: x[0])
+
+                    # Single-select dropdown for file (only allow one at a time)
+                    selected_file_path = st.selectbox(
+                        "Select a file from test folder: (inputs/test/)",
+                        options=[DEFAULT_FILE_PLACEHOLDER] + [f[0] for f in available_files],
+                        help="Select one file to extract",
+                        key="prefill_test_file_selector",
+                    )
+
+                    if selected_file_path and selected_file_path != DEFAULT_FILE_PLACEHOLDER:
+                        # Load selected file into memory
+                        from io import BytesIO
+
+                        # Find the full path
+                        full_path = next(
+                            f[1] for f in available_files if f[0] == selected_file_path
+                        )
+
+                        with open(full_path, "rb") as f:
+                            file_bytes = f.read()
+
+                        file_obj = BytesIO(file_bytes)
+                        file_obj.name = os.path.basename(full_path)
+
+                        # Add type attribute based on file extension
+                        # This mimics Streamlit's UploadedFile behavior
+                        file_ext = os.path.splitext(full_path)[1].lower()
+                        mime_types = {
+                            ".pdf": "application/pdf",
+                            ".png": "image/png",
+                            ".jpg": "image/jpeg",
+                            ".jpeg": "image/jpeg",
+                        }
+                        file_obj.type = mime_types.get(file_ext, "application/octet-stream")
+
+                        file_obj.seek(0)
+                        uploaded_file = file_obj
+
+                        # Store in session state for access in other sections
+                        st.session_state.prefill_current_file = file_obj
+
+                        st.success(f"✅ File loaded: {file_obj.name}")
+                    else:
+                        uploaded_file = None
+                        st.session_state.prefill_current_file = None
+                else:
+                    st.warning(f"⚠️ No valid files found in: {test_dir}")
+                    uploaded_file = None
+                    st.session_state.prefill_current_file = None
+
+            else:  # Upload from Computer
+                uploaded_file = st.file_uploader(
+                    "Choose a file (PDF or image)",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    key="prefill_file_uploader",
+                    help=f"Note: Browser file picker cannot default to {test_dir}",
+                )
+                st.caption("Supported: PDF, PNG, JPG, JPEG")
+
+                # Store in session state for access in other sections
+                if uploaded_file:
+                    st.session_state.prefill_current_file = uploaded_file
+                else:
+                    st.session_state.prefill_current_file = None
+
+            # Validate and handle uploaded file (works for both upload methods)
             if uploaded_file and not is_valid_file_type(uploaded_file):
                 st.error("❌ Invalid file type. Please upload PDF, PNG, JPG, or JPEG files only.")
 
-    # Get current uploaded file from uploader widget
-    uploaded_file = st.session_state.get("prefill_file_uploader")
+    # Handle rerun processing triggered by button click (outside container)
+    if st.session_state.prefill_trigger_rerun:
+        # Reset the trigger flag
+        st.session_state.prefill_trigger_rerun = False
+
+        # Check if file is available
+        uploaded_file = st.session_state.get("prefill_current_file")
+        if not uploaded_file or not is_valid_file_type(uploaded_file):
+            st.error("❌ Please upload a valid file first before rerunning processing.")
+        else:
+            # Get selected service
+            service_name, service_class = SERVICE_CONFIG[
+                st.session_state.prefill_selected_service_display
+            ]
+
+            # Process the document using the consolidated handler
+            handle_document_processing(uploaded_file, service_name, service_class, is_rerun=True)
+
+    # Get current uploaded file from session state (works for both upload methods)
+    uploaded_file = st.session_state.get("prefill_current_file")
     has_valid_file = uploaded_file is not None and is_valid_file_type(uploaded_file)
 
     # Section 3: Auto-trigger parallel processing when a new file is uploaded
@@ -412,96 +660,10 @@ def main():
                     st.session_state.prefill_selected_service_display
                 ]
 
-                with st.spinner(
-                    "⏳ Processing document (Classification + Extraction in parallel)..."
-                ):
-                    try:
-                        # Run classification and extraction in parallel
-                        consolidated_result = asyncio.run(
-                            process_document_parallel(uploaded_file, service_name, service_class)
-                        )
-
-                        # Store consolidated result
-                        st.session_state.prefill_consolidated_result = consolidated_result
-                        st.session_state.prefill_uploaded_file_name = uploaded_file.name
-
-                        # Extract classification and extraction results
-                        classification_result = consolidated_result.get("classification", {})
-                        extraction_result = consolidated_result.get("extraction", {})
-                        is_valid_document = consolidated_result.get("is_valid_document", False)
-                        overall_time = consolidated_result.get("overall_processing_time", 0.0)
-                        classification_time = consolidated_result.get("classification_time", 0.0)
-                        extraction_time = consolidated_result.get("extraction_time", 0.0)
-
-                        # Show processing time summary
-                        st.info(
-                            f"⏱️ **Processing Time Summary:**\n\n"
-                            f"- Classification: {classification_time:.3f}s\n"
-                            f"- Extraction: {extraction_time:.3f}s\n"
-                            f"- **Overall (Parallel): {overall_time:.3f}s**"
-                        )
-
-                        # Check classification validity first
-                        if "error" in classification_result:
-                            st.error(
-                                f"❌ Classification failed: "
-                                f"{classification_result.get('error', 'Unknown error')}"
-                            )
-                            st.session_state.prefill_invalid_file_name = uploaded_file.name
-                        elif not is_valid_document:
-                            # Invalid document type (unknown)
-                            doc_type = classification_result.get("docType", "unknown")
-                            confidence = classification_result.get("confidence", 0.0)
-                            st.error(
-                                f"❌ **Invalid Document Type Detected**\n\n"
-                                f"The uploaded document could not be classified. "
-                                f"Please upload a valid document.\n\n"
-                                f"**Type:** {doc_type} | **Confidence:** {confidence:.2%}"
-                            )
-                            st.session_state.prefill_invalid_file_name = uploaded_file.name
-                        else:
-                            # Valid document - show classification success
-                            doc_type = classification_result.get("docType", "unknown")
-                            confidence = classification_result.get("confidence", 0.0)
-                            st.success(
-                                f"✅ Document classified as: **{doc_type}** "
-                                f"(confidence: {confidence:.2%})"
-                            )
-
-                            # Check extraction results and populate form if valid document
-                            if "error" in extraction_result:
-                                st.error(
-                                    f"❌ Extraction failed: "
-                                    f"{extraction_result.get('error', 'Unknown error')}"
-                                )
-                            else:
-                                # Extract field values and populate form data
-                                st.session_state.prefill_form_data["tin"] = extract_field_value(
-                                    extraction_result, "tin"
-                                )
-                                st.session_state.prefill_form_data["taxpayerName"] = (
-                                    extract_field_value(extraction_result, "taxpayerName")
-                                )
-                                st.session_state.prefill_form_data["registeredDate"] = (
-                                    extract_field_value(extraction_result, "registeredDate")
-                                )
-                                st.session_state.prefill_form_data["registeredAddress"] = (
-                                    extract_field_value(extraction_result, "registeredAddress")
-                                )
-                                st.session_state.prefill_form_data["tradeName"] = (
-                                    extract_field_value(extraction_result, "tradeName")
-                                )
-                                st.session_state.prefill_form_data["businessType"] = (
-                                    extract_field_value(extraction_result, "businessType")
-                                )
-
-                                st.success("✅ Form pre-filled successfully!")
-
-                    except Exception as e:
-                        logger.error(f"Parallel processing error: {str(e)}", exc_info=True)
-                        st.error(f"❌ Processing failed: {str(e)}")
-                        st.session_state.prefill_consolidated_result = None
-                        st.session_state.prefill_invalid_file_name = uploaded_file.name
+                # Process the document using the consolidated handler
+                handle_document_processing(
+                    uploaded_file, service_name, service_class, is_rerun=False
+                )
 
     # Section 4: Display Form (always visible, pre-filled after extraction)
     st.markdown("---")
@@ -512,8 +674,8 @@ def main():
     if consolidated_result and consolidated_result.get("is_valid_document", False):
         extraction_result = consolidated_result.get("extraction", {})
         if extraction_result and "error" not in extraction_result:
-            uploaded_file = st.session_state.get("prefill_file_uploader")
-            file_name = uploaded_file.name if uploaded_file else "Unknown"
+            current_file = st.session_state.get("prefill_current_file")
+            file_name = current_file.name if current_file else "Unknown"
             overall_time = consolidated_result.get("overall_processing_time", 0.0)
             st.caption(
                 f"🔍 Extracted from **{file_name}** "
@@ -578,18 +740,18 @@ def main():
 
     # RIGHT COLUMN: File preview
     with col_preview:
-        uploaded_file = st.session_state.get("prefill_file_uploader")
-        if uploaded_file:
+        current_file = st.session_state.get("prefill_current_file")
+        if current_file:
             with st.container(border=True):
                 st.markdown("**📄 Document Preview**")
 
-                file_name = uploaded_file.name
+                file_name = current_file.name
                 file_extension = file_name.lower().split(".")[-1]
 
                 try:
                     if file_extension == "pdf":
                         # For PDF files, render all pages in tabs
-                        pdf_bytes = uploaded_file.getvalue()
+                        pdf_bytes = current_file.getvalue()
                         file_size_mb = len(pdf_bytes) / (1024 * 1024)
 
                         # Open PDF to get page count
@@ -618,7 +780,7 @@ def main():
                     elif file_extension in ["png", "jpg", "jpeg"]:
                         # For image files, display the image
                         st.image(
-                            uploaded_file,
+                            current_file,
                             caption=f"Image: {file_name}",
                         )
 
@@ -631,7 +793,7 @@ def main():
 
     # Help section
     st.markdown("---")
-    st.markdown("### 💡 How to Use")
+    st.subheader("💡 How to Use")
 
     col_help1, col_help2 = st.columns(2)
 

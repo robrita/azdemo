@@ -65,9 +65,10 @@ test-fast:
 # Stage, commit, and push changes (cross-platform)
 push:
 ifeq ($(OS),Windows_NT)
-	@powershell -Command "$$msg = Read-Host 'Enter commit message'; git add . ; git commit -m \"$$msg\" ; git push"
+	@powershell -Command "$$msg = Read-Host 'Enter commit message'; git restore .\outputs\extract_results.json ; git add . ; git commit -m \"$$msg\" ; git push"
 else
 	@read -p "Enter commit message: " msg; \
+	git restore ./outputs/extract_results.json && \
 	git add . && \
 	git commit -m "$$msg" && \
 	git push

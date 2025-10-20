@@ -75,3 +75,31 @@ st.plotly_chart(fig, use_container_width=True)  # Deprecated
 - `width="stretch"` is the modern approach for general charts
 - `st.plotly_chart()` uses Plotly's native configuration system via the `config` parameter
 - Following these guidelines avoids deprecation warnings and ensures future compatibility
+
+## Semantic Headers with st.subheader()
+
+Use `st.subheader()` for all section headers instead of `st.markdown("### XXXXXXX")`.
+
+**Correct:**
+```python
+st.subheader("Section Title")
+st.subheader("Field Configuration")
+```
+
+**Incorrect (deprecated):**
+```python
+st.markdown("### Section Title")
+st.markdown("### Field Configuration")
+```
+
+### Why This Matters
+- `st.subheader()` is the semantic Streamlit component designed for headers
+- `st.markdown("### ...")` is a workaround that doesn't leverage Streamlit's styling system
+- Using semantic components ensures consistency, better accessibility, and proper theme support
+- Streamlit components adapt to your app's configured theme automatically
+
+---
+
+# VERY IMPORTANT: Do not duplicate instructions
+
+- Do not reuse, copy or duplicate the instructions above here in AGENTS.md for copilot-instructions.md
