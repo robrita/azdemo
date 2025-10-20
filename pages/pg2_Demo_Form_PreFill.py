@@ -118,6 +118,13 @@ async def extract_with_service_async(svc_name: str, svc_class, file) -> dict[str
         processing_time = time.time() - start_time
         logger.info(f"Extraction completed: {svc_name} | {file.name} | {processing_time:.3f}s")
 
+        # Extract processing time from handler's result (if available in processing_info)
+        if "processing_info" in result and "processing_time_seconds" in result["processing_info"]:
+            result["processing_time"] = result["processing_info"]["processing_time_seconds"]
+        else:
+            # Fallback: use our measured time if handler doesn't provide it
+            result["processing_time"] = processing_time
+
         return result
 
     except Exception as e:
@@ -163,6 +170,13 @@ async def classify_document_async(file) -> dict[str, Any]:
             f"{processing_time:.3f}s"
         )
 
+        # Extract processing time from handler's result (if available in processing_info)
+        if "processing_info" in result and "processing_time_seconds" in result["processing_info"]:
+            result["processing_time"] = result["processing_info"]["processing_time_seconds"]
+        else:
+            # Fallback: use our measured time if handler doesn't provide it
+            result["processing_time"] = processing_time
+
         return result
 
     except Exception as e:
@@ -175,6 +189,77 @@ async def classify_document_async(file) -> dict[str, Any]:
             "docType": "unknown",
             "confidence": 0.0,
         }
+
+
+async def process_document_parallel(file, service_name: str, service_class) -> dict[str, Any]:
+    """
+    Run classification and extraction in parallel, then consolidate results.
+
+    Args:
+        file: File to process
+        service_name: Name of the extraction service
+        service_class: Service class to instantiate
+
+    Returns:
+        Consolidated results with classification and extraction data
+    """
+    overall_start_time = time.time()
+
+    # Run classification and extraction in parallel
+    classification_task = classify_document_async(file)
+    extraction_task = extract_with_service_async(service_name, service_class, file)
+
+    # Wait for both tasks to complete
+    classification_result, extraction_result = await asyncio.gather(
+        classification_task, extraction_task, return_exceptions=True
+    )
+
+    # Handle exceptions from gather
+    if isinstance(classification_result, Exception):
+        classification_result = {
+            "service": "Document Classification",
+            "error": f"Classification failed: {str(classification_result)}",
+            "processing_time": 0.0,
+            "docType": "unknown",
+            "confidence": 0.0,
+        }
+
+    if isinstance(extraction_result, Exception):
+        extraction_result = {
+            "service": service_name,
+            "error": f"Extraction failed: {str(extraction_result)}",
+            "processing_time": 0.0,
+        }
+
+    # Calculate overall processing time (max of both operations)
+    classification_time = classification_result.get("processing_time", 0.0)
+    extraction_time = extraction_result.get("processing_time", 0.0)
+    overall_processing_time = time.time() - overall_start_time
+
+    # Log the parallel execution results
+    logger.info(
+        f"Parallel processing completed: {file.name} | "
+        f"Classification: {classification_time:.3f}s | "
+        f"Extraction: {extraction_time:.3f}s | "
+        f"Overall: {overall_processing_time:.3f}s"
+    )
+
+    # Validate classification result
+    is_classification_valid = (
+        "error" not in classification_result and classification_result.get("docType") != "unknown"
+    )
+
+    # Build consolidated result
+    consolidated_result = {
+        "classification": classification_result,
+        "extraction": extraction_result,
+        "is_valid_document": is_classification_valid,
+        "overall_processing_time": overall_processing_time,
+        "classification_time": classification_time,
+        "extraction_time": extraction_time,
+    }
+
+    return consolidated_result
 
 
 def extract_field_value(extraction_result: dict[str, Any], field_name: str) -> str:
@@ -226,11 +311,8 @@ def initialize_session_state():
     if "prefill_invalid_file_name" not in st.session_state:
         st.session_state.prefill_invalid_file_name = None
 
-    if "prefill_classification_result" not in st.session_state:
-        st.session_state.prefill_classification_result = None
-
-    if "prefill_extraction_result" not in st.session_state:
-        st.session_state.prefill_extraction_result = None
+    if "prefill_consolidated_result" not in st.session_state:
+        st.session_state.prefill_consolidated_result = None
 
     if "prefill_form_data" not in st.session_state:
         st.session_state.prefill_form_data = {
@@ -276,8 +358,7 @@ def main():
                 index=(list(SERVICE_CONFIG.keys())).index(
                     st.session_state.prefill_selected_service_display
                 )
-                if st.session_state.prefill_selected_service_display
-                in list(SERVICE_CONFIG.keys())
+                if st.session_state.prefill_selected_service_display in list(SERVICE_CONFIG.keys())
                 else 0,
                 key="prefill_service_selector",
             )
@@ -296,171 +377,148 @@ def main():
 
             # Validate and handle uploaded file
             if uploaded_file and not is_valid_file_type(uploaded_file):
-                st.error(
-                    "❌ Invalid file type. Please upload PDF, PNG, JPG, or JPEG files only."
-                )
+                st.error("❌ Invalid file type. Please upload PDF, PNG, JPG, or JPEG files only.")
 
     # Get current uploaded file from uploader widget
     uploaded_file = st.session_state.get("prefill_file_uploader")
     has_valid_file = uploaded_file is not None and is_valid_file_type(uploaded_file)
 
-    # Section 3: Auto-trigger classification when a new file is uploaded
-    if uploaded_file and uploaded_file.name != st.session_state.prefill_uploaded_file_name:
-        # New file detected - check if it was previously marked as invalid
+    # Section 3: Auto-trigger parallel processing when a new file is uploaded
+    if uploaded_file:
+        # Check if file is already marked as invalid (regardless of if it's new)
         if uploaded_file.name == st.session_state.prefill_invalid_file_name:
-            # File was previously invalid - show persistent warning
+            # File was previously marked as invalid - show persistent warning and skip processing
             st.warning(
                 f"⚠️ **File Previously Invalid**\n\n"
                 f"The file `{uploaded_file.name}` was previously rejected due to validation issues. "
                 f"Please upload a different valid document or ensure the file meets requirements."
             )
-            # Don't proceed with classification for previously invalid files
-        elif not has_valid_file:
-            # New file is invalid - mark it and show error
-            st.session_state.prefill_invalid_file_name = uploaded_file.name
-            st.error(
-                f"❌ **Invalid File Uploaded**\n\n"
-                f"The file `{uploaded_file.name}` is not valid for processing. "
-                f"Please upload a valid PDF, PNG, JPG, or JPEG file."
-            )
-            # Reset classification and extraction results
-            st.session_state.prefill_classification_result = None
-            st.session_state.prefill_extraction_result = None
-        else:
-            # Valid file - proceed with classification
-            with st.spinner("🔍 Classifying document type..."):
-                try:
-                    # Run classification asynchronously
-                    classification_result = asyncio.run(classify_document_async(uploaded_file))
+            # Don't proceed with processing for previously invalid files
+        elif uploaded_file.name != st.session_state.prefill_uploaded_file_name:
+            # New file detected - process it
+            if not has_valid_file:
+                # New file is invalid - mark it and show error
+                st.session_state.prefill_invalid_file_name = uploaded_file.name
+                st.error(
+                    f"❌ **Invalid File Uploaded**\n\n"
+                    f"The file `{uploaded_file.name}` is not valid for processing. "
+                    f"Please upload a valid PDF, PNG, JPG, or JPEG file."
+                )
+                # Reset consolidated result
+                st.session_state.prefill_consolidated_result = None
+            else:
+                # Valid file - proceed with parallel processing
+                service_name, service_class = SERVICE_CONFIG[
+                    st.session_state.prefill_selected_service_display
+                ]
 
-                    # Store classification result
-                    st.session_state.prefill_classification_result = classification_result
-                    st.session_state.prefill_uploaded_file_name = uploaded_file.name
-
-                    # Reset extraction result when new file is uploaded
-                    st.session_state.prefill_extraction_result = None
-
-                    # Check for classification errors
-                    if "error" in classification_result:
-                        st.error(
-                            f"❌ Classification failed: {classification_result.get('error', 'Unknown error')}"
+                with st.spinner(
+                    "⏳ Processing document (Classification + Extraction in parallel)..."
+                ):
+                    try:
+                        # Run classification and extraction in parallel
+                        consolidated_result = asyncio.run(
+                            process_document_parallel(uploaded_file, service_name, service_class)
                         )
-                    else:
-                        # Get docType from classification
-                        doc_type = classification_result.get("docType", "unknown")
-                        confidence = classification_result.get("confidence", 0.0)
 
-                        # Validate docType - reject "bir2303-null"
-                        if doc_type == "bir2303-null":
+                        # Store consolidated result
+                        st.session_state.prefill_consolidated_result = consolidated_result
+                        st.session_state.prefill_uploaded_file_name = uploaded_file.name
+
+                        # Extract classification and extraction results
+                        classification_result = consolidated_result.get("classification", {})
+                        extraction_result = consolidated_result.get("extraction", {})
+                        is_valid_document = consolidated_result.get("is_valid_document", False)
+                        overall_time = consolidated_result.get("overall_processing_time", 0.0)
+                        classification_time = consolidated_result.get("classification_time", 0.0)
+                        extraction_time = consolidated_result.get("extraction_time", 0.0)
+
+                        # Show processing time summary
+                        st.info(
+                            f"⏱️ **Processing Time Summary:**\n\n"
+                            f"- Classification: {classification_time:.3f}s\n"
+                            f"- Extraction: {extraction_time:.3f}s\n"
+                            f"- **Overall (Parallel): {overall_time:.3f}s**"
+                        )
+
+                        # Check classification validity first
+                        if "error" in classification_result:
+                            st.error(
+                                f"❌ Classification failed: "
+                                f"{classification_result.get('error', 'Unknown error')}"
+                            )
+                            st.session_state.prefill_invalid_file_name = uploaded_file.name
+                        elif not is_valid_document:
+                            # Invalid document type (unknown)
+                            doc_type = classification_result.get("docType", "unknown")
+                            confidence = classification_result.get("confidence", 0.0)
                             st.error(
                                 f"❌ **Invalid Document Type Detected**\n\n"
-                                f"The uploaded document was classified as `{doc_type}`, "
-                                f"which is not supported for form pre-fill.\n\n"
-                                f"**Confidence:** {confidence:.2%}\n\n"
-                                f"Please upload a valid BIR 2303 document."
+                                f"The uploaded document could not be classified. "
+                                f"Please upload a valid document.\n\n"
+                                f"**Type:** {doc_type} | **Confidence:** {confidence:.2%}"
                             )
-                            # Mark as invalid due to classification
                             st.session_state.prefill_invalid_file_name = uploaded_file.name
                         else:
-                            # Show classification success
+                            # Valid document - show classification success
+                            doc_type = classification_result.get("docType", "unknown")
+                            confidence = classification_result.get("confidence", 0.0)
                             st.success(
-                                f"✅ Document classified as: **{doc_type}** (confidence: {confidence:.2%})"
+                                f"✅ Document classified as: **{doc_type}** "
+                                f"(confidence: {confidence:.2%})"
                             )
 
-                except Exception as e:
-                    logger.error(f"Classification error: {str(e)}", exc_info=True)
-                    st.error(f"❌ Classification failed: {str(e)}")
-                    st.session_state.prefill_classification_result = None
-                    # Mark as invalid due to classification error
-                    st.session_state.prefill_invalid_file_name = uploaded_file.name
+                            # Check extraction results and populate form if valid document
+                            if "error" in extraction_result:
+                                st.error(
+                                    f"❌ Extraction failed: "
+                                    f"{extraction_result.get('error', 'Unknown error')}"
+                                )
+                            else:
+                                # Extract field values and populate form data
+                                st.session_state.prefill_form_data["tin"] = extract_field_value(
+                                    extraction_result, "tin"
+                                )
+                                st.session_state.prefill_form_data["taxpayerName"] = (
+                                    extract_field_value(extraction_result, "taxpayerName")
+                                )
+                                st.session_state.prefill_form_data["registeredDate"] = (
+                                    extract_field_value(extraction_result, "registeredDate")
+                                )
+                                st.session_state.prefill_form_data["registeredAddress"] = (
+                                    extract_field_value(extraction_result, "registeredAddress")
+                                )
+                                st.session_state.prefill_form_data["tradeName"] = (
+                                    extract_field_value(extraction_result, "tradeName")
+                                )
+                                st.session_state.prefill_form_data["businessType"] = (
+                                    extract_field_value(extraction_result, "businessType")
+                                )
 
-    # Section 4: Auto-trigger extraction when service is selected (after classification)
-    has_valid_service = (
-        st.session_state.prefill_selected_service_display != DEFAULT_SERVICE
-        and st.session_state.prefill_selected_service_display in SERVICE_CONFIG
-    )
+                                st.success("✅ Form pre-filled successfully!")
 
-    # Only extract if we have:
-    # 1. A valid file
-    # 2. A valid service selected
-    # 3. Classification completed successfully
-    # 4. No extraction result yet (to avoid re-extraction on rerun)
-    should_extract = (
-        has_valid_file
-        and has_valid_service
-        and st.session_state.prefill_classification_result is not None
-        and "error" not in st.session_state.prefill_classification_result
-        and st.session_state.prefill_classification_result.get("docType") != "bir2303-null"
-        and st.session_state.prefill_extraction_result is None
-    )
+                    except Exception as e:
+                        logger.error(f"Parallel processing error: {str(e)}", exc_info=True)
+                        st.error(f"❌ Processing failed: {str(e)}")
+                        st.session_state.prefill_consolidated_result = None
+                        st.session_state.prefill_invalid_file_name = uploaded_file.name
 
-    if should_extract:
-        # Get service configuration
-        service_name, service_class = SERVICE_CONFIG[
-            st.session_state.prefill_selected_service_display
-        ]
-
-        with st.spinner(
-            f"📄 Extracting data using {st.session_state.prefill_selected_service_display}..."
-        ):
-            try:
-                # Run extraction asynchronously
-                extraction_result = asyncio.run(
-                    extract_with_service_async(service_name, service_class, uploaded_file)
-                )
-
-                # Store extraction result
-                st.session_state.prefill_extraction_result = extraction_result
-
-                # Check for errors
-                if "error" in extraction_result:
-                    st.error(
-                        f"❌ Extraction failed: {extraction_result.get('error', 'Unknown error')}"
-                    )
-                else:
-                    # Extract field values and populate form data
-                    st.session_state.prefill_form_data["tin"] = extract_field_value(
-                        extraction_result, "tin"
-                    )
-                    st.session_state.prefill_form_data["taxpayerName"] = extract_field_value(
-                        extraction_result, "taxpayerName"
-                    )
-                    st.session_state.prefill_form_data["registeredDate"] = extract_field_value(
-                        extraction_result, "registeredDate"
-                    )
-                    st.session_state.prefill_form_data["registeredAddress"] = extract_field_value(
-                        extraction_result, "registeredAddress"
-                    )
-                    st.session_state.prefill_form_data["tradeName"] = extract_field_value(
-                        extraction_result, "tradeName"
-                    )
-                    st.session_state.prefill_form_data["businessType"] = extract_field_value(
-                        extraction_result, "businessType"
-                    )
-
-                    st.success("✅ Form pre-filled successfully!")
-
-            except Exception as e:
-                logger.error(f"Pre-fill extraction error: {str(e)}", exc_info=True)
-                st.error(f"❌ Extraction failed: {str(e)}")
-
-    # Section 5: Display Form (always visible, pre-filled after extraction)
+    # Section 4: Display Form (always visible, pre-filled after extraction)
     st.markdown("---")
     st.subheader("📋 Document Information Form")
 
     # Show extraction info if available
-    if (
-        st.session_state.prefill_extraction_result
-        and "error" not in st.session_state.prefill_extraction_result
-    ):
-        processing_info = st.session_state.prefill_extraction_result.get("processing_info", {})
-        if processing_info:
+    consolidated_result = st.session_state.prefill_consolidated_result
+    if consolidated_result and consolidated_result.get("is_valid_document", False):
+        extraction_result = consolidated_result.get("extraction", {})
+        if extraction_result and "error" not in extraction_result:
             uploaded_file = st.session_state.get("prefill_file_uploader")
             file_name = uploaded_file.name if uploaded_file else "Unknown"
+            overall_time = consolidated_result.get("overall_processing_time", 0.0)
             st.caption(
                 f"🔍 Extracted from **{file_name}** "
                 f"using **{st.session_state.prefill_selected_service_display}** "
-                f"in {processing_info.get('processing_time_seconds', 0):.3f}s"
+                f"in {overall_time:.3f}s (parallel processing)"
             )
 
     # Create form with two-column layout: fields on left, preview on right
@@ -475,6 +533,7 @@ def main():
             value=st.session_state.prefill_form_data.get("tin", ""),
             placeholder="XXX-XXX-XXX-XXXXX",
             help="Taxpayer Identification Number",
+            disabled=True,
         )
 
         st.text_input(
@@ -482,6 +541,7 @@ def main():
             value=st.session_state.prefill_form_data.get("taxpayerName", ""),
             placeholder="Enter taxpayer name",
             help="Full name of the taxpayer or business entity",
+            disabled=True,
         )
 
         st.text_input(
@@ -489,6 +549,7 @@ def main():
             value=st.session_state.prefill_form_data.get("registeredDate", ""),
             placeholder="MM/DD/YYYY",
             help="Date the TIN was issued or registered",
+            disabled=True,
         )
 
         st.text_input(
@@ -496,6 +557,7 @@ def main():
             value=st.session_state.prefill_form_data.get("tradeName", ""),
             placeholder="Enter trade name",
             help="Registered trade name or business name",
+            disabled=True,
         )
 
         st.text_input(
@@ -503,6 +565,7 @@ def main():
             value=st.session_state.prefill_form_data.get("businessType", ""),
             placeholder="Enter business type",
             help="Line of business or business activities",
+            disabled=True,
         )
 
         st.text_area(
@@ -510,6 +573,7 @@ def main():
             value=st.session_state.prefill_form_data.get("registeredAddress", ""),
             placeholder="Enter complete registered address",
             help="Complete registered address of the taxpayer or business",
+            disabled=True,
         )
 
     # RIGHT COLUMN: File preview

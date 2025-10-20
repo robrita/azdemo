@@ -7,6 +7,7 @@
 - **Quotes**: Double quotes only
 - **Target**: Python 3.11+
 - **Pre-commit**: Run `make format` before every commit
+- **Cross-platform**: Ensure all code works on both Windows and Linux (use `pathlib.Path`, avoid shell-specific commands)
 
 ## Per-File Ignores
 

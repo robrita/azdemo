@@ -1,0 +1,2 @@
+- doc classification is `unknown` for null, new or old less than 20%
+- run doc classification and extraction in parallel

@@ -276,7 +276,6 @@ def main():
         # Handle stored files from session state
         elif stored_valid_files:
             valid_files = stored_valid_files
-            st.info(f"📁 Using {len(valid_files)} previously uploaded file(s) from session")
 
             # Show stored files with option to clear
             col_files, col_clear_files = st.columns([3, 1])

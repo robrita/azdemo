@@ -62,6 +62,13 @@ test-cov:
 test-fast:
 	uv run pytest -m "not slow and not integration" -v
 
-# Stage, commit, and push changes
+# Stage, commit, and push changes (cross-platform)
 push:
-	@powershell -Command "$$msg = Read-Host 'Enter commit message'; git add . ; git commit -m $$msg ; git push"
+ifeq ($(OS),Windows_NT)
+	@powershell -Command "$$msg = Read-Host 'Enter commit message'; git add . ; git commit -m \"$$msg\" ; git push"
+else
+	@read -p "Enter commit message: " msg; \
+	git add . && \
+	git commit -m "$$msg" && \
+	git push
+endif

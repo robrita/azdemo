@@ -132,17 +132,12 @@
       "service_name": "ADI-Template",
       "pages_count": 2,
       "document_confidence": 0.774,
-      "processing_time": 11.05,
+      "processing_time": 11.743,
       "fields": [
         {
-          "name": "taxpayerName",
-          "value": "MARIA SINUKUAN PETROLEUM",
-          "confidence": 0.943
-        },
-        {
-          "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.799
+          "name": "registeredDate",
+          "value": "May 8, 2023",
+          "confidence": 0.798
         },
         {
           "name": "tradeName",
@@ -150,9 +145,14 @@
           "confidence": 0.486
         },
         {
-          "name": "registeredDate",
-          "value": "May 8, 2023",
-          "confidence": 0.798
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.799
+        },
+        {
+          "name": "businessType",
+          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
+          "confidence": 0.466
         },
         {
           "name": "tin",
@@ -160,9 +160,9 @@
           "confidence": 0.944
         },
         {
-          "name": "businessType",
-          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
-          "confidence": 0.466
+          "name": "taxpayerName",
+          "value": "MARIA SINUKUAN PETROLEUM",
+          "confidence": 0.943
         }
       ]
     },
@@ -210,7 +210,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 12.233,
+      "processing_time": 12.81,
       "fields": [
         {
           "name": "language",
@@ -259,22 +259,12 @@
       "service_name": "ADI-Template",
       "pages_count": 1,
       "document_confidence": 0.841,
-      "processing_time": 10.376,
+      "processing_time": 10.459,
       "fields": [
         {
-          "name": "tradeName",
-          "value": "56303-CAFE OR COFFEE SHOPS",
-          "confidence": 0.492
-        },
-        {
-          "name": "taxpayerName",
-          "value": "DURANO YZABELLA BEATRIZ CASTRO",
+          "name": "tin",
+          "value": "461-846-496-00000",
           "confidence": 0.99
-        },
-        {
-          "name": "businessType",
-          "value": "FILING",
-          "confidence": 0.636
         },
         {
           "name": "registeredAddress",
@@ -282,8 +272,18 @@
           "confidence": 0.928
         },
         {
-          "name": "tin",
-          "value": "461-846-496-00000",
+          "name": "tradeName",
+          "value": "56303-CAFE OR COFFEE SHOPS",
+          "confidence": 0.492
+        },
+        {
+          "name": "businessType",
+          "value": "FILING",
+          "confidence": 0.636
+        },
+        {
+          "name": "taxpayerName",
+          "value": "DURANO YZABELLA BEATRIZ CASTRO",
           "confidence": 0.99
         },
         {
@@ -337,7 +337,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 12.414,
+      "processing_time": 11.775,
       "fields": [
         {
           "name": "language",
@@ -502,8 +502,8 @@
       "file_name": "BIR_COR (87).jpeg",
       "service_name": "GPT-4.1-Vision",
       "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 19.465,
+      "document_confidence": 0.913,
+      "processing_time": 11.712,
       "fields": [
         {
           "name": "language",
@@ -512,7 +512,7 @@
         },
         {
           "name": "summary",
-          "value": "This is a BIR Form 2303 Certificate of Registration for Yzabella Beatriz Castro Durano, operating as Strange Matcha Cafe, registered as a single proprietorship. The document details the taxpayer's TIN, registered address, tax types, filing frequencies, and business information.",
+          "value": "This is a BIR Form 2303 Certificate of Registration for Yzabella Beatriz Castro Durano, a single proprietorship business named Strange Matcha Cafe, registered as a coffee shop at III Juana Osmena St, Camputhaw, Cebu City. The TIN was issued on January 5, 2015. The document lists the tax types, filing frequencies, and due dates for the business.",
           "confidence": 0.0
         },
         {
@@ -542,7 +542,7 @@
         },
         {
           "name": "businessType",
-          "value": "COFFEE SHOP (PSIC 56303-CAFÉ OR COFFEE SHOPS) Primary line of business: COFFEE SHOP",
+          "value": "COFFEE SHOP",
           "confidence": 0.0
         }
       ]
@@ -551,8 +551,8 @@
       "file_name": "4. BIR 2303 (3).pdf",
       "service_name": "GPT-4.1-Vision",
       "pages_count": 2,
-      "document_confidence": 0.0,
-      "processing_time": 16.65,
+      "document_confidence": 0.907,
+      "processing_time": 17.904,
       "fields": [
         {
           "name": "language",
@@ -561,7 +561,7 @@
         },
         {
           "name": "summary",
-          "value": "This is a BIR Form 2303 Certificate of Registration for Maria Sinukuan Petroleum Corporation, issued on May 8, 2023. It details the taxpayer's TIN, registered address, business type, and tax types with their respective filing frequencies and due dates.",
+          "value": "This is a BIR Form 2303 Certificate of Registration for Maria Sinukuan Petroleum Corporation, issued on May 8, 2023. It details the taxpayer's TIN, registered address, business type, trade name, and tax types to be filed.",
           "confidence": 0.0
         },
         {
@@ -591,7 +591,7 @@
         },
         {
           "name": "businessType",
-          "value": "RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES; RETAIL SALE OF AUTOMOTIVE FUEL (PSIC 47300) Primary Line of Business: RETAIL SALE OF AUTOMOTIVE FUEL; Category: Primary; Taxpayer Type: DOMESTIC CORPORATION; Registration Fee: Annually; Tax Types: Withholding Tax-Compensation, Corporate Income Tax, Value Added Tax, Registration Fee; Filing Frequencies: Monthly, Annually, Quarterly; Filing Due Dates: Specified per tax type as per document.",
+          "value": "RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES; RETAIL SALE OF AUTOMOTIVE FUEL (PSIC 47300) Primary Line of Business: RETAIL SALE OF AUTOMOTIVE FUEL; Taxpayer Type: DOMESTIC CORPORATION; Category: Primary; Registration Fee: Annually; Tax Types: Withholding Tax-Compensation, Corporate Income Tax, Value Added Tax, Registration Fee; Filing Frequency: Monthly, Annually, Quarterly; Filing Start Dates: June 1, 2023, January 1, 2024, July 1, 2023; Filing Due Dates: 10th day of the month, January 31, 15th day of the 4th month, 60 days after quarter, 25th day after quarter, last day of January; Reminders: Annual registration fee, filing of required tax returns/conformity with tax types, with or without business operations.",
           "confidence": 0.0
         }
       ]
@@ -642,329 +642,6 @@
           "name": "businessType",
           "value": "GEN. MDSE. (UKAY-UKAY) / 47749-RETAIL SALE OF SECOND-HAND GOODS, N.E.C. (PSIC)",
           "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "BIR_COR (87).jpeg",
-      "service_name": "GPT-5-Vision",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 31.83,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English/Filipino",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "BIR Form 2303 - Certificate of Registration for DURANO, YZABELLA BEATRIZ CASTRO. TIN 461-846-496-00000 issued on 01/05/2015. Registered address in Camputhaw, City of Cebu. Trade name: Strange Matcha Cafe. Line of business: Cafe / Coffee Shop (PSIC: 76303). Registration/OCN generated on 03/10/2025.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "Durano, Yzabella Beatriz Castro",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "01/05/2015",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "III Juana Osmeña St., Camputhaw, 6000 City of Cebu, Cebu, Philippines",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "Strange Matcha Cafe",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "Cafe / Coffee Shop (PSIC 76303)",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "2 COR_SHELA CLOTHING STORE (1).pdf",
-      "service_name": "GPT-5-Vision",
-      "pages_count": 2,
-      "document_confidence": 0.0,
-      "processing_time": 24.16,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English/Filipino",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "Certificate of Registration (BIR Form 2303) issued to Rowena Espina Bulat-Ag for a single proprietorship (Shela Clothing Store) registered in Cebu City for retail sale of second-hand goods (gen. mdse. - ukay-ukay).",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "259-769-972-00004",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "BULAT-AG, ROWENA ESPINA",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "05/30/2022",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "2nd Flr., SO43 Elizabeth Mall, Leon Kilat St., Pahina Central (Pob), 6000 Cebu City (Capital), Cebu, Philippines",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "SHELA CLOTHING STORE",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "Retail sale of second-hand goods; Gen. Mdse. (Ukay-ukay)",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "4. BIR 2303 (3).pdf",
-      "service_name": "GPT-5-Vision",
-      "pages_count": 2,
-      "document_confidence": 0.0,
-      "processing_time": 24.37,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "BIR Form 2303 Certificate of Registration for Maria Sinukuan Petroleum Corporation issued May 8, 2023; includes TIN, registered address, trade name, business activity (retail sale of automotive fuel), and tax filing details.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "625-928-561-00000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "05/08/2023",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-45.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.642,
-      "processing_time": 9.257,
-      "fields": [
-        {
-          "name": "businessType",
-          "value": "78102 LABOR RECRUITMENT AND PROVISION OF PERSONNEL, OVERSEAS",
-          "confidence": 0.943
-        },
-        {
-          "name": "taxpayerName",
-          "value": "TAN, CRYSTAL ROSE GENOVA",
-          "confidence": 0.99
-        },
-        {
-          "name": "tin",
-          "value": "247-098-232-00000",
-          "confidence": 0.99
-        },
-        {
-          "name": "registeredAddress",
-          "value": "21 A TRDC BLDG DR A SANTOS AVE SAN ANTONIO, CITY OF PARAÑAQUE NCR, FOURTH DISTRICT PHILIPPINES 1715",
-          "confidence": 0.958
-        },
-        {
-          "name": "registeredDate",
-          "value": "August 22, 2006",
-          "confidence": 0.957
-        },
-        {
-          "name": "tradeName",
-          "value": "JOB EMPLOYMENT SERVICES",
-          "confidence": 0.892
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-02.png",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 9.323,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) in the Philippines. It contains details such as the TIN, taxpayer's name, registered address, line of business, and other relevant information.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "161-225-173-0000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "TORIAGA, MA. LUZA ERVAS",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "12/29/1999",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "124 Poblacion Central 4712 Barcelona, Sorsogon, Philippines",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "Package Tour Reservation",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "Package Tour Reservation",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 6.728,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This is a Certificate of Registration (BIR Form 2303) issued by the Republic of the Philippines' Bureau of Internal Revenue. It certifies that the taxpayer, Napole G. Deolito Delantar, is registered under the National Internal Revenue Code.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "245-208-083-00001",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "Napole G. Deolito Delantar",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "07/18/2022",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 Unit H NIOG Road, NIOG II 4102 Bacoor Cavite Philippines",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "Not specified",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "Not specified",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.851,
-      "processing_time": 8.708,
-      "fields": [
-        {
-          "name": "tradeName",
-          "value": "",
-          "confidence": 0.984
-        },
-        {
-          "name": "taxpayerName",
-          "value": "NAPOLES, DEOLITO DELANTAR",
-          "confidence": 0.99
-        },
-        {
-          "name": "businessType",
-          "value": "",
-          "confidence": 0.984
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
-          "confidence": 0.943
-        },
-        {
-          "name": "tin",
-          "value": "245-208-083-00001",
-          "confidence": 0.99
-        },
-        {
-          "name": "registeredDate",
-          "value": "July 18, 2022",
-          "confidence": 0.943
         }
       ]
     }

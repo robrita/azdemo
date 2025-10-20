@@ -19,60 +19,70 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "pages"))
 class TestFieldTypeMapping:
     """Test field type mapping from JSON schema to Python types."""
 
+    @pytest.mark.unit
     def test_string_type_mapping(self):
         """Test string type maps to 'str'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("string") == "str"
 
+    @pytest.mark.unit
     def test_number_type_mapping(self):
         """Test number type maps to 'float'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("number") == "float"
 
+    @pytest.mark.unit
     def test_integer_type_mapping(self):
         """Test integer type maps to 'int'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("integer") == "int"
 
+    @pytest.mark.unit
     def test_boolean_type_mapping(self):
         """Test boolean type maps to 'bool'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("boolean") == "bool"
 
+    @pytest.mark.unit
     def test_array_type_mapping(self):
         """Test array type maps to 'list'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("array") == "list"
 
+    @pytest.mark.unit
     def test_object_type_mapping(self):
         """Test object type maps to 'dict'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("object") == "dict"
 
+    @pytest.mark.unit
     def test_date_type_mapping(self):
         """Test date type maps to 'str'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("date") == "str"
 
+    @pytest.mark.unit
     def test_email_type_mapping(self):
         """Test email type maps to 'str'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("email") == "str"
 
+    @pytest.mark.unit
     def test_url_type_mapping(self):
         """Test url type maps to 'str'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
 
         assert map_schema_type_to_python("url") == "str"
 
+    @pytest.mark.unit
     def test_unknown_type_default_to_string(self):
         """Test unknown type defaults to 'str'."""
         from pages.pg1_Schema_Builder import map_schema_type_to_python
@@ -83,6 +93,7 @@ class TestFieldTypeMapping:
 class TestJsonSchemaGeneration:
     """Test JSON schema generation from field definitions."""
 
+    @pytest.mark.unit
     def test_generate_basic_schema(self):
         """Test generating a basic JSON schema."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -98,6 +109,7 @@ class TestJsonSchemaGeneration:
         assert "schema" in schema
         assert "properties" in schema["schema"]
 
+    @pytest.mark.unit
     def test_schema_includes_default_fields(self):
         """Test schema includes language and summary fields by default."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -109,6 +121,7 @@ class TestJsonSchemaGeneration:
         assert "language" in properties
         assert "summary" in properties
 
+    @pytest.mark.unit
     def test_schema_includes_custom_fields(self):
         """Test schema includes custom field definitions."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -126,6 +139,7 @@ class TestJsonSchemaGeneration:
         assert properties["taxpayer_id"]["type"] == "string"
         assert properties["amount"]["type"] == "number"
 
+    @pytest.mark.unit
     def test_schema_normalizes_field_names(self):
         """Test schema converts field names to snake_case."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -138,6 +152,7 @@ class TestJsonSchemaGeneration:
         # Field name should be as provided (no auto-conversion in this version)
         assert "taxPayerName" in properties
 
+    @pytest.mark.unit
     def test_schema_converts_name_to_snake_case(self):
         """Test schema name is converted to snake_case."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -146,6 +161,7 @@ class TestJsonSchemaGeneration:
 
         assert schema["name"] == "my_schema_name"
 
+    @pytest.mark.unit
     def test_schema_skips_empty_field_names(self):
         """Test schema skips fields with empty names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -161,6 +177,7 @@ class TestJsonSchemaGeneration:
         assert "" not in properties
         assert "valid_field" in properties
 
+    @pytest.mark.unit
     def test_schema_with_multiple_field_types(self):
         """Test schema with various field types."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -184,6 +201,7 @@ class TestJsonSchemaGeneration:
         assert properties["date"]["type"] == "date"
         assert properties["email"]["type"] == "email"
 
+    @pytest.mark.unit
     def test_schema_preserves_field_descriptions(self):
         """Test schema preserves field descriptions."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -206,6 +224,7 @@ class TestJsonSchemaGeneration:
 class TestPydanticModelGeneration:
     """Test Pydantic model code generation."""
 
+    @pytest.mark.unit
     def test_generate_pydantic_model_basic(self):
         """Test generating basic Pydantic model code."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -231,6 +250,7 @@ class TestPydanticModelGeneration:
         assert "field_one: str | None = Field" in code
         assert "First field" in code
 
+    @pytest.mark.unit
     def test_pydantic_model_has_docstring(self):
         """Test generated Pydantic model includes docstring."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -246,6 +266,7 @@ class TestPydanticModelGeneration:
         assert '"""Pydantic schemas' in code
         assert "DocSchema" in code
 
+    @pytest.mark.unit
     def test_pydantic_model_includes_all_fields(self):
         """Test Pydantic model includes all schema fields."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -268,6 +289,7 @@ class TestPydanticModelGeneration:
         assert "field_b: int | None" in code
         assert "field_c: bool | None" in code
 
+    @pytest.mark.unit
     def test_pydantic_model_uses_correct_type_hints(self):
         """Test Pydantic model uses correct Python type hints."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -292,6 +314,7 @@ class TestPydanticModelGeneration:
         assert "price: float | None" in code
         assert "active: bool | None" in code
 
+    @pytest.mark.unit
     def test_pydantic_model_escapes_descriptions(self):
         """Test Pydantic model properly formats field descriptions."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -310,6 +333,7 @@ class TestPydanticModelGeneration:
         assert "description=" in code
         assert "field" in code
 
+    @pytest.mark.unit
     def test_pydantic_model_has_all_marker(self):
         """Test Pydantic model includes __all__ export."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -328,6 +352,7 @@ class TestPydanticModelGeneration:
 class TestPythonFunctionGeneration:
     """Test Python function code generation (Mistral format)."""
 
+    @pytest.mark.unit
     def test_generate_python_function_basic(self):
         """Test generating basic Python function."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -344,6 +369,7 @@ class TestPythonFunctionGeneration:
         assert "return" in code
         assert '"name": "test_schema"' in code
 
+    @pytest.mark.unit
     def test_python_function_includes_docstring(self):
         """Test generated function includes docstring."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -359,6 +385,7 @@ class TestPythonFunctionGeneration:
         assert '"""' in code
         assert "JSON schema object" in code
 
+    @pytest.mark.unit
     def test_python_function_valid_syntax(self):
         """Test generated function has valid Python syntax."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -377,6 +404,7 @@ class TestPythonFunctionGeneration:
         except SyntaxError as e:
             pytest.fail(f"Generated code has syntax error: {e}")
 
+    @pytest.mark.unit
     def test_python_function_returns_valid_json(self):
         """Test function returns valid JSON schema."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -403,6 +431,7 @@ class TestPythonFunctionGeneration:
 class TestFieldOperations:
     """Test field management operations (add, remove, update)."""
 
+    @pytest.mark.unit
     def test_field_structure(self):
         """Test field has correct structure."""
         field = {"id": 0, "name": "test_field", "type": "string", "description": "Test"}
@@ -412,6 +441,7 @@ class TestFieldOperations:
         assert "type" in field
         assert "description" in field
 
+    @pytest.mark.unit
     def test_field_with_various_types(self):
         """Test field supports all field types."""
         from pages.pg1_Schema_Builder import FIELD_TYPES
@@ -420,6 +450,7 @@ class TestFieldOperations:
             field = {"id": 0, "name": "test", "type": field_type, "description": "Test"}
             assert field["type"] == field_type
 
+    @pytest.mark.unit
     def test_field_name_normalization(self):
         """Test field name can handle various formats."""
         field_names = [
@@ -435,6 +466,7 @@ class TestFieldOperations:
             field = {"id": 0, "name": name, "type": "string", "description": "Test"}
             assert field["name"] == name
 
+    @pytest.mark.unit
     def test_field_description_length(self):
         """Test field supports long descriptions."""
         long_description = "A" * 1000
@@ -448,6 +480,7 @@ class TestFieldOperations:
 class TestSessionStateManagement:
     """Test Streamlit session state initialization and management."""
 
+    @pytest.mark.unit
     def test_schema_name_session_state(self):
         """Test schema name persists in session state."""
         schema_name = "test_schema"
@@ -455,6 +488,7 @@ class TestSessionStateManagement:
 
         assert session_state["schema_name"] == schema_name
 
+    @pytest.mark.unit
     def test_schema_description_session_state(self):
         """Test schema description persists in session state."""
         description = "Test description"
@@ -462,6 +496,7 @@ class TestSessionStateManagement:
 
         assert session_state["schema_description"] == description
 
+    @pytest.mark.unit
     def test_fields_list_session_state(self):
         """Test fields list persists in session state."""
         fields = [
@@ -473,12 +508,14 @@ class TestSessionStateManagement:
         assert len(session_state["fields"]) == 2
         assert session_state["fields"][0]["name"] == "field_one"
 
+    @pytest.mark.unit
     def test_next_field_id_tracking(self):
         """Test next field ID is tracked in session state."""
         session_state = {"next_field_id": 5}
 
         assert session_state["next_field_id"] == 5
 
+    @pytest.mark.unit
     def test_generated_schema_session_state(self):
         """Test generated schema is stored in session state."""
         schema = {
@@ -495,6 +532,7 @@ class TestSessionStateManagement:
 class TestSchemaExportFormats:
     """Test schema export in different formats."""
 
+    @pytest.mark.unit
     def test_export_as_json(self):
         """Test exporting schema as JSON string."""
         schema = {
@@ -509,6 +547,7 @@ class TestSchemaExportFormats:
         parsed = json.loads(json_str)
         assert parsed["name"] == "test_schema"
 
+    @pytest.mark.unit
     def test_export_json_preserves_structure(self):
         """Test JSON export preserves schema structure."""
         schema = {
@@ -528,6 +567,7 @@ class TestSchemaExportFormats:
         assert parsed["schema"]["properties"]["field_a"]["type"] == "string"
         assert parsed["schema"]["properties"]["field_b"]["type"] == "integer"
 
+    @pytest.mark.unit
     def test_pydantic_code_is_valid_python(self):
         """Test Pydantic code export is valid Python."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -546,6 +586,7 @@ class TestSchemaExportFormats:
         except SyntaxError as e:
             pytest.fail(f"Invalid Python syntax: {e}")
 
+    @pytest.mark.unit
     def test_function_code_is_valid_python(self):
         """Test function code export is valid Python."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -568,6 +609,7 @@ class TestSchemaExportFormats:
 class TestSchemaValidation:
     """Test schema validation and error handling."""
 
+    @pytest.mark.unit
     def test_empty_schema_generation(self):
         """Test generating schema with no fields."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -579,6 +621,7 @@ class TestSchemaValidation:
         assert "language" in properties
         assert "summary" in properties
 
+    @pytest.mark.unit
     def test_schema_with_whitespace_names(self):
         """Test schema handles fields with whitespace names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -592,6 +635,7 @@ class TestSchemaValidation:
         # The key should exist (with or without whitespace stripped)
         assert len(properties) > 2  # More than just language and summary
 
+    @pytest.mark.unit
     def test_schema_special_characters_in_names(self):
         """Test schema handles special characters in field names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -604,6 +648,7 @@ class TestSchemaValidation:
         properties = schema["schema"]["properties"]
         assert "field@name#1" in properties or len(properties) > 2
 
+    @pytest.mark.unit
     def test_large_number_of_fields(self):
         """Test schema generation with many fields."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -623,6 +668,7 @@ class TestSchemaValidation:
 class TestFieldTypeOptions:
     """Test all available field type options."""
 
+    @pytest.mark.unit
     def test_all_field_types_available(self):
         """Test all field types are defined."""
         from pages.pg1_Schema_Builder import FIELD_TYPES
@@ -642,12 +688,14 @@ class TestFieldTypeOptions:
         for field_type in expected_types:
             assert field_type in FIELD_TYPES
 
+    @pytest.mark.unit
     def test_field_types_are_unique(self):
         """Test all field types are unique."""
         from pages.pg1_Schema_Builder import FIELD_TYPES
 
         assert len(FIELD_TYPES) == len(set(FIELD_TYPES))
 
+    @pytest.mark.unit
     def test_field_types_are_lowercase(self):
         """Test all field types are lowercase."""
         from pages.pg1_Schema_Builder import FIELD_TYPES
@@ -659,6 +707,7 @@ class TestFieldTypeOptions:
 class TestSchemaNameHandling:
     """Test schema name handling and conversion."""
 
+    @pytest.mark.unit
     def test_schema_name_to_snake_case(self):
         """Test schema name is converted to snake_case."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -676,6 +725,7 @@ class TestSchemaNameHandling:
             # The schema name should be processed (typically snake_case or lowercased)
             assert schema["name"] == expected_output
 
+    @pytest.mark.unit
     def test_schema_name_with_special_characters(self):
         """Test schema name handling with special characters."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -690,6 +740,7 @@ class TestSchemaNameHandling:
 class TestCodeGenerationIntegration:
     """Integration tests for code generation."""
 
+    @pytest.mark.unit
     def test_generated_pydantic_can_be_used(self):
         """Test generated Pydantic code can actually be imported and used."""
         from pages.pg1_Schema_Builder import generate_pydantic_model_code
@@ -720,6 +771,7 @@ class TestCodeGenerationIntegration:
         assert instance.name == "Test"
         assert instance.age == 30
 
+    @pytest.mark.unit
     def test_generated_function_can_be_executed(self):
         """Test generated function can be executed."""
         from pages.pg1_Schema_Builder import generate_python_function_code
@@ -749,6 +801,7 @@ class TestCodeGenerationIntegration:
 class TestEdgeCasesAndBoundaries:
     """Test edge cases and boundary conditions."""
 
+    @pytest.mark.unit
     def test_very_long_field_name(self):
         """Test handling very long field names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -761,6 +814,7 @@ class TestEdgeCasesAndBoundaries:
 
         assert long_name in properties
 
+    @pytest.mark.unit
     def test_very_long_description(self):
         """Test handling very long descriptions."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -773,6 +827,7 @@ class TestEdgeCasesAndBoundaries:
 
         assert len(properties["field"]["description"]) == 5000
 
+    @pytest.mark.unit
     def test_unicode_in_field_names(self):
         """Test Unicode characters in field names."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic
@@ -784,6 +839,7 @@ class TestEdgeCasesAndBoundaries:
 
         assert "名前" in properties
 
+    @pytest.mark.unit
     def test_unicode_in_descriptions(self):
         """Test Unicode in descriptions."""
         from pages.pg1_Schema_Builder import generate_json_schema_basic

@@ -1,5 +1,5 @@
 [project]
-name = "azdemo"
+name = "doc-extraction"
 version = "0.1.0"
 description = "Document Processing Dashboard - Comprehensive Document Extraction and Analysis Platform"
 readme = "README.md"

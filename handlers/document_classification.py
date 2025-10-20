@@ -107,8 +107,18 @@ class DocumentClassification:
 
             # Extract docType from first document (primary use case)
             if result.documents and len(result.documents) > 0:
-                classification_data["docType"] = result.documents[0].doc_type
-                classification_data["confidence"] = result.documents[0].confidence
+                doc_type = result.documents[0].doc_type
+                confidence = result.documents[0].confidence
+
+                # Set to "unknown" if:
+                # 1. doc_type contains the word "null"
+                # 2. doc_type doesn't have "null" but confidence is less than 0.2
+                if "null" in doc_type.lower() or confidence < 0.2:
+                    classification_data["docType"] = "unknown"
+                    classification_data["confidence"] = confidence
+                else:
+                    classification_data["docType"] = doc_type
+                    classification_data["confidence"] = confidence
             else:
                 classification_data["docType"] = "unknown"
                 classification_data["confidence"] = 0.0

@@ -800,7 +800,7 @@ class TestMistralDocumentAIHandler:
             result = handler.extract(sample_image_file)
 
             assert "error" in result
-            assert "API request failed" in result["error"]
+            assert "extraction failed" in result["error"].lower()
 
     def test_extract_saves_results_when_properties_exist(self, handler, sample_image_file):
         """Test that results are saved when properties are extracted."""
