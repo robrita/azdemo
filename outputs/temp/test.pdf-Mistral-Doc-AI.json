@@ -1,0 +1,14 @@
+{
+  "file_name": "test.pdf",
+  "service_name": "Mistral-Doc-AI",
+  "pages_count": 1,
+  "document_confidence": 0.0,
+  "processing_time": 0.0,
+  "fields": [
+    {
+      "name": "tin",
+      "value": "123-456-789",
+      "confidence": 0.0
+    }
+  ]
+}

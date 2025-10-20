@@ -20,7 +20,13 @@ from handlers.content_understanding import ContentUnderstanding
 from handlers.document_intelligence import DocumentIntelligence
 from handlers.gpt_vision import GPTForVision
 from handlers.mistral_document_ai import MistralDocumentAI
-from utils import keep_state, render_sidebar
+from utils import (
+    clean_temp_extraction_files,
+    consolidate_temp_extractions,
+    delete_temp_extraction_files,
+    keep_state,
+    render_sidebar,
+)
 
 # Load environment variables
 load_dotenv()
@@ -385,6 +391,10 @@ def main():
                     is_extracting = False
 
             if is_extracting:
+                # Step 1: Clean up temp directory before starting
+                logger.info("Step 1: Cleaning temp directory")
+                clean_temp_extraction_files()
+
                 with st.spinner(
                     f"Extracting {len(valid_files)} document(s) with {len(selected_services)} services in parallel..."
                 ):
@@ -435,6 +445,22 @@ def main():
                             )
                             st.error(f"❌ Failed to process {file.name}: {str(e)}")
                             continue
+
+                # Step 3: Consolidate all temp files into extract_results.json
+                logger.info("Step 3: Consolidating temp files")
+                try:
+                    consolidated_count = consolidate_temp_extractions()
+                    st.success(
+                        f"✅ Successfully consolidated {consolidated_count} extraction result(s)"
+                    )
+                except Exception as e:
+                    logger.error(f"Consolidation failed: {str(e)}", exc_info=True)
+                    st.error(f"❌ Failed to consolidate results: {str(e)}")
+
+                # Step 4: Delete temp files after consolidation
+                logger.info("Step 4: Cleaning up temp files")
+                deleted_count = delete_temp_extraction_files()
+                logger.info(f"Cleanup complete: {deleted_count} temp file(s) deleted")
 
     with tab2:
         st.subheader("Analyze Output")

@@ -1,2 +1,1 @@
-- optimize parallel run of doc extraction services by saving to temp/<file_name>-<service_name>.json and consolidate afterwards
 - deploy to azure container apps via github actions

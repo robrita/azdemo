@@ -63,6 +63,31 @@ def keep_state(state_object, state_name):
     return False
 
 
+def clean_temp_extraction_files() -> None:
+    """
+    Clean up all JSON files in the outputs/temp/ directory.
+    This should be called before starting a new extraction batch.
+    """
+    from pathlib import Path
+
+    temp_dir = Path("outputs/temp")
+
+    try:
+        if temp_dir.exists():
+            json_files = list(temp_dir.glob("*.json"))
+            for json_file in json_files:
+                json_file.unlink()
+                logger.debug(f"Deleted temp file: {json_file}")
+
+            logger.info(f"Cleaned {len(json_files)} temp extraction file(s)")
+        else:
+            logger.debug("Temp directory does not exist, nothing to clean")
+
+    except Exception as e:
+        logger.error(f"Error cleaning temp files: {str(e)}", exc_info=True)
+        st.warning(f"Failed to clean temp files: {str(e)}")
+
+
 def save_extraction_to_json(
     file_name: str,
     service_name: str,
@@ -70,12 +95,10 @@ def save_extraction_to_json(
     fields: dict,
     overall_confidence: float = None,
     processing_time: float = None,
-    results_file_path: str = "outputs/extract_results.json",
 ) -> None:
     """
-    Save extraction results to JSON file following standardized structure.
-    This function handles loading existing data, filtering by file_name and service_name,
-    and updating or appending new results.
+    Save extraction results to individual JSON file in outputs/temp/ directory.
+    File naming: outputs/temp/<file_name>-<service_name>.json
 
     Args:
         file_name: Name of the processed file
@@ -84,7 +107,6 @@ def save_extraction_to_json(
         fields: Dictionary of extracted fields with confidence scores and content
         overall_confidence: Overall document confidence score (if None, defaults to 0.0)
         processing_time: Time taken to process the file in seconds (if None, defaults to 0.0)
-        results_file_path: Path to the JSON results file (default: outputs/extract_results.json)
 
     Raises:
         ValueError: If service_name is not in VALID_SERVICE_NAMES
@@ -107,19 +129,9 @@ def save_extraction_to_json(
     )
 
     try:
-        results_file = Path(results_file_path)
-
-        # Ensure outputs directory exists
-        results_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Load existing data or create new structure
-        if results_file.exists():
-            with open(results_file, encoding="utf-8") as f:
-                data = json.load(f)
-            logger.debug(f"Loaded existing results file: {results_file_path}")
-        else:
-            data = {"results": []}
-            logger.debug(f"Creating new results file: {results_file_path}")
+        # Ensure temp directory exists
+        temp_dir = Path("outputs/temp")
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         # Build fields array with name, value, and confidence
         fields_array = []
@@ -141,8 +153,8 @@ def save_extraction_to_json(
         # Use provided processing_time or default to 0.0
         proc_time = round(processing_time, 3) if processing_time is not None else 0.0
 
-        # Create new result entry
-        new_result = {
+        # Create result entry
+        result_data = {
             "file_name": file_name,
             "service_name": service_name,
             "pages_count": pages_count,
@@ -151,27 +163,149 @@ def save_extraction_to_json(
             "fields": fields_array,
         }
 
-        # Find and update existing entry or append new one
-        existing_index = None
-        for idx, result in enumerate(data["results"]):
-            if result.get("file_name") == file_name and result.get("service_name") == service_name:
-                existing_index = idx
-                break
+        # Create filename: outputs/temp/<file_name>-<service_name>.json
+        # Sanitize file_name to remove any path separators
+        safe_file_name = Path(file_name).name
+        temp_file_path = temp_dir / f"{safe_file_name}-{service_name}.json"
 
-        if existing_index is not None:
-            # Update existing entry
-            data["results"][existing_index] = new_result
-        else:
-            # Append new entry
-            data["results"].append(new_result)
+        # Save to temp file
+        with open(temp_file_path, "w", encoding="utf-8") as f:
+            json.dump(result_data, f, indent=2, ensure_ascii=False)
 
-        # Save back to file
-        with open(results_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Saved results: {file_name} | {service_name} | {results_file_path}")
+        logger.info(f"Saved temp result: {temp_file_path}")
 
     except Exception as e:
         logger.error(f"JSON save error: {file_name} | {service_name} | {str(e)}", exc_info=True)
         st.warning(f"Failed to save results to JSON: {str(e)}")
         print(f"Error details: {e}")
+
+
+def consolidate_temp_extractions(
+    output_file: str = "outputs/extract_results.json",
+) -> int:
+    """
+    Consolidate all temporary extraction files from outputs/temp/ into the main results file.
+    This function reads all JSON files from outputs/temp/, merges them with existing results
+    (avoiding duplicates based on file_name + service_name), and saves to the output file.
+
+    Args:
+        output_file: Path to the consolidated results file (default: outputs/extract_results.json)
+
+    Returns:
+        Number of results consolidated
+
+    Raises:
+        Exception: If consolidation fails
+    """
+    import json
+    from pathlib import Path
+
+    try:
+        temp_dir = Path("outputs/temp")
+        output_path = Path(output_file)
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing results or create new structure
+        if output_path.exists():
+            with open(output_path, encoding="utf-8") as f:
+                consolidated_data = json.load(f)
+            logger.debug(f"Loaded existing consolidated file: {output_file}")
+        else:
+            consolidated_data = {"results": []}
+            logger.debug(f"Creating new consolidated file: {output_file}")
+
+        # Read all temp JSON files
+        temp_files = list(temp_dir.glob("*.json"))
+        logger.info(f"Found {len(temp_files)} temp file(s) to consolidate")
+
+        consolidated_count = 0
+
+        for temp_file in temp_files:
+            try:
+                with open(temp_file, encoding="utf-8") as f:
+                    temp_data = json.load(f)
+
+                # Extract file_name and service_name for duplicate checking
+                file_name = temp_data.get("file_name")
+                service_name = temp_data.get("service_name")
+
+                if not file_name or not service_name:
+                    logger.warning(f"Skipping invalid temp file: {temp_file}")
+                    continue
+
+                # Find existing entry with same file_name and service_name
+                existing_index = None
+                for idx, result in enumerate(consolidated_data["results"]):
+                    if (
+                        result.get("file_name") == file_name
+                        and result.get("service_name") == service_name
+                    ):
+                        existing_index = idx
+                        break
+
+                if existing_index is not None:
+                    # Update existing entry
+                    consolidated_data["results"][existing_index] = temp_data
+                    logger.debug(f"Updated existing entry: {file_name} | {service_name}")
+                else:
+                    # Append new entry
+                    consolidated_data["results"].append(temp_data)
+                    logger.debug(f"Added new entry: {file_name} | {service_name}")
+
+                consolidated_count += 1
+
+            except Exception as e:
+                logger.error(f"Error reading temp file {temp_file}: {str(e)}", exc_info=True)
+                continue
+
+        # Save consolidated results
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(consolidated_data, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Consolidated {consolidated_count} result(s) into {output_file}")
+
+        return consolidated_count
+
+    except Exception as e:
+        logger.error(f"Consolidation error: {str(e)}", exc_info=True)
+        st.warning(f"Failed to consolidate results: {str(e)}")
+        raise
+
+
+def delete_temp_extraction_files() -> int:
+    """
+    Delete all temporary extraction JSON files from outputs/temp/ directory.
+    This should be called after successful consolidation.
+
+    Returns:
+        Number of files deleted
+    """
+    from pathlib import Path
+
+    try:
+        temp_dir = Path("outputs/temp")
+
+        if not temp_dir.exists():
+            logger.debug("Temp directory does not exist, nothing to delete")
+            return 0
+
+        json_files = list(temp_dir.glob("*.json"))
+        deleted_count = 0
+
+        for json_file in json_files:
+            try:
+                json_file.unlink()
+                logger.debug(f"Deleted temp file: {json_file}")
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"Error deleting {json_file}: {str(e)}", exc_info=True)
+
+        logger.info(f"Deleted {deleted_count} temp extraction file(s)")
+
+        return deleted_count
+
+    except Exception as e:
+        logger.error(f"Error deleting temp files: {str(e)}", exc_info=True)
+        return 0

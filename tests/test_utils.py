@@ -12,11 +12,12 @@ from unittest.mock import mock_open, patch
 class TestSaveExtractionToJson:
     """Test suite for save_extraction_to_json function."""
 
-    def test_save_extraction_creates_new_file(self, temp_output_dir):
-        """Test saving extraction results creates new JSON file when none exists."""
+    def test_save_extraction_creates_temp_file(self, tmp_path, monkeypatch):
+        """Test saving extraction results creates temp JSON file."""
         from utils import save_extraction_to_json
 
-        results_file = temp_output_dir / "test_results.json"
+        # Change to temp directory so outputs/temp will be created there
+        monkeypatch.chdir(tmp_path)
 
         fields = {
             "tin": {"content": "123-456-789-00000", "confidence": 0.98},
@@ -30,117 +31,27 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=0.95,
             processing_time=2.5,
-            results_file_path=str(results_file),
         )
 
-        # Verify file was created
-        assert results_file.exists()
+        # Verify temp file was created
+        temp_file = tmp_path / "outputs" / "temp" / "test_file.png-ADI-Template.json"
+        assert temp_file.exists()
 
         # Verify content structure
-        with open(results_file, encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert "results" in data
-        assert len(data["results"]) == 1
-        assert data["results"][0]["file_name"] == "test_file.png"
-        assert data["results"][0]["service_name"] == "ADI-Template"
-        assert data["results"][0]["pages_count"] == 1
-        assert data["results"][0]["document_confidence"] == 0.95
-        assert data["results"][0]["processing_time"] == 2.5
+        assert data["file_name"] == "test_file.png"
+        assert data["service_name"] == "ADI-Template"
+        assert data["pages_count"] == 1
+        assert data["document_confidence"] == 0.95
+        assert data["processing_time"] == 2.5
 
-    def test_save_extraction_appends_to_existing_file(self, temp_output_dir):
-        """Test saving extraction appends to existing results file."""
-        from utils import save_extraction_to_json
-
-        results_file = temp_output_dir / "test_results.json"
-
-        # Create initial file with one result
-        initial_data = {
-            "results": [
-                {
-                    "file_name": "existing_file.png",
-                    "service_name": "Content-Understanding",
-                    "pages_count": 1,
-                    "document_confidence": 0.90,
-                    "processing_time": 1.5,
-                    "fields": [],
-                }
-            ]
-        }
-
-        with open(results_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
-
-        # Add new result
-        fields = {"tin": {"content": "123-456-789-00000", "confidence": 0.98}}
-
-        save_extraction_to_json(
-            file_name="new_file.png",
-            service_name="ADI-Neural",
-            pages_count=1,
-            fields=fields,
-            overall_confidence=0.95,
-            processing_time=2.5,
-            results_file_path=str(results_file),
-        )
-
-        # Verify both results exist
-        with open(results_file, encoding="utf-8") as f:
-            data = json.load(f)
-
-        assert len(data["results"]) == 2
-        assert data["results"][0]["file_name"] == "existing_file.png"
-        assert data["results"][1]["file_name"] == "new_file.png"
-
-    def test_save_extraction_updates_existing_entry(self, temp_output_dir):
-        """Test saving extraction updates existing entry with same file_name and service_name."""
-        from utils import save_extraction_to_json
-
-        results_file = temp_output_dir / "test_results.json"
-
-        # Create initial file
-        initial_data = {
-            "results": [
-                {
-                    "file_name": "test_file.png",
-                    "service_name": "ADI-Template",
-                    "pages_count": 1,
-                    "document_confidence": 0.80,
-                    "processing_time": 1.0,
-                    "fields": [],
-                }
-            ]
-        }
-
-        with open(results_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
-
-        # Update with new data
-        fields = {"tin": {"content": "123-456-789-00000", "confidence": 0.98}}
-
-        save_extraction_to_json(
-            file_name="test_file.png",
-            service_name="ADI-Template",
-            pages_count=1,
-            fields=fields,
-            overall_confidence=0.95,
-            processing_time=2.5,
-            results_file_path=str(results_file),
-        )
-
-        # Verify entry was updated, not duplicated
-        with open(results_file, encoding="utf-8") as f:
-            data = json.load(f)
-
-        assert len(data["results"]) == 1
-        assert data["results"][0]["document_confidence"] == 0.95
-        assert data["results"][0]["processing_time"] == 2.5
-
-    def test_save_extraction_rounds_confidence_to_three_decimals(self, temp_output_dir):
+    def test_save_extraction_rounds_confidence_to_three_decimals(self, tmp_path, monkeypatch):
         """Test confidence scores are rounded to 3 decimal places."""
         from utils import save_extraction_to_json
 
-        results_file = temp_output_dir / "test_results.json"
+        monkeypatch.chdir(tmp_path)
 
         fields = {
             "tin": {"content": "123-456-789-00000", "confidence": 0.987654321},
@@ -154,30 +65,28 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=0.956789,
             processing_time=2.567891,
-            results_file_path=str(results_file),
         )
 
-        with open(results_file, encoding="utf-8") as f:
+        temp_file = tmp_path / "outputs" / "temp" / "test_file.png-ADI-Template.json"
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # Check overall confidence rounded
-        assert data["results"][0]["document_confidence"] == 0.957
+        assert data["document_confidence"] == 0.957
 
         # Check processing time rounded
-        assert data["results"][0]["processing_time"] == 2.568
+        assert data["processing_time"] == 2.568
 
         # Check field confidences rounded
-        field_confidences = {
-            field["name"]: field["confidence"] for field in data["results"][0]["fields"]
-        }
+        field_confidences = {field["name"]: field["confidence"] for field in data["fields"]}
         assert field_confidences["tin"] == 0.988
         assert field_confidences["taxpayerName"] == 0.123
 
-    def test_save_extraction_with_none_confidence_defaults_to_zero(self, temp_output_dir):
+    def test_save_extraction_with_none_confidence_defaults_to_zero(self, tmp_path, monkeypatch):
         """Test None confidence values default to 0.0."""
         from utils import save_extraction_to_json
 
-        results_file = temp_output_dir / "test_results.json"
+        monkeypatch.chdir(tmp_path)
 
         fields = {"tin": {"content": "123-456-789-00000", "confidence": 0.98}}
 
@@ -188,20 +97,20 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=None,
             processing_time=None,
-            results_file_path=str(results_file),
         )
 
-        with open(results_file, encoding="utf-8") as f:
+        temp_file = tmp_path / "outputs" / "temp" / "test_file.png-ADI-Template.json"
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["results"][0]["document_confidence"] == 0.0
-        assert data["results"][0]["processing_time"] == 0.0
+        assert data["document_confidence"] == 0.0
+        assert data["processing_time"] == 0.0
 
-    def test_save_extraction_handles_fields_with_value_key(self, temp_output_dir):
+    def test_save_extraction_handles_fields_with_value_key(self, tmp_path, monkeypatch):
         """Test extraction handles fields using 'value' instead of 'content'."""
         from utils import save_extraction_to_json
 
-        results_file = temp_output_dir / "test_results.json"
+        monkeypatch.chdir(tmp_path)
 
         # Use 'value' key instead of 'content'
         fields = {
@@ -216,22 +125,22 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=0.95,
             processing_time=2.5,
-            results_file_path=str(results_file),
         )
 
-        with open(results_file, encoding="utf-8") as f:
+        temp_file = tmp_path / "outputs" / "temp" / "test_file.png-ADI-Template.json"
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # Verify values were extracted correctly
-        field_values = {field["name"]: field["value"] for field in data["results"][0]["fields"]}
+        field_values = {field["name"]: field["value"] for field in data["fields"]}
         assert field_values["tin"] == "123-456-789-00000"
         assert field_values["taxpayerName"] == "Sample Corp"
 
-    def test_save_extraction_handles_missing_confidence_in_fields(self, temp_output_dir):
+    def test_save_extraction_handles_missing_confidence_in_fields(self, tmp_path, monkeypatch):
         """Test extraction handles fields without confidence key."""
         from utils import save_extraction_to_json
 
-        results_file = temp_output_dir / "test_results.json"
+        monkeypatch.chdir(tmp_path)
 
         # Fields without confidence
         fields = {
@@ -246,21 +155,21 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=0.95,
             processing_time=2.5,
-            results_file_path=str(results_file),
         )
 
-        with open(results_file, encoding="utf-8") as f:
+        temp_file = tmp_path / "outputs" / "temp" / "test_file.png-ADI-Template.json"
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # Verify confidence defaults to 0.0
-        for field in data["results"][0]["fields"]:
+        for field in data["fields"]:
             assert field["confidence"] == 0.0
 
-    def test_save_extraction_creates_directory_if_not_exists(self, tmp_path):
-        """Test extraction creates output directory if it doesn't exist."""
+    def test_save_extraction_creates_directory_if_not_exists(self, tmp_path, monkeypatch):
+        """Test extraction creates temp directory if it doesn't exist."""
         from utils import save_extraction_to_json
 
-        results_file = tmp_path / "non_existent_dir" / "results.json"
+        monkeypatch.chdir(tmp_path)
 
         fields = {"tin": {"content": "123-456-789-00000", "confidence": 0.98}}
 
@@ -271,21 +180,18 @@ class TestSaveExtractionToJson:
             fields=fields,
             overall_confidence=0.95,
             processing_time=2.5,
-            results_file_path=str(results_file),
         )
 
         # Verify directory and file were created
-        assert results_file.parent.exists()
-        assert results_file.exists()
+        temp_dir = tmp_path / "outputs" / "temp"
+        assert temp_dir.exists()
+        temp_file = temp_dir / "test_file.png-ADI-Template.json"
+        assert temp_file.exists()
 
     @patch("streamlit.warning")
-    def test_save_extraction_handles_json_write_error(self, mock_warning, tmp_path):
+    def test_save_extraction_handles_json_write_error(self, mock_warning):
         """Test extraction handles errors when writing JSON file."""
         from utils import save_extraction_to_json
-
-        # Create a read-only directory (Windows compatible)
-        results_file = tmp_path / "readonly" / "results.json"
-        results_file.parent.mkdir()
 
         fields = {"tin": {"content": "123-456-789-00000", "confidence": 0.98}}
 
@@ -298,12 +204,143 @@ class TestSaveExtractionToJson:
                 fields=fields,
                 overall_confidence=0.95,
                 processing_time=2.5,
-                results_file_path=str(results_file),
             )
 
         # Verify warning was called
         mock_warning.assert_called_once()
         assert "Failed to save results to JSON" in mock_warning.call_args[0][0]
+
+
+class TestConsolidateTempExtractions:
+    """Test suite for consolidate_temp_extractions function."""
+
+    def test_consolidate_creates_new_results_file(self, tmp_path, monkeypatch):
+        """Test consolidation creates new results file when none exists."""
+        from utils import consolidate_temp_extractions
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create temp directory with test files
+        temp_dir = tmp_path / "outputs" / "temp"
+        temp_dir.mkdir(parents=True)
+        output_file = tmp_path / "outputs" / "results.json"
+
+        # Create temp files
+        temp_file1 = temp_dir / "file1.pdf-ADI-Template.json"
+        temp_file1.write_text(
+            json.dumps(
+                {
+                    "file_name": "file1.pdf",
+                    "service_name": "ADI-Template",
+                    "pages_count": 1,
+                    "document_confidence": 0.95,
+                    "processing_time": 2.5,
+                    "fields": [],
+                }
+            )
+        )
+
+        count = consolidate_temp_extractions("outputs/results.json")
+
+        assert count == 1
+        assert output_file.exists()
+
+        with open(output_file) as f:
+            data = json.load(f)
+
+        assert len(data["results"]) == 1
+        assert data["results"][0]["file_name"] == "file1.pdf"
+
+    def test_consolidate_appends_to_existing_file(self, tmp_path, monkeypatch):
+        """Test consolidation appends to existing results."""
+        from utils import consolidate_temp_extractions
+
+        monkeypatch.chdir(tmp_path)
+
+        temp_dir = tmp_path / "outputs" / "temp"
+        temp_dir.mkdir(parents=True)
+        output_file = tmp_path / "outputs" / "results.json"
+
+        # Create existing results file
+        existing_data = {
+            "results": [
+                {
+                    "file_name": "existing.pdf",
+                    "service_name": "ADI-Neural",
+                    "pages_count": 1,
+                    "document_confidence": 0.90,
+                    "processing_time": 1.5,
+                    "fields": [],
+                }
+            ]
+        }
+        output_file.write_text(json.dumps(existing_data))
+
+        # Create temp file
+        temp_file = temp_dir / "new.pdf-ADI-Template.json"
+        temp_file.write_text(
+            json.dumps(
+                {
+                    "file_name": "new.pdf",
+                    "service_name": "ADI-Template",
+                    "pages_count": 1,
+                    "document_confidence": 0.95,
+                    "processing_time": 2.5,
+                    "fields": [],
+                }
+            )
+        )
+
+        count = consolidate_temp_extractions("outputs/results.json")
+
+        assert count == 1
+
+        with open(output_file) as f:
+            data = json.load(f)
+
+        assert len(data["results"]) == 2
+
+
+class TestCleanAndDeleteTempFiles:
+    """Test suite for temp file cleanup functions."""
+
+    def test_clean_temp_extraction_files(self, tmp_path, monkeypatch):
+        """Test cleaning temp files before extraction."""
+        from utils import clean_temp_extraction_files
+
+        monkeypatch.chdir(tmp_path)
+
+        temp_dir = tmp_path / "outputs" / "temp"
+        temp_dir.mkdir(parents=True)
+
+        # Create some temp files
+        (temp_dir / "file1.json").write_text("{}")
+        (temp_dir / "file2.json").write_text("{}")
+
+        clean_temp_extraction_files()
+
+        # Verify files are deleted
+        assert not (temp_dir / "file1.json").exists()
+        assert not (temp_dir / "file2.json").exists()
+
+    def test_delete_temp_extraction_files(self, tmp_path, monkeypatch):
+        """Test deleting temp files after consolidation."""
+        from utils import delete_temp_extraction_files
+
+        monkeypatch.chdir(tmp_path)
+
+        temp_dir = tmp_path / "outputs" / "temp"
+        temp_dir.mkdir(parents=True)
+
+        # Create temp files
+        (temp_dir / "file1.json").write_text("{}")
+        (temp_dir / "file2.json").write_text("{}")
+
+        count = delete_temp_extraction_files()
+
+        assert count == 2
+        assert not (temp_dir / "file1.json").exists()
+        assert not (temp_dir / "file2.json").exists()
 
     @patch("streamlit.session_state", new_callable=dict)
     def test_keep_state_returns_true_when_key_exists(self, mock_session_state):

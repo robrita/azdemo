@@ -1,0 +1,24 @@
+{
+  "file_name": "bir2303-true-10.png",
+  "service_name": "GPT-4.1-Vision",
+  "pages_count": 1,
+  "document_confidence": 0.0,
+  "processing_time": 0.204,
+  "fields": [
+    {
+      "name": "tin",
+      "value": "123-456-789-00000",
+      "confidence": 0.0
+    },
+    {
+      "name": "taxpayerName",
+      "value": "Sample Corp",
+      "confidence": 0.0
+    },
+    {
+      "name": "registeredDate",
+      "value": "01/15/2024",
+      "confidence": 0.0
+    }
+  ]
+}
