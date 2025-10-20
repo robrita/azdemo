@@ -44,22 +44,17 @@
       "service_name": "ADI-Template",
       "pages_count": 2,
       "document_confidence": 0.775,
-      "processing_time": 13.544,
+      "processing_time": 11.426,
       "fields": [
+        {
+          "name": "businessType",
+          "value": "SHELA CLOTHING STORE",
+          "confidence": 0.652
+        },
         {
           "name": "taxpayerName",
           "value": "BULAT-AG, ROWENA ESPINA",
           "confidence": 0.97
-        },
-        {
-          "name": "registeredAddress",
-          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST.,PAHINA CENTRAL (POB.) 6000 CEBU CITY (CAPITAL)\nCEBU PHILIPPINES",
-          "confidence": 0.769
-        },
-        {
-          "name": "tradeName",
-          "value": "47749-RETAIL SALE OF SECOND-HAND",
-          "confidence": 0.486
         },
         {
           "name": "registeredDate",
@@ -67,14 +62,19 @@
           "confidence": 0.798
         },
         {
+          "name": "registeredAddress",
+          "value": "2ND FLR. S043 ELIZABETH MALL, LEON KILAT ST.,PAHINA CENTRAL (POB.) 6000 CEBU CITY (CAPITAL)\nCEBU PHILIPPINES",
+          "confidence": 0.769
+        },
+        {
           "name": "tin",
           "value": "259-769-972-00004",
           "confidence": 0.972
         },
         {
-          "name": "businessType",
-          "value": "SHELA CLOTHING STORE",
-          "confidence": 0.652
+          "name": "tradeName",
+          "value": "47749-RETAIL SALE OF SECOND-HAND",
+          "confidence": 0.486
         }
       ]
     },
@@ -132,17 +132,12 @@
       "service_name": "ADI-Template",
       "pages_count": 2,
       "document_confidence": 0.774,
-      "processing_time": 11.166,
+      "processing_time": 11.743,
       "fields": [
         {
-          "name": "taxpayerName",
-          "value": "MARIA SINUKUAN PETROLEUM",
-          "confidence": 0.943
-        },
-        {
-          "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
-          "confidence": 0.799
+          "name": "registeredDate",
+          "value": "May 8, 2023",
+          "confidence": 0.798
         },
         {
           "name": "tradeName",
@@ -150,9 +145,14 @@
           "confidence": 0.486
         },
         {
-          "name": "registeredDate",
-          "value": "May 8, 2023",
-          "confidence": 0.798
+          "name": "registeredAddress",
+          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "confidence": 0.799
+        },
+        {
+          "name": "businessType",
+          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
+          "confidence": 0.466
         },
         {
           "name": "tin",
@@ -160,9 +160,9 @@
           "confidence": 0.944
         },
         {
-          "name": "businessType",
-          "value": "47300-RETAIL SALE OF AUTOMOTIVE FUEL IN SPECIALIZED STORES",
-          "confidence": 0.466
+          "name": "taxpayerName",
+          "value": "MARIA SINUKUAN PETROLEUM",
+          "confidence": 0.943
         }
       ]
     },
@@ -210,7 +210,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 11.498,
+      "processing_time": 12.81,
       "fields": [
         {
           "name": "language",
@@ -229,7 +229,7 @@
         },
         {
           "name": "taxpayerName",
-          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "value": "Maria Sinukuan Petroleum Corporation",
           "confidence": 0.0
         },
         {
@@ -239,17 +239,17 @@
         },
         {
           "name": "registeredAddress",
-          "value": "NUEVA ECIJA PAMPANGA ROAD MANGGA-CACUTUD 2012 ARAYAT PAMPANGA PHILIPPINES",
+          "value": "Nueva Ecija Pampanga Road, Mangga-Cacutud 2012 Arayat Pampanga Philippines",
           "confidence": 0.0
         },
         {
           "name": "tradeName",
-          "value": "MARIA SINUKUAN PETROLEUM CORPORATION",
+          "value": "Maria Sinukuan Petroleum Corporation",
           "confidence": 0.0
         },
         {
           "name": "businessType",
-          "value": "RETAIL SALE OF AUTOMOTIVE FUEL",
+          "value": "Retail Sale of Automotive Fuel",
           "confidence": 0.0
         }
       ]
@@ -259,8 +259,18 @@
       "service_name": "ADI-Template",
       "pages_count": 1,
       "document_confidence": 0.841,
-      "processing_time": 10.13,
+      "processing_time": 10.459,
       "fields": [
+        {
+          "name": "tin",
+          "value": "461-846-496-00000",
+          "confidence": 0.99
+        },
+        {
+          "name": "registeredAddress",
+          "value": "III JUANA OSMENA ST",
+          "confidence": 0.928
+        },
         {
           "name": "tradeName",
           "value": "56303-CAFE OR COFFEE SHOPS",
@@ -270,16 +280,6 @@
           "name": "businessType",
           "value": "FILING",
           "confidence": 0.636
-        },
-        {
-          "name": "registeredAddress",
-          "value": "III JUANA OSMENA ST",
-          "confidence": 0.928
-        },
-        {
-          "name": "tin",
-          "value": "461-846-496-00000",
-          "confidence": 0.99
         },
         {
           "name": "taxpayerName",
@@ -337,7 +337,7 @@
       "service_name": "Mistral-Doc-AI",
       "pages_count": 1,
       "document_confidence": 0.0,
-      "processing_time": 10.682,
+      "processing_time": 11.775,
       "fields": [
         {
           "name": "language",
@@ -386,7 +386,7 @@
       "service_name": "Content-Understanding",
       "pages_count": 2,
       "document_confidence": 0.0,
-      "processing_time": 15.8,
+      "processing_time": 17.731,
       "fields": [
         {
           "name": "tin",
@@ -641,495 +641,6 @@
         {
           "name": "businessType",
           "value": "GEN. MDSE. (UKAY-UKAY) / 47749-RETAIL SALE OF SECOND-HAND GOODS, N.E.C. (PSIC)",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "GPT-4.1-Vision",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 0.208,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "123-456-789-00000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "Sample Corp",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "01/15/2024",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "GPT-5-Vision",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 0.238,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "123-456-789-00000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "Sample Corp",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "multipage.pdf",
-      "service_name": "ADI-Template",
-      "pages_count": 3,
-      "document_confidence": 0.95,
-      "processing_time": 0.0,
-      "fields": []
-    },
-    {
-      "file_name": "test.png",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 0.0,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "123-456-789",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "test.pdf",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 0.001,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "123-456-789",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.851,
-      "processing_time": 8.931,
-      "fields": [
-        {
-          "name": "taxpayerName",
-          "value": "NAPOLES, DEOLITO DELANTAR",
-          "confidence": 0.99
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
-          "confidence": 0.943
-        },
-        {
-          "name": "tradeName",
-          "value": "",
-          "confidence": 0.984
-        },
-        {
-          "name": "registeredDate",
-          "value": "July 18, 2022",
-          "confidence": 0.943
-        },
-        {
-          "name": "tin",
-          "value": "245-208-083-00001",
-          "confidence": 0.99
-        },
-        {
-          "name": "businessType",
-          "value": "",
-          "confidence": 0.984
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-30.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.198,
-      "processing_time": 6.092,
-      "fields": [
-        {
-          "name": "businessType",
-          "value": "INCOME TAX\nCORHI PARTIASSOC",
-          "confidence": 0.538
-        },
-        {
-          "name": "taxpayerName",
-          "value": "PHILIPPINE NETWORK FOUNDATION\n(PFI), INC.",
-          "confidence": 0.663
-        },
-        {
-          "name": "tin",
-          "value": "003-944-350-000",
-          "confidence": 0.99
-        },
-        {
-          "name": "registeredAddress",
-          "value": "REGISTERED ACTIVITY(IES)",
-          "confidence": 0.496
-        },
-        {
-          "name": "registeredDate",
-          "value": "01/01/1997",
-          "confidence": 0.843
-        },
-        {
-          "name": "tradeName",
-          "value": "",
-          "confidence": 0.024
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-61.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.94,
-      "processing_time": 9.988,
-      "fields": [
-        {
-          "name": "businessType",
-          "value": "INSTALLATION SERVICES",
-          "confidence": 0.944
-        },
-        {
-          "name": "taxpayerName",
-          "value": "CENTRIFUGAL MACHINERY AND\nSERVICES, INC.",
-          "confidence": 0.99
-        },
-        {
-          "name": "tin",
-          "value": "009-188-339-00000",
-          "confidence": 0.99
-        },
-        {
-          "name": "registeredAddress",
-          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
-          "confidence": 0.942
-        },
-        {
-          "name": "registeredDate",
-          "value": "April 15. 2016",
-          "confidence": 0.941
-        },
-        {
-          "name": "tradeName",
-          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
-          "confidence": 0.892
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "ADI-Neural",
-      "pages_count": 1,
-      "document_confidence": 0.999,
-      "processing_time": 8.653,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "245-208-083-00001",
-          "confidence": 0.89
-        },
-        {
-          "name": "taxpayerName",
-          "value": "NAPOLES, DEOLITO DELANTAR",
-          "confidence": 0.694
-        },
-        {
-          "name": "registeredDate",
-          "value": "July 18, 2022",
-          "confidence": 0.845
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
-          "confidence": 0.092
-        },
-        {
-          "name": "tradeName",
-          "value": "",
-          "confidence": 0.981
-        },
-        {
-          "name": "businessType",
-          "value": "",
-          "confidence": 0.97
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-10.png",
-      "service_name": "Content-Understanding",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 10.118,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "245-208-083-00001",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "NAPOLES, DEOLITO DELANTAR",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "07/18/2022",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "9132 UNIT H NIOG ROAD NIOG || 4102 BACOOR CAVITE PHILIPPINES",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "LUWIE",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "{'type': 'string'}",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-61.png",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 13.376,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This document is a Certificate of Registration (BIR Form 2303) issued by the Bureau of Internal Revenue (BIR) in the Philippines. It contains details about the taxpayer, including the TIN, registered address, trade name, and business type.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "009-188-339-0000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "04/15/2016",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY, ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "WHOLESALE OF OTHER MACHINERY AND EQUIPMENT, N.E.C.; WHOLESALE/RETAIL TRADE OF ELECTRO-MECHANICAL EQUIPMENT; OTHER BUSINESS SUPPORT SERVICE ACTIVITIES, N.E.C.; INSTALLATION SERVICES",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-04.png",
-      "service_name": "ADI-Template",
-      "pages_count": 1,
-      "document_confidence": 0.015,
-      "processing_time": 8.803,
-      "fields": [
-        {
-          "name": "tradeName",
-          "value": "",
-          "confidence": 0.864
-        },
-        {
-          "name": "taxpayerName",
-          "value": "KAGAWAR/ ROPAVANALAPI KAWANIHANNA RENDES INTERNAS REVENUE REGIONAL\nREVENUE DORTYSOFT ICE NO",
-          "confidence": 0.911
-        },
-        {
-          "name": "businessType",
-          "value": "",
-          "confidence": 0.204
-        },
-        {
-          "name": "registeredAddress",
-          "value": "REGISTERED ACTIVITY(IES) TAX TYPE",
-          "confidence": 0.537
-        },
-        {
-          "name": "tin",
-          "value": "009-081-209-000",
-          "confidence": 0.983
-        },
-        {
-          "name": "registeredDate",
-          "value": "029",
-          "confidence": 0.5
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-04.png",
-      "service_name": "Mistral-Doc-AI",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 7.34,
-      "fields": [
-        {
-          "name": "language",
-          "value": "English",
-          "confidence": 0.0
-        },
-        {
-          "name": "summary",
-          "value": "This is a Certificate of Registration for a business entity named Philippine Native E-Tailer Co. The document includes details such as the TIN number, registered address, trade name, and line of business.",
-          "confidence": 0.0
-        },
-        {
-          "name": "tin",
-          "value": "009-081-209-000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "Philippine Native E-Tailer Co.",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "08/18/2015",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "3001 Jose Abad Santos Ave, Brgy. 201 Zone 16 Dist. III, Tondo Manila 1012",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "Philippine Native E-Tailer Co.",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "5259 Other Non-Store Retail Sale",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-61.png",
-      "service_name": "Content-Understanding",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 11.322,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "009-188-339-00000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "04/15/2016",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "UNITS 716/821/822 CIVIC PLACE BUILDING 2301 CIVIC DRIVE FILINVEST CORPORATE CITY ALABANG 1781 CITY OF MUNTINLUPA NCR, FOURTH DISTRICT PHILIPPINES",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "CENTRIFUGAL MACHINERY AND SERVICES, INC.",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "WHOLESALE/RETAIL TRADE OF ELECTRO-MECHANICAL EQUIPMENT",
-          "confidence": 0.0
-        }
-      ]
-    },
-    {
-      "file_name": "bir2303-true-04.png",
-      "service_name": "Content-Understanding",
-      "pages_count": 1,
-      "document_confidence": 0.0,
-      "processing_time": 11.534,
-      "fields": [
-        {
-          "name": "tin",
-          "value": "009-081-209-000",
-          "confidence": 0.0
-        },
-        {
-          "name": "taxpayerName",
-          "value": "PHILIPPINE NATIVE E-TAILER CO.",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredDate",
-          "value": "08/18/2015",
-          "confidence": 0.0
-        },
-        {
-          "name": "registeredAddress",
-          "value": "3001 JOSE ABAD SANTOS AVE\nBRGY 201 ZONE 18 DIST III\nTONDO MANILA 1012",
-          "confidence": 0.0
-        },
-        {
-          "name": "tradeName",
-          "value": "PHILIPPINE NATIVE E-TAILER CO.",
-          "confidence": 0.0
-        },
-        {
-          "name": "businessType",
-          "value": "5259. OTHER NON-STORE RETAIL SALE",
           "confidence": 0.0
         }
       ]
