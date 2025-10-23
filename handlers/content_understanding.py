@@ -171,11 +171,26 @@ class ContentUnderstanding:
             if contents:
                 for idx, content in enumerate(contents):
                     fields = content.get("fields", {})
+                    logger.info(
+                        f"Content Understanding fields extracted | Document {idx + 1}: {fields}"
+                    )
+
+                    # Calculate document-level confidence from field confidences
+                    field_confidences = [
+                        field_data.get("confidence", 0.0)
+                        for field_data in fields.values()
+                        if isinstance(field_data, dict)
+                    ]
+                    doc_confidence = (
+                        sum(field_confidences) / len(field_confidences)
+                        if field_confidences
+                        else 0.0
+                    )
 
                     doc_data = {
                         "document_number": idx + 1,
                         "doc_type": content.get("kind", "document"),
-                        "confidence": 0.0,  # Content Understanding doesn't provide overall confidence
+                        "confidence": doc_confidence,
                         "page_range": {
                             "start": content.get("startPageNumber", 1),
                             "end": content.get("endPageNumber", 1),
@@ -186,10 +201,22 @@ class ContentUnderstanding:
                     # Extract fields with their values
                     for field_name, field_data in fields.items():
                         if isinstance(field_data, dict):
+                            # Extract value based on field type
+                            field_type = field_data.get("type", "unknown")
+                            if field_type == "date":
+                                content = field_data.get("valueDate", "")
+                            elif field_type == "string":
+                                content = field_data.get("valueString", "")
+                            else:
+                                # Fallback for other types
+                                content = field_data.get(
+                                    "valueString", field_data.get("valueDate", "")
+                                )
+
                             doc_data["fields"][field_name] = {
-                                "type": field_data.get("type", "unknown"),
-                                "content": field_data.get("valueString", str(field_data)),
-                                "confidence": 0.0,  # Content Understanding doesn't provide field-level confidence
+                                "type": field_type,
+                                "content": content,
+                                "confidence": field_data.get("confidence", 0.0),
                             }
 
                     extracted_data["documents"].append(doc_data)
@@ -213,20 +240,35 @@ class ContentUnderstanding:
                 # Build fields dictionary for save_extraction_to_json
                 # Following the same pattern as mistral_document_ai.py
                 fields_dict = {}
-                overall_confidence = 0.0
+                confidence_scores = []
 
                 # Map the extracted properties to fields with confidence scores
                 for field_name, field_data in fields.items():
                     if isinstance(field_data, dict):
-                        value = field_data.get("valueString", str(field_data))
                         field_type = field_data.get("type", "string")
+                        confidence = field_data.get("confidence", 0.0)
+
+                        # Extract value based on field type
+                        if field_type == "date":
+                            value = field_data.get("valueDate", "")
+                        elif field_type == "string":
+                            value = field_data.get("valueString", "")
+                        else:
+                            # Fallback for other types
+                            value = field_data.get("valueString", field_data.get("valueDate", ""))
 
                         if value:  # Only include fields with values
                             fields_dict[field_name] = {
                                 "content": value,
-                                "confidence": 0.0,  # Content Understanding doesn't provide confidence
+                                "confidence": confidence,
                                 "type": field_type,
                             }
+                            confidence_scores.append(confidence)
+
+                # Calculate overall confidence as average of all field confidences
+                overall_confidence = (
+                    sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
+                )
 
                 # Save extraction results
                 if fields_dict:
