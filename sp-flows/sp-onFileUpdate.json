@@ -1,0 +1,61 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_file_is_created_or_modified": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://microsoftapc.sharepoint.com/teams/RobAI-MilestoneTracker'))}/tables/@{encodeURIComponent(encodeURIComponent('b0a77cf4-b6f3-4c73-8f4f-ee065deab81d'))}/onupdatedfileitems"
+                },
+                "recurrence": {
+                    "interval": 1,
+                    "frequency": "Second",
+                    "timeZone": "Singapore Standard Time"
+                },
+                "splitOn": "@triggerBody()?['value']"
+            }
+        },
+        "actions": {
+            "HTTP": {
+                "type": "Http",
+                "inputs": {
+                    "uri": "https://prod-67.eastus.logic.azure.com:443/workflows/76f2c8283a1d4906a7ff2a1f178a3af5/triggers/HTTP_request_trigger/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FHTTP_request_trigger%2Frun&sv=1.0&sig=pa4FvM_l4MMDJZZGhHyN_RlfTGv3Wh1NEt5Uje1r5TQ",
+                    "method": "POST",
+                    "body": "@triggerBody()"
+                },
+                "runAfter": {},
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "sharepointonline": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/sharepointonline",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/sharepointonline",
+                    "connectionName": "sharepointonline"
+                }
+            }
+        }
+    }
+}

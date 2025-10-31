@@ -1,0 +1,416 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "Queue_pages_trigger": {
+                "type": "ApiConnection",
+                "description": "Visibility timeout must be longer than the ff to avoid race condition.\n- max retry time delay\n- e2e process",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/message_trigger",
+                    "queries": {
+                        "visibilitytimeout": "300"
+                    }
+                },
+                "recurrence": {
+                    "interval": 1,
+                    "frequency": "Second",
+                    "timeZone": "Singapore Standard Time"
+                },
+                "splitOn": "@triggerBody()?['QueueMessagesList']?['QueueMessage']"
+            }
+        },
+        "actions": {
+            "Query_pages_by_fileId": {
+                "type": "ApiConnection",
+                "description": "Get all pages with the same fileId",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/query",
+                    "queries": {
+                        "queryText": "SELECT * FROM c WHERE c.fileId = \"@{triggerBody()?['MessageText']}\""
+                    }
+                },
+                "runAfter": {
+                    "Is_last_retry": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Initialize_variable": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "RetryLimit",
+                            "type": "integer",
+                            "value": 2
+                        }
+                    ]
+                },
+                "runAfter": {}
+            },
+            "For_each_page": {
+                "type": "Foreach",
+                "description": "Loop through each document page",
+                "foreach": "@body('Query_pages_by_fileId')?['value']",
+                "actions": {
+                    "Chunk_a_page": {
+                        "type": "ApiConnection",
+                        "description": "Chunk a page using LLM into a topic and content structure.",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureopenai']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "messages": [
+                                    {
+                                        "role": "system",
+                                        "content": "You are a document analysis assistant that extracts and organizes content by topic from complex documents. Your task is to analyze the input document and return a well-structured JSON object.\n\n## Instructions:\n\n1. **Topic Identification**: Identify distinct topics based on:\n   - Section headings and subheadings\n   - Natural content boundaries\n   - Semantic relationships between paragraphs\n   - Context shifts in the narrative\n\n2. **Content Preservation**: \n   - Preserve ALL original content exactly as written\n   - Do NOT add, modify, or remove any information\n   - Maintain the original wording, terminology, and phrasing\n   - Keep all numerical data, dates, and references intact\n\n3. **Table and Figure Handling**:\n   - Group tables with their associated topic and explanatory text\n   - Include table headers, all rows, and any captions or notes\n   - If a table spans multiple topics, keep it with the primary topic it supports\n   - Include figure descriptions, captions, and any referenced data\n   - Maintain the relationship between figures/tables and their surrounding context\n\n4. **Semantic Grouping**:\n   - Group related paragraphs under a single topic even if they appear in different sections\n   - Keep introductory content with the topic it introduces\n   - Include examples, explanations, and supporting details with their parent topic\n   - Ensure each topic is self-contained and makes logical sense\n   - Avoid fragmenting closely related information across multiple topics\n\n5. **Topic Naming**:\n   - Use clear, descriptive topic names derived from the document\n   - Use section headings when appropriate\n   - Create concise but informative topic names when headings aren't present\n   - Ensure topic names reflect the actual content\n\n6. **Content Formatting**:\n   - Preserve markdown formatting if present (headers, lists, bold, italic)\n   - For tables: maintain structure using markdown table syntax or preserve original format\n   - Use line breaks to maintain readability\n   - Keep bullet points, numbered lists, and indentation as they appear\n\n## Output Format:\n\nReturn ONLY a valid JSON object with the following structure:\n\n```json\n{\n  \"topics\": [\n    {\n      \"topic\": \"Topic Name\",\n      \"content\": \"Complete content for this topic, including all paragraphs, tables (with headers and all data rows), figures, examples, and supporting information. Tables should be formatted clearly with all data grouped together.\"\n    },\n    {\n      \"topic\": \"Another Topic Name\",\n      \"content\": \"Content for this topic...\"\n    }\n  ]\n}\n```\n\n## Important Notes:\n- Each topic should be substantial and meaningful\n- Avoid creating too many granular topics - aim for logical groupings\n- If the document has a clear structure, respect it\n- If tables or figures are referenced in text, keep them together with that text\n- Ensure the JSON is properly formatted and valid\n\n---\n\nDocument:"
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": "@items('For_each_page')?['pageContent']"
+                                    }
+                                ],
+                                "temperature": 0,
+                                "top_p": 1,
+                                "response_format": {
+                                    "type": "json_object"
+                                }
+                            },
+                            "path": "/2024-02-15-preview/deployments/@{encodeURIComponent(parameters('openai_gpt_model'))}/chat/completions",
+                            "queries": {
+                                "api-version": "2025-01-01-preview"
+                            }
+                        }
+                    },
+                    "Format_to_JSON": {
+                        "type": "Compose",
+                        "inputs": "@json(\r\n  body('Chunk_a_page')['choices']?[0]?['message']?['content']\r\n)",
+                        "runAfter": {
+                            "Chunk_a_page": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Map_Chunks_to_AI_Search": {
+                        "type": "Select",
+                        "description": "AI Search document schema",
+                        "inputs": {
+                            "from": "@range(0, length(body('Map_to_embeddings')))",
+                            "select": {
+                                "id": "@{replace(items('For_each_page')?['id'], '.', '-')}_@{add(item(), 1)}",
+                                "spId": "@items('For_each_page')?['spId']",
+                                "path": "@items('For_each_page')?['path']",
+                                "fileName": "@items('For_each_page')?['fileName']",
+                                "fileId": "@items('For_each_page')?['fileId']",
+                                "pageId": "@items('For_each_page')?['id']",
+                                "pageLink": "@if(\r\n  contains(items('For_each_page')?['fileType'],'pdf'),\r\n  concat(items('For_each_page')?['link'],'#page=', items('For_each_page')?['pageNumber']),\r\n  items('For_each_page')?['link']\r\n)",
+                                "pageNumber": "@items('For_each_page')?['pageNumber']",
+                                "pageContent": "@items('For_each_page')?['pageContent']",
+                                "chunkContent": "@body('Map_to_embeddings')?[item()]",
+                                "vector": "@body('Multiple_embeddings')?['embeddings']?[item()]"
+                            }
+                        },
+                        "runAfter": {
+                            "Multiple_embeddings": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Map_Chunks_to_Cosmos_DB": {
+                        "type": "Select",
+                        "description": "Cosmos DB document schema",
+                        "inputs": {
+                            "from": "@range(0, length(body('Map_to_embeddings')))",
+                            "select": {
+                                "id": "@{items('For_each_page')?['id']}_@{add(item(), 1)}",
+                                "spId": "@items('For_each_page')?['spId']",
+                                "path": "@items('For_each_page')?['path']",
+                                "fileName": "@items('For_each_page')?['fileName']",
+                                "fileId": "@items('For_each_page')?['fileId']",
+                                "pageId": "@items('For_each_page')?['id']",
+                                "pageLink": "@if(\r\n  contains(items('For_each_page')?['fileType'],'pdf'),\r\n  concat(items('For_each_page')?['link'],'#page=', items('For_each_page')?['pageNumber']),\r\n  items('For_each_page')?['link']\r\n)",
+                                "pageNumber": "@items('For_each_page')?['pageNumber']",
+                                "chunkContent": "@body('Map_to_embeddings')?[item()]",
+                                "vector": "@body('Multiple_embeddings')?['embeddings']?[item()]"
+                            }
+                        },
+                        "runAfter": {
+                            "Multiple_embeddings": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Map_to_embeddings": {
+                        "type": "Select",
+                        "inputs": {
+                            "from": "@range(0, length(outputs('Format_to_JSON')?['topics']))",
+                            "select": "@concat(\r\n  outputs('Format_to_JSON')?['topics']?[item()]?['topic'],\r\n  '\n\n',\r\n  outputs('Format_to_JSON')?['topics']?[item()]?['content']\r\n)"
+                        },
+                        "runAfter": {
+                            "Format_to_JSON": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Multiple_embeddings": {
+                        "type": "ApiConnection",
+                        "description": "Generate multiple embeddings from an array of chunks - max of 8k tokens only",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureopenai']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "input": "@body('Map_to_embeddings')"
+                            },
+                            "path": "/deployments/@{encodeURIComponent(parameters('openai_embedding_model'))}/multipleEmbeddings",
+                            "queries": {
+                                "api-version": "2023-05-15"
+                            }
+                        },
+                        "runAfter": {
+                            "Map_to_embeddings": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "AI_Search_indexing": {
+                        "type": "ApiConnection",
+                        "description": "AI Search can index multiple documents all at once",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureaisearch_template']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": "@body('Map_Chunks_to_AI_Search')",
+                            "path": "/indexDocuments",
+                            "queries": {
+                                "indexName": "@parameters('ai_search_index')"
+                            }
+                        },
+                        "runAfter": {
+                            "Map_Chunks_to_AI_Search": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "For_each_chunk": {
+                        "type": "Foreach",
+                        "foreach": "@outputs('Map_Chunks_to_Cosmos_DB')['body']",
+                        "actions": {
+                            "Cosmos_DB_indexing": {
+                                "type": "ApiConnection",
+                                "description": "Index each Cosmos DB document through a loop",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": "@items('For_each_chunk')",
+                                    "headers": {
+                                        "x-ms-documentdb-is-upsert": true
+                                    },
+                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/docs"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Map_Chunks_to_Cosmos_DB": [
+                                "Succeeded"
+                            ]
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Query_pages_by_fileId": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Delete_queue_page_2": {
+                "type": "ApiConnection",
+                "description": "Finally, delete the page queue once everything is successful to terminate retry.",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                        }
+                    },
+                    "method": "delete",
+                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                    "queries": {
+                        "popreceipt": "@triggerBody()?['PopReceipt']"
+                    }
+                },
+                "runAfter": {
+                    "For_each_page": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Is_last_retry": {
+                "type": "If",
+                "description": "DequeueCount indicates failure from prior execution",
+                "expression": {
+                    "and": [
+                        {
+                            "greater": [
+                                "@int(triggerBody()?['DequeueCount'])",
+                                "@variables('RetryLimit')"
+                            ]
+                        }
+                    ]
+                },
+                "actions": {
+                    "Delete_queue_page_1": {
+                        "type": "ApiConnection",
+                        "description": "Delete queue page on last retry",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                                }
+                            },
+                            "method": "delete",
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                            "queries": {
+                                "popreceipt": "@triggerBody()?['PopReceipt']"
+                            }
+                        }
+                    },
+                    "Terminate_retry": {
+                        "type": "Terminate",
+                        "inputs": {
+                            "runStatus": "Failed",
+                            "runError": {
+                                "code": "429",
+                                "message": "Retry Limit Error"
+                            }
+                        },
+                        "runAfter": {
+                            "Delete_queue_page_1": [
+                                "Succeeded"
+                            ]
+                        }
+                    }
+                },
+                "else": {
+                    "actions": {}
+                },
+                "runAfter": {
+                    "Initialize_variable": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "cosmosdb_account": {
+                "defaultValue": "robaidoc",
+                "type": "String"
+            },
+            "cosmosdb_database": {
+                "defaultValue": "sharepoint",
+                "type": "String"
+            },
+            "cosmosdb_pages": {
+                "defaultValue": "pages",
+                "type": "String"
+            },
+            "cosmosdb_chunks": {
+                "defaultValue": "chunks",
+                "type": "String"
+            },
+            "queue_endpoint": {
+                "defaultValue": "robaidoc",
+                "type": "String"
+            },
+            "queue_name_pages": {
+                "defaultValue": "pages",
+                "type": "String"
+            },
+            "ai_search_index": {
+                "defaultValue": "sharepoint-search",
+                "type": "String"
+            },
+            "openai_embedding_model": {
+                "defaultValue": "",
+                "type": "String"
+            },
+            "openai_gpt_model": {
+                "defaultValue": "",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "openai_embedding_model": {
+            "value": "text-embedding-3-small"
+        },
+        "openai_gpt_model": {
+            "value": "gpt-4.1"
+        },
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "azurequeues": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azurequeues",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/azurequeues",
+                    "connectionName": "azurequeues",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    }
+                },
+                "documentdb": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/documentdb",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/documentdb",
+                    "connectionName": "documentdb",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    }
+                },
+                "azureopenai": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azureopenai",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/azureopenai",
+                    "connectionName": "azureopenai"
+                },
+                "azureaisearch_template": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azureaisearch",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/aisearchbyapikey-aiengr-forwizard"
+                }
+            }
+        }
+    }
+}
