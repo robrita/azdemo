@@ -32,9 +32,9 @@
                         }
                     },
                     "method": "get",
-                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_documents'))}/query",
+                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/query",
                     "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.spId = \"@{variables('ID')}\""
+                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
                     }
                 },
                 "runAfter": {
@@ -54,7 +54,7 @@
                     "method": "get",
                     "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/query",
                     "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.spId = \"@{variables('ID')}\""
+                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
                     }
                 },
                 "runAfter": {
@@ -74,7 +74,7 @@
                     "method": "get",
                     "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/query",
                     "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.spId = \"@{variables('ID')}\""
+                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
                     }
                 },
                 "runAfter": {
@@ -99,7 +99,7 @@
                             "headers": {
                                 "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_files')?['path']}\""
                             },
-                            "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_documents'))}/docs/@{encodeURIComponent(items('For_each_files')?['id'])}"
+                            "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/docs/@{encodeURIComponent(items('For_each_files')?['id'])}"
                         }
                     },
                     "Delete_blob_file": {
@@ -118,7 +118,7 @@
                         },
                         "runAfter": {
                             "Delete_a_file": [
-                                "SUCCEEDED"
+                                "Succeeded"
                             ]
                         },
                         "metadata": {
@@ -201,13 +201,11 @@
                                 "id": "@items('For_each_docs')?['id']",
                                 "path": "@items('For_each_docs')?['path']",
                                 "fileName": "@items('For_each_docs')?['fileName']",
-                                "fileId": "@items('For_each_docs')?['fileId']",
                                 "pageId": "@items('For_each_docs')?['pageId']",
                                 "pageLink": "@items('For_each_docs')?['pageLink']",
                                 "pageNumber": "@items('For_each_docs')?['pageNumber']",
                                 "pageContent": "@items('For_each_docs')?['pageContent']",
-                                "chunkContent": "@items('For_each_docs')?['chunkContent']",
-                                "spId": "@items('For_each_docs')?['spId']"
+                                "chunkContent": "@items('For_each_docs')?['chunkContent']"
                             },
                             "path": "/deleteDocument",
                             "queries": {
@@ -226,11 +224,6 @@
                 "type": "InitializeVariable",
                 "inputs": {
                     "variables": [
-                        {
-                            "name": "ID",
-                            "type": "integer",
-                            "value": "@triggerBody()?['ID']"
-                        },
                         {
                             "name": "FileNameWithExtension",
                             "type": "string",
@@ -252,7 +245,7 @@
                     "body": {
                         "searchText": "@variables('FileNameWithExtension')",
                         "vectorizedSearchFields": [],
-                        "filterCondition": "spId eq '@{variables('ID')}'"
+                        "filterCondition": "fileName eq '@{variables('FileNameWithExtension')}'"
                     },
                     "path": "/integratedVectorSearch/@{encodeURIComponent(parameters('ai_search_index'))}"
                 },
@@ -281,8 +274,8 @@
                 "defaultValue": "sharepoint",
                 "type": "String"
             },
-            "cosmosdb_documents": {
-                "defaultValue": "documents",
+            "cosmosdb_files": {
+                "defaultValue": "files",
                 "type": "String"
             },
             "cosmosdb_pages": {
@@ -326,11 +319,6 @@
                         }
                     }
                 },
-                "azureaisearch": {
-                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azureaisearch",
-                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/aisearchbyapikey-aiengr-forwizard",
-                    "connectionName": "aisearchbyapikey-aiengr-forwizard"
-                },
                 "azureblob": {
                     "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azureblob",
                     "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/azureblob",
@@ -340,6 +328,11 @@
                             "type": "ManagedServiceIdentity"
                         }
                     }
+                },
+                "azureaisearch": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azureaisearch",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/aisearchbyapikey-aiengr-forwizard",
+                    "connectionName": "aisearchbyapikey-aiengr-forwizard"
                 }
             }
         }

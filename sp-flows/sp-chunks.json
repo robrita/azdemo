@@ -15,7 +15,7 @@
                     "method": "get",
                     "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/message_trigger",
                     "queries": {
-                        "visibilitytimeout": "300"
+                        "visibilitytimeout": "600"
                     }
                 },
                 "recurrence": {
@@ -39,11 +39,11 @@
                     "method": "get",
                     "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/query",
                     "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.fileId = \"@{triggerBody()?['MessageText']}\""
+                        "queryText": "SELECT * FROM c WHERE c.fileId = \"@{variables('MessageText')}\""
                     }
                 },
                 "runAfter": {
-                    "Is_last_retry": [
+                    "Rate_limit_delay": [
                         "Succeeded"
                     ]
                 }
@@ -56,6 +56,16 @@
                             "name": "RetryLimit",
                             "type": "integer",
                             "value": 2
+                        },
+                        {
+                            "name": "MessageText",
+                            "type": "string",
+                            "value": "@{split(triggerBody()?['MessageText'],'--')[0]}"
+                        },
+                        {
+                            "name": "MessageDelay",
+                            "type": "string",
+                            "value": "@{split(triggerBody()?['MessageText'],'--')[1]}"
                         }
                     ]
                 },
@@ -66,45 +76,14 @@
                 "description": "Loop through each document page",
                 "foreach": "@body('Query_pages_by_fileId')?['value']",
                 "actions": {
-                    "Chunk_a_page": {
-                        "type": "ApiConnection",
-                        "description": "Chunk a page using LLM into a topic and content structure.",
-                        "inputs": {
-                            "host": {
-                                "connection": {
-                                    "name": "@parameters('$connections')['azureopenai']['connectionId']"
-                                }
-                            },
-                            "method": "post",
-                            "body": {
-                                "messages": [
-                                    {
-                                        "role": "system",
-                                        "content": "You are a document analysis assistant that extracts and organizes content by topic from complex documents. Your task is to analyze the input document and return a well-structured JSON object.\n\n## Instructions:\n\n1. **Topic Identification**: Identify distinct topics based on:\n   - Section headings and subheadings\n   - Natural content boundaries\n   - Semantic relationships between paragraphs\n   - Context shifts in the narrative\n\n2. **Content Preservation**: \n   - Preserve ALL original content exactly as written\n   - Do NOT add, modify, or remove any information\n   - Maintain the original wording, terminology, and phrasing\n   - Keep all numerical data, dates, and references intact\n\n3. **Table and Figure Handling**:\n   - Group tables with their associated topic and explanatory text\n   - Include table headers, all rows, and any captions or notes\n   - If a table spans multiple topics, keep it with the primary topic it supports\n   - Include figure descriptions, captions, and any referenced data\n   - Maintain the relationship between figures/tables and their surrounding context\n\n4. **Semantic Grouping**:\n   - Group related paragraphs under a single topic even if they appear in different sections\n   - Keep introductory content with the topic it introduces\n   - Include examples, explanations, and supporting details with their parent topic\n   - Ensure each topic is self-contained and makes logical sense\n   - Avoid fragmenting closely related information across multiple topics\n\n5. **Topic Naming**:\n   - Use clear, descriptive topic names derived from the document\n   - Use section headings when appropriate\n   - Create concise but informative topic names when headings aren't present\n   - Ensure topic names reflect the actual content\n\n6. **Content Formatting**:\n   - Preserve markdown formatting if present (headers, lists, bold, italic)\n   - For tables: maintain structure using markdown table syntax or preserve original format\n   - Use line breaks to maintain readability\n   - Keep bullet points, numbered lists, and indentation as they appear\n\n## Output Format:\n\nReturn ONLY a valid JSON object with the following structure:\n\n```json\n{\n  \"topics\": [\n    {\n      \"topic\": \"Topic Name\",\n      \"content\": \"Complete content for this topic, including all paragraphs, tables (with headers and all data rows), figures, examples, and supporting information. Tables should be formatted clearly with all data grouped together.\"\n    },\n    {\n      \"topic\": \"Another Topic Name\",\n      \"content\": \"Content for this topic...\"\n    }\n  ]\n}\n```\n\n## Important Notes:\n- Each topic should be substantial and meaningful\n- Avoid creating too many granular topics - aim for logical groupings\n- If the document has a clear structure, respect it\n- If tables or figures are referenced in text, keep them together with that text\n- Ensure the JSON is properly formatted and valid\n\n---\n\nDocument:"
-                                    },
-                                    {
-                                        "role": "user",
-                                        "content": "@items('For_each_page')?['pageContent']"
-                                    }
-                                ],
-                                "temperature": 0,
-                                "top_p": 1,
-                                "response_format": {
-                                    "type": "json_object"
-                                }
-                            },
-                            "path": "/2024-02-15-preview/deployments/@{encodeURIComponent(parameters('openai_gpt_model'))}/chat/completions",
-                            "queries": {
-                                "api-version": "2025-01-01-preview"
-                            }
-                        }
-                    },
                     "Format_to_JSON": {
                         "type": "Compose",
-                        "inputs": "@json(\r\n  body('Chunk_a_page')['choices']?[0]?['message']?['content']\r\n)",
+                        "inputs": "@if(\r\n  equals(body('Page_chunking')?['choices']?[0]?['message']?['content'], null),\r\n  json(\r\n    concat(\r\n      '{\"topics\":[{\"topic\":\"\n\",\"content\":',\r\n      '\"', replace(string(items('For_each_page')?['pageContent']), '\"', '\\\"'), '\"',\r\n      '}]}'\r\n    )\r\n  ),\r\n  json(body('Page_chunking')?['choices']?[0]?['message']?['content'])\r\n)",
                         "runAfter": {
-                            "Chunk_a_page": [
-                                "Succeeded"
+                            "Page_chunking": [
+                                "Succeeded",
+                                "TimedOut",
+                                "Failed"
                             ]
                         }
                     },
@@ -115,10 +94,8 @@
                             "from": "@range(0, length(body('Map_to_embeddings')))",
                             "select": {
                                 "id": "@{replace(items('For_each_page')?['id'], '.', '-')}_@{add(item(), 1)}",
-                                "spId": "@items('For_each_page')?['spId']",
                                 "path": "@items('For_each_page')?['path']",
                                 "fileName": "@items('For_each_page')?['fileName']",
-                                "fileId": "@items('For_each_page')?['fileId']",
                                 "pageId": "@items('For_each_page')?['id']",
                                 "pageLink": "@if(\r\n  contains(items('For_each_page')?['fileType'],'pdf'),\r\n  concat(items('For_each_page')?['link'],'#page=', items('For_each_page')?['pageNumber']),\r\n  items('For_each_page')?['link']\r\n)",
                                 "pageNumber": "@items('For_each_page')?['pageNumber']",
@@ -140,13 +117,12 @@
                             "from": "@range(0, length(body('Map_to_embeddings')))",
                             "select": {
                                 "id": "@{items('For_each_page')?['id']}_@{add(item(), 1)}",
-                                "spId": "@items('For_each_page')?['spId']",
                                 "path": "@items('For_each_page')?['path']",
                                 "fileName": "@items('For_each_page')?['fileName']",
-                                "fileId": "@items('For_each_page')?['fileId']",
                                 "pageId": "@items('For_each_page')?['id']",
                                 "pageLink": "@if(\r\n  contains(items('For_each_page')?['fileType'],'pdf'),\r\n  concat(items('For_each_page')?['link'],'#page=', items('For_each_page')?['pageNumber']),\r\n  items('For_each_page')?['link']\r\n)",
                                 "pageNumber": "@items('For_each_page')?['pageNumber']",
+                                "pageContent": "@items('For_each_page')?['pageContent']",
                                 "chunkContent": "@body('Map_to_embeddings')?[item()]",
                                 "vector": "@body('Multiple_embeddings')?['embeddings']?[item()]"
                             }
@@ -242,6 +218,46 @@
                                 "Succeeded"
                             ]
                         }
+                    },
+                    "Page_chunking": {
+                        "type": "Http",
+                        "description": "Chunk a page using LLM into a topic and content structure.",
+                        "inputs": {
+                            "uri": "@parameters('openai_gpt_uri')",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "Authorization": "Bearer @{parameters('openai_gpt_key')}"
+                            },
+                            "body": {
+                                "messages": [
+                                    {
+                                        "role": "system",
+                                        "content": "You are a document analysis assistant that extracts and organizes content by topic from complex documents. Your task is to analyze the input document and return a well-structured JSON object.\n\n## Instructions:\n\n1. **Topic Identification**: Identify distinct topics based on:\n   - Section headings and subheadings\n   - Natural content boundaries\n   - Semantic relationships between paragraphs\n   - Context shifts in the narrative\n\n2. **Content Preservation**: \n   - Preserve ALL original content exactly as written\n   - Do NOT add, modify, or remove any information\n   - Maintain the original wording, terminology, and phrasing\n   - Keep all numerical data, dates, and references intact\n\n3. **Table and Figure Handling**:\n   - Group tables with their associated topic and explanatory text\n   - Include table headers, all rows, and any captions or notes\n   - If a table spans multiple topics, keep it with the primary topic it supports\n   - Include figure descriptions, captions, and any referenced data\n   - Maintain the relationship between figures/tables and their surrounding context\n\n4. **Semantic Grouping**:\n   - Group related paragraphs under a single topic even if they appear in different sections\n   - Keep introductory content with the topic it introduces\n   - Include examples, explanations, and supporting details with their parent topic\n   - Ensure each topic is self-contained and makes logical sense\n   - Avoid fragmenting closely related information across multiple topics\n\n5. **Topic Naming**:\n   - Use clear, descriptive topic names derived from the document\n   - Use section headings when appropriate\n   - Create concise but informative topic names when headings aren't present\n   - Ensure topic names reflect the actual content\n\n6. **Content Formatting**:\n   - Preserve markdown formatting if present (headers, lists, bold, italic)\n   - For tables: maintain structure using markdown table syntax or preserve original format\n   - Use line breaks to maintain readability\n   - Keep bullet points, numbered lists, and indentation as they appear\n\n## Output Format:\n\nReturn ONLY a valid JSON object with the following structure:\n\n```json\n{\n  \"topics\": [\n    {\n      \"topic\": \"Topic Name\",\n      \"content\": \"Complete content for this topic, including all paragraphs, tables (with headers and all data rows), figures, examples, and supporting information. Tables should be formatted clearly with all data grouped together.\"\n    },\n    {\n      \"topic\": \"Another Topic Name\",\n      \"content\": \"Content for this topic...\"\n    }\n  ]\n}\n```\n\n## Important Notes:\n- Each topic should be substantial and meaningful\n- Avoid creating too many granular topics - aim for logical groupings\n- If the document has a clear structure, respect it\n- If tables or figures are referenced in text, keep them together with that text\n- Ensure the JSON is properly formatted and valid\n\n---\n\nDocument:"
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": "@{items('For_each_page')?['pageContent']}"
+                                    }
+                                ],
+                                "temperature": 0,
+                                "top_p": 1,
+                                "response_format": {
+                                    "type": "json_object"
+                                }
+                            },
+                            "retryPolicy": {
+                                "type": "none"
+                            }
+                        },
+                        "limit": {
+                            "timeout": "PT10S"
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
                     }
                 },
                 "runAfter": {
@@ -325,10 +341,32 @@
                         "Succeeded"
                     ]
                 }
+            },
+            "Rate_limit_delay": {
+                "type": "Wait",
+                "inputs": {
+                    "interval": {
+                        "count": "@int(variables('MessageDelay'))",
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {
+                    "Is_last_retry": [
+                        "Succeeded"
+                    ]
+                }
             }
         },
         "outputs": {},
         "parameters": {
+            "openai_gpt_uri": {
+                "defaultValue": "https://r0bai.cognitiveservices.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview",
+                "type": "String"
+            },
+            "openai_gpt_key": {
+                "defaultValue": "<GPT KEY>",
+                "type": "String"
+            },
             "cosmosdb_account": {
                 "defaultValue": "robaidoc",
                 "type": "String"
@@ -361,10 +399,6 @@
                 "defaultValue": "",
                 "type": "String"
             },
-            "openai_gpt_model": {
-                "defaultValue": "",
-                "type": "String"
-            },
             "$connections": {
                 "type": "Object",
                 "defaultValue": {}
@@ -374,9 +408,6 @@
     "parameters": {
         "openai_embedding_model": {
             "value": "text-embedding-3-small"
-        },
-        "openai_gpt_model": {
-            "value": "gpt-4.1"
         },
         "$connections": {
             "type": "Object",
