@@ -1,0 +1,174 @@
+{
+  "@odata.etag": "\"0x8DE18D97445B3EF\"",
+  "name": "sharepoint-search",
+  "fields": [
+    {
+      "name": "id",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": true,
+      "synonymMaps": []
+    },
+    {
+      "name": "path",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "fileName",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "pageId",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "pageLink",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": true,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "pageNumber",
+      "type": "Edm.Int32",
+      "searchable": false,
+      "filterable": true,
+      "retrievable": true,
+      "stored": true,
+      "sortable": true,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "pageContent",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "chunkContent",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "synonymMaps": []
+    },
+    {
+      "name": "vector",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": false,
+      "stored": false,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vector-profile-1761568912897",
+      "synonymMaps": []
+    }
+  ],
+  "scoringProfiles": [],
+  "suggesters": [],
+  "analyzers": [],
+  "normalizers": [],
+  "tokenizers": [],
+  "tokenFilters": [],
+  "charFilters": [],
+  "similarity": {
+    "@odata.type": "#Microsoft.Azure.Search.BM25Similarity"
+  },
+  "vectorSearch": {
+    "algorithms": [
+      {
+        "name": "vector-config-1761568914998",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "metric": "cosine",
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500
+        }
+      }
+    ],
+    "profiles": [
+      {
+        "name": "vector-profile-1761568912897",
+        "algorithm": "vector-config-1761568914998",
+        "vectorizer": "vectorizer-1761568919625",
+        "compression": "vector-1761568735864-compressor"
+      }
+    ],
+    "vectorizers": [
+      {
+        "name": "vectorizer-1761568919625",
+        "kind": "azureOpenAI",
+        "azureOpenAIParameters": {
+          "resourceUri": "https://r0bai.openai.azure.com",
+          "deploymentId": "text-embedding-3-small",
+          "apiKey": "<redacted>",
+          "modelName": "text-embedding-3-small"
+        }
+      }
+    ],
+    "compressions": [
+      {
+        "name": "vector-1761568735864-compressor",
+        "kind": "scalarQuantization",
+        "scalarQuantizationParameters": {
+          "quantizedDataType": "int8"
+        },
+        "rescoringOptions": {
+          "enableRescoring": true,
+          "defaultOversampling": 4,
+          "rescoreStorageMethod": "preserveOriginals"
+        }
+      }
+    ]
+  }
+}
