@@ -118,13 +118,13 @@
                         }
                     },
                     "method": "get",
-                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/query",
+                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_documents'))}/query",
                     "queries": {
                         "queryText": "SELECT * FROM c WHERE c.id = \"@{variables('MessageText')}\""
                     }
                 },
                 "runAfter": {
-                    "Rate_limit_delay": [
+                    "Has_valid_delay": [
                         "Succeeded"
                     ]
                 }
@@ -139,13 +139,13 @@
                         }
                     },
                     "method": "get",
-                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent(parameters('storage_account')))}/files/@{encodeURIComponent(encodeURIComponent('/sharepoint/',variables('DBData')?['blobName']))}/content",
+                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent(parameters('storage_account')))}/files/@{encodeURIComponent(encodeURIComponent('/sharepoint/',body('Get_blob_name_by_id')?['value']?[0]?['blobName']))}/content",
                     "queries": {
                         "inferContentType": false
                     }
                 },
                 "runAfter": {
-                    "Set_DB_data": [
+                    "Get_blob_name_by_id": [
                         "Succeeded"
                     ]
                 },
@@ -161,6 +161,80 @@
                     "JTJmc2hhcmVwb2ludCUyZlNoYXJlZF9Eb2N1bWVudHMtLU90aGVycy0tT3ZlcnZpZXdfLV9DQUZfQURPX3RvX0dpdEh1Yl9NaWdyYXRpb24ucHB0eC5qc29u": "/sharepoint/Shared_Documents--Others--Overview_-_CAF_ADO_to_GitHub_Migration.pptx.json",
                     "JTJmc2hhcmVwb2ludCUyZlNoYXJlZF9Eb2N1bWVudHMtLU90aGVycy0tQVNFQU5fTUFDQy54bHN4Lmpzb24=": "/sharepoint/Shared_Documents--Others--ASEAN_MACC.xlsx.json",
                     "JTJmc2hhcmVwb2ludCUyZjEwMzQwNTYtYVcxaFoyVWdLRE0yS1M1d2JtYy5wbmcuanNvbg==": "/sharepoint/1034056-aW1hZ2UgKDM2KS5wbmc.png.json"
+                }
+            },
+            "Is_PDF_File": {
+                "type": "If",
+                "description": "Check PDF file type",
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@body('Get_blob_name_by_id')?['value']?[0]?['fileType']",
+                                "application/pdf"
+                            ]
+                        }
+                    ]
+                },
+                "actions": {
+                    "Split_Pages": {
+                        "type": "Compose",
+                        "description": "Split markdown data by '<!-- PageBreak -->' keyword",
+                        "inputs": "@split(body('ACU_Get')?['result']?['contents']?[0]?['markdown'], '<!-- PageBreak -->')"
+                    },
+                    "Map_Pages_to_DB": {
+                        "type": "Select",
+                        "description": "Map all data to cosmos db schema",
+                        "inputs": {
+                            "from": "@range(0, length(outputs('Split_Pages')))",
+                            "select": {
+                                "id": "@{variables('MessageText')}_@{add(item(), 1)}",
+                                "spId": "@body('Get_blob_name_by_id')?['value']?[0]?['spId']",
+                                "path": "@body('Get_blob_name_by_id')?['value']?[0]?['path']",
+                                "fileName": "@body('Get_blob_name_by_id')?['value']?[0]?['fileName']",
+                                "fileId": "@variables('MessageText')",
+                                "link": "@body('Get_blob_name_by_id')?['value']?[0]?['link']",
+                                "fileType": "@body('Get_blob_name_by_id')?['value']?[0]?['fileType']",
+                                "pageCount": "@length(outputs('Split_Pages'))",
+                                "pageNumber": "@add(item(), 1)",
+                                "pageContent": "@outputs('Split_Pages')[item()]"
+                            }
+                        },
+                        "runAfter": {
+                            "Split_Pages": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Set_PDF_to_DocList": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "DocList",
+                            "value": "@body('Map_Pages_to_DB')"
+                        },
+                        "runAfter": {
+                            "Map_Pages_to_DB": [
+                                "Succeeded"
+                            ]
+                        }
+                    }
+                },
+                "else": {
+                    "actions": {
+                        "Set_Empty_DocList": {
+                            "type": "SetVariable",
+                            "description": "Indicates that DocList is empty",
+                            "inputs": {
+                                "name": "IsDocList",
+                                "value": false
+                            }
+                        }
+                    }
+                },
+                "runAfter": {
+                    "ACU_result_polling": [
+                        "Succeeded"
+                    ]
                 }
             },
             "Initialize_variable": {
@@ -183,7 +257,7 @@
                             "value": "@{split(triggerBody()?['MessageText'],'--')[1]}"
                         },
                         {
-                            "name": "PageList",
+                            "name": "DocList",
                             "type": "array"
                         },
                         {
@@ -192,19 +266,20 @@
                             "value": 2
                         },
                         {
-                            "name": "DBData",
-                            "type": "object"
+                            "name": "IsDocList",
+                            "type": "boolean",
+                            "value": true
                         }
                     ]
                 },
                 "runAfter": {}
             },
-            "For_each_item_in_PageList": {
+            "For_each_item_in_DocList": {
                 "type": "Foreach",
-                "description": "Loop through each PageList array",
-                "foreach": "@body('Map_Pages_to_DB')",
+                "description": "Loop through each DocList array",
+                "foreach": "@variables('DocList')",
                 "actions": {
-                    "Save_PageList_to_DB": {
+                    "Save_DocList_to_DB": {
                         "type": "ApiConnection",
                         "description": "Save each page document to cosmos db through upsert",
                         "inputs": {
@@ -223,7 +298,7 @@
                     }
                 },
                 "runAfter": {
-                    "Map_Pages_to_DB": [
+                    "Is_PDF_File": [
                         "Succeeded"
                     ]
                 }
@@ -242,7 +317,7 @@
                     ]
                 },
                 "actions": {
-                    "Delete_queue_file_1": {
+                    "Delete_queue_file_2": {
                         "type": "ApiConnection",
                         "description": "Delete file queue to stop the retry",
                         "inputs": {
@@ -268,7 +343,7 @@
                             }
                         },
                         "runAfter": {
-                            "Delete_queue_file_1": [
+                            "Delete_queue_file_2": [
                                 "Succeeded"
                             ]
                         }
@@ -283,15 +358,15 @@
                     ]
                 }
             },
-            "Has_PageList": {
+            "Has_DocList": {
                 "type": "If",
                 "description": "",
                 "expression": {
                     "and": [
                         {
-                            "greater": [
-                                "@length(variables('PageList'))",
-                                0
+                            "equals": [
+                                "@variables('IsDocList')",
+                                true
                             ]
                         }
                     ]
@@ -299,7 +374,7 @@
                 "actions": {
                     "Queue_on_pages": {
                         "type": "ApiConnection",
-                        "description": "Set pages queue only for those that has PageList",
+                        "description": "Set pages queue only for those that has DocList",
                         "inputs": {
                             "host": {
                                 "connection": {
@@ -307,152 +382,21 @@
                                 }
                             },
                             "method": "post",
-                            "body": "@triggerBody()?['MessageText']",
+                            "body": "@{variables('MessageText')}",
                             "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages"
                         }
                     }
                 },
                 "else": {
-                    "actions": {
-                        "Empty_PageList": {
-                            "type": "Terminate",
-                            "inputs": {
-                                "runStatus": "Failed",
-                                "runError": {
-                                    "code": "404",
-                                    "message": "Empty PageList"
-                                }
-                            }
-                        }
-                    }
+                    "actions": {}
                 },
                 "runAfter": {
-                    "Delete_queue_file_2": [
+                    "For_each_item_in_DocList": [
                         "Succeeded"
                     ]
                 }
             },
-            "Get_parsed_data": {
-                "type": "Compose",
-                "inputs": "@body('ACU_Get')?['result']?['contents']?[0]?['markdown']",
-                "runAfter": {
-                    "ACU_result_polling": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Map_Pages_to_DB": {
-                "type": "Select",
-                "description": "Map all data to cosmos db schema",
-                "inputs": {
-                    "from": "@range(0, length(variables('PageList')))",
-                    "select": {
-                        "id": "@{variables('MessageText')}_@{add(item(), 1)}",
-                        "path": "@variables('DBData')?['path']",
-                        "fileName": "@variables('DBData')?['fileName']",
-                        "fileId": "@variables('MessageText')",
-                        "link": "@variables('DBData')?['link']",
-                        "fileType": "@variables('DBData')?['fileType']",
-                        "pageCount": "@length(variables('PageList'))",
-                        "pageNumber": "@add(item(), 1)",
-                        "pageContent": "@variables('PageList')[item()]"
-                    }
-                },
-                "runAfter": {
-                    "Process_file_type": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Set_DB_data": {
-                "type": "SetVariable",
-                "inputs": {
-                    "name": "DBData",
-                    "value": "@body('Get_blob_name_by_id')?['value']?[0]"
-                },
-                "runAfter": {
-                    "Get_blob_name_by_id": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Process_file_type": {
-                "type": "Switch",
-                "expression": "@if(\r\n  equals(outputs('Get_parsed_data'), null),\r\n  'null',\r\n  if(\r\n    endsWith(variables('DBData')?['fileType'], '/pdf'),\r\n    'pdf',\r\n    if(\r\n      startsWith(variables('DBData')?['fileType'], 'image/'),\r\n      'image',\r\n      if(\r\n        endsWith(variables('DBData')?['fileType'], '.document'),\r\n        'docx',\r\n        if(\r\n          endsWith(variables('DBData')?['fileType'], '.sheet'),\r\n          'xlsx',\r\n          if(\r\n            endsWith(variables('DBData')?['fileType'], '.presentation'),\r\n            'pptx',\r\n            if(\r\n              endsWith(variables('DBData')?['fileType'], '/octet-stream'),\r\n              'csv',\r\n              'null'\r\n            )\r\n          )\r\n        )\r\n      )\r\n    )\r\n  )\r\n)",
-                "default": {
-                    "actions": {
-                        "Needs_pagination": {
-                            "type": "If",
-                            "expression": {
-                                "and": [
-                                    {
-                                        "greater": [
-                                            "@length(\r\n  split(\r\n    trim(\r\n      replace(\r\n        replace(\r\n          replace(outputs('Get_parsed_data'), '\r', ' '),\r\n          '\n', ' '\r\n        ),\r\n        '\t', ' '\r\n      )\r\n    ),\r\n    ' '\r\n  )\r\n)",
-                                            2000
-                                        ]
-                                    }
-                                ]
-                            },
-                            "actions": {
-                                "Chunks_PageList": {
-                                    "type": "SetVariable",
-                                    "inputs": {
-                                        "name": "PageList",
-                                        "value": "@body('Chunk_parsed_data')?['value']"
-                                    },
-                                    "runAfter": {
-                                        "Chunk_parsed_data": [
-                                            "Succeeded"
-                                        ]
-                                    }
-                                },
-                                "Chunk_parsed_data": {
-                                    "type": "ChunkText",
-                                    "inputs": {
-                                        "chunkingStrategy": "TokenSize",
-                                        "text": "@outputs('Get_parsed_data')",
-                                        "encodingModel": "cl100k_base",
-                                        "tokenSize": 2000,
-                                        "pageOverlapLength": 0
-                                    }
-                                }
-                            },
-                            "else": {
-                                "actions": {
-                                    "Single_data_PageList": {
-                                        "type": "AppendToArrayVariable",
-                                        "inputs": {
-                                            "name": "PageList",
-                                            "value": "@outputs('Get_parsed_data')"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "cases": {
-                    "PDF": {
-                        "actions": {
-                            "PDF_PageList": {
-                                "type": "SetVariable",
-                                "description": "Split markdown data by '<!-- PageBreak -->' keyword",
-                                "inputs": {
-                                    "name": "PageList",
-                                    "value": "@split(outputs('Get_parsed_data'), '<!-- PageBreak -->')"
-                                }
-                            }
-                        },
-                        "case": "pdf"
-                    }
-                },
-                "runAfter": {
-                    "Get_parsed_data": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Delete_queue_file_2": {
+            "Delete_queue_file_1": {
                 "type": "ApiConnection",
                 "description": "Delete queue file to stop recurrence",
                 "inputs": {
@@ -468,18 +412,90 @@
                     }
                 },
                 "runAfter": {
-                    "For_each_item_in_PageList": [
+                    "Has_DocList": [
                         "Succeeded"
                     ]
                 }
             },
-            "Rate_limit_delay": {
-                "type": "Wait",
-                "inputs": {
-                    "interval": {
-                        "count": "@int(variables('MessageDelay'))",
-                        "unit": "Second"
+            "Has_valid_delay": {
+                "type": "If",
+                "description": "Initial trigger has a valid delay, then will be replaced by X",
+                "expression": {
+                    "and": [
+                        {
+                            "not": {
+                                "equals": [
+                                    "@variables('MessageDelay')",
+                                    "X"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "actions": {
+                    "Rate_Limit_Delay": {
+                        "type": "Wait",
+                        "inputs": {
+                            "interval": {
+                                "count": "@int(variables('MessageDelay'))",
+                                "unit": "Second"
+                            }
+                        }
+                    },
+                    "Delete_queue_file_3": {
+                        "type": "ApiConnection",
+                        "description": "Force delete queue containing delay value",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                                }
+                            },
+                            "method": "delete",
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_file'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                            "queries": {
+                                "popreceipt": "@triggerBody()?['PopReceipt']"
+                            }
+                        },
+                        "runAfter": {
+                            "Rate_Limit_Delay": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Queue_file_no_delay": {
+                        "type": "ApiConnection",
+                        "description": "Recreate a queue with invalid delay",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": "@{variables('MessageText')}--X",
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_file'))}/messages"
+                        },
+                        "runAfter": {
+                            "Delete_queue_file_3": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Terminate_delay": {
+                        "type": "Terminate",
+                        "inputs": {
+                            "runStatus": "Cancelled"
+                        },
+                        "runAfter": {
+                            "Queue_file_no_delay": [
+                                "Succeeded"
+                            ]
+                        }
                     }
+                },
+                "else": {
+                    "actions": {}
                 },
                 "runAfter": {
                     "Is_last_retry": [
@@ -506,8 +522,8 @@
                 "defaultValue": "sharepoint",
                 "type": "String"
             },
-            "cosmosdb_files": {
-                "defaultValue": "files",
+            "cosmosdb_documents": {
+                "defaultValue": "documents",
                 "type": "String"
             },
             "cosmosdb_pages": {

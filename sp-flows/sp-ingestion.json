@@ -91,6 +91,7 @@
                                     "method": "post",
                                     "body": {
                                         "id": "@{outputs('Set_Unique_File_Name')}",
+                                        "spId": "@{item()?['ID']}",
                                         "path": "@{item()?['{Path}']}",
                                         "fileName": "@{item()?['{FilenameWithExtension}']}",
                                         "link": "@{item()?['{Link}']}",
@@ -100,7 +101,7 @@
                                     "headers": {
                                         "x-ms-documentdb-is-upsert": true
                                     },
-                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/docs"
+                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent('documents')}/docs"
                                 },
                                 "runAfter": {
                                     "Save_blob_file": [
@@ -139,8 +140,8 @@
                             },
                             "Set_Unique_File_Name": {
                                 "type": "Compose",
-                                "description": "The unique file name will help deduplicate files automatically.\nOptional: outputs('Get_file_content')?['headers']?['Content-Length']",
-                                "inputs": "@concat(\r\n  substring(\r\n    outputs('File_Name_to_Base64'),\r\n    0,\r\n    min(100, length(outputs('File_Name_to_Base64')))\r\n  ),\r\n  substring(item()?['{FilenameWithExtension}'], lastIndexOf(item()?['{FilenameWithExtension}'], '.'))\r\n)",
+                                "description": "The unique file name will help deduplicate files automatically. ",
+                                "inputs": "@{outputs('Get_file_content')?['headers']?['Content-Length']}-@{concat(\r\n  substring(\r\n    outputs('File_Name_to_Base64'),\r\n    0,\r\n    min(100, length(outputs('File_Name_to_Base64')))\r\n  ),\r\n  substring(item()?['{FilenameWithExtension}'], lastIndexOf(item()?['{FilenameWithExtension}'], '.'))\r\n)}",
                                 "runAfter": {
                                     "File_Name_to_Base64": [
                                         "Succeeded"
@@ -270,8 +271,8 @@
                 "defaultValue": "sharepoint",
                 "type": "String"
             },
-            "cosmosdb_files": {
-                "defaultValue": "files",
+            "cosmosdb_documents": {
+                "defaultValue": "documents",
                 "type": "String"
             },
             "storage_account": {
