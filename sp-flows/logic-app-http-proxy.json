@@ -1,0 +1,116 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "version": "1.0.0.0",
+    "title": "search-bsp",
+    "description": "HTTP proxy tool that forwards HTTP requests to external endpoints. Send any HTTP request by providing the target URI and request content/body. This is useful for making HTTP calls to external APIs or services. Example: Search BSP information by providing the search endpoint URI and query parameters in the request body."
+  },
+  "servers": [
+    {
+      "url": "https://prod-79.eastus.logic.azure.com/workflows"
+    }
+  ],
+  "security": [
+    {
+      "sig": []
+    }
+  ],
+  "paths": {
+    "/invoke": {
+      "post": {
+        "description": "Forwards HTTP requests to any external endpoint. Provide the target HTTP_URI (complete URL with protocol, host, path, and query parameters) and HTTP_request_content (JSON body or form data as a string). The proxy will execute the request and return the response. Example: To search BSP data, set HTTP_URI to 'https://api.example.com/search?query=BSP' and HTTP_request_content to '{\"filters\": {\"category\": \"products\"}}'",
+        "operationId": "When_a_HTTP_request_is_received-invoke",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "description": "`2016-10-01` is the most common generally available version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "2016-10-01"
+            },
+            "example": "2016-10-01"
+          },
+          {
+            "name": "sv",
+            "in": "query",
+            "description": "The version number",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "1.0"
+            },
+            "example": "1.0"
+          },
+          {
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun"
+            },
+            "example": "%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Logic App Response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "The Logic App Response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "HTTP_URI": {
+                    "description": "Complete URI for the HTTP request including protocol, host, path, and query parameters. Example: 'https://api.contoso.com/v1/search?q=term&limit=10'",
+                    "type": "string",
+                    "example": "https://api.example.com/search?query=BSP&type=product"
+                  },
+                  "HTTP_request_content": {
+                    "description": "Request body content as a JSON string. Use this to send POST data, filters, or parameters. For GET requests, this can be empty or omitted. Example: '{\"filters\": {\"category\": \"electronics\", \"inStock\": true}, \"sort\": \"price_asc\"}'",
+                    "type": "string",
+                    "example": "{\"query\": \"BSP\", \"filters\": {\"category\": \"products\"}, \"maxResults\": 20}"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sig": {
+        "type": "apiKey",
+        "description": "The SHA 256 hash of the entire request URI with an internal key.",
+        "name": "sig",
+        "in": "query"
+      }
+    }
+  }
+}

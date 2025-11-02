@@ -3,38 +3,65 @@
         "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
         "contentVersion": "1.0.0.0",
         "triggers": {
-            "When_a_file_is_deleted": {
+            "Queue_on_delete": {
                 "type": "ApiConnection",
                 "inputs": {
                     "host": {
                         "connection": {
-                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                            "name": "@parameters('$connections')['azurequeues']['connectionId']"
                         }
                     },
                     "method": "get",
-                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharepoint_address')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('sharepoint_library')))}/ondeletedfileitems"
+                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_delete'))}/message_trigger"
                 },
                 "recurrence": {
                     "interval": 1,
                     "frequency": "Second",
                     "timeZone": "Singapore Standard Time"
                 },
-                "splitOn": "@triggerBody()?['value']"
+                "splitOn": "@triggerBody()?['QueueMessagesList']?['QueueMessage']"
             }
         },
         "actions": {
-            "Get_matching_files": {
-                "type": "ApiConnection",
+            "Initialize_variables": {
+                "type": "InitializeVariable",
                 "inputs": {
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                    "variables": [
+                        {
+                            "name": "FileNameWithExtension",
+                            "type": "string",
+                            "value": "@{json(triggerBody()?['MessageText'])?['FileNameWithExtension']}"
+                        },
+                        {
+                            "name": "IsFolder",
+                            "type": "boolean",
+                            "value": "@json(triggerBody()?['MessageText'])?['IsFolder']"
                         }
-                    },
-                    "method": "get",
-                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/query",
-                    "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
+                    ]
+                },
+                "runAfter": {}
+            },
+            "Is_valid_file": {
+                "type": "If",
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@variables('IsFolder')",
+                                false
+                            ]
+                        }
+                    ]
+                },
+                "actions": {},
+                "else": {
+                    "actions": {
+                        "Terminate": {
+                            "type": "Terminate",
+                            "inputs": {
+                                "runStatus": "Cancelled"
+                            }
+                        }
                     }
                 },
                 "runAfter": {
@@ -43,51 +70,10 @@
                     ]
                 }
             },
-            "Get_matching_pages": {
-                "type": "ApiConnection",
-                "inputs": {
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['documentdb']['connectionId']"
-                        }
-                    },
-                    "method": "get",
-                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/query",
-                    "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
-                    }
-                },
-                "runAfter": {
-                    "Initialize_variables": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Get_matching_chunks": {
-                "type": "ApiConnection",
-                "inputs": {
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['documentdb']['connectionId']"
-                        }
-                    },
-                    "method": "get",
-                    "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/query",
-                    "queries": {
-                        "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
-                    }
-                },
-                "runAfter": {
-                    "Initialize_variables": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "For_each_files": {
-                "type": "Foreach",
-                "foreach": "@body('Get_matching_files')?['value']",
+            "Delete_file": {
+                "type": "Scope",
                 "actions": {
-                    "Delete_a_file": {
+                    "Get_matching_files": {
                         "type": "ApiConnection",
                         "inputs": {
                             "host": {
@@ -95,48 +81,104 @@
                                     "name": "@parameters('$connections')['documentdb']['connectionId']"
                                 }
                             },
-                            "method": "delete",
-                            "headers": {
-                                "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_files')?['path']}\""
-                            },
-                            "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/docs/@{encodeURIComponent(items('For_each_files')?['id'])}"
+                            "method": "get",
+                            "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/query",
+                            "queries": {
+                                "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
+                            }
                         }
                     },
-                    "Delete_blob_file": {
-                        "type": "ApiConnection",
-                        "inputs": {
-                            "host": {
-                                "connection": {
-                                    "name": "@parameters('$connections')['azureblob']['connectionId']"
+                    "For_each_files": {
+                        "type": "Foreach",
+                        "foreach": "@body('Get_matching_files')?['value']",
+                        "actions": {
+                            "Delete_a_file": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                        }
+                                    },
+                                    "method": "delete",
+                                    "headers": {
+                                        "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_files')?['path']}\""
+                                    },
+                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/docs/@{encodeURIComponent(items('For_each_files')?['id'])}"
                                 }
                             },
-                            "method": "delete",
-                            "headers": {
-                                "SkipDeleteIfFileNotFoundOnServer": false
-                            },
-                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent(parameters('storage_account')))}/files/@{encodeURIComponent(encodeURIComponent('/sharepoint/',items('For_each_files')?['blobName']))}"
+                            "Delete_blob_file": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                        }
+                                    },
+                                    "method": "delete",
+                                    "headers": {
+                                        "SkipDeleteIfFileNotFoundOnServer": false
+                                    },
+                                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent(parameters('storage_account')))}/files/@{encodeURIComponent(encodeURIComponent('/sharepoint/',items('For_each_files')?['blobName']))}"
+                                },
+                                "runAfter": {
+                                    "Delete_a_file": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "metadata": {
+                                    "JTJmc2hhcmVwb2ludCUyZjEwMzQwNTYtYVcxaFoyVWdLRE0yS1M1d2JtYy5wbmcuanNvbg==": "/sharepoint/1034056-aW1hZ2UgKDM2KS5wbmc.png.json"
+                                }
+                            }
                         },
                         "runAfter": {
-                            "Delete_a_file": [
+                            "Get_matching_files": [
                                 "Succeeded"
                             ]
+                        }
+                    },
+                    "Get_matching_pages": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/query",
+                            "queries": {
+                                "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\""
+                            }
+                        }
+                    },
+                    "For_each_pages": {
+                        "type": "Foreach",
+                        "foreach": "@body('Get_matching_pages')?['value']",
+                        "actions": {
+                            "Delete_a_page": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                        }
+                                    },
+                                    "method": "delete",
+                                    "headers": {
+                                        "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_pages')?['path']}\""
+                                    },
+                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/docs/@{encodeURIComponent(items('For_each_pages')?['id'])}"
+                                }
+                            }
                         },
-                        "metadata": {
-                            "JTJmc2hhcmVwb2ludCUyZjEwMzQwNTYtYVcxaFoyVWdLRE0yS1M1d2JtYy5wbmcuanNvbg==": "/sharepoint/1034056-aW1hZ2UgKDM2KS5wbmc.png.json"
+                        "runAfter": {
+                            "Get_matching_pages": [
+                                "Succeeded"
+                            ]
                         }
-                    }
-                },
-                "runAfter": {
-                    "Get_matching_files": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "For_each_pages": {
-                "type": "Foreach",
-                "foreach": "@body('Get_matching_pages')?['value']",
-                "actions": {
-                    "Delete_a_page": {
+                    },
+                    "Get_matching_chunks": {
                         "type": "ApiConnection",
                         "inputs": {
                             "host": {
@@ -144,51 +186,41 @@
                                     "name": "@parameters('$connections')['documentdb']['connectionId']"
                                 }
                             },
-                            "method": "delete",
-                            "headers": {
-                                "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_pages')?['path']}\""
-                            },
-                            "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_pages'))}/docs/@{encodeURIComponent(items('For_each_pages')?['id'])}"
+                            "method": "get",
+                            "path": "/v5/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/query",
+                            "queries": {
+                                "queryText": "SELECT * FROM c WHERE c.fileName = \"@{variables('FileNameWithExtension')}\"",
+                                "maxItemCount": 500
+                            }
                         }
-                    }
-                },
-                "runAfter": {
-                    "Get_matching_pages": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "For_each_chunks": {
-                "type": "Foreach",
-                "foreach": "@body('Get_matching_chunks')?['value']",
-                "actions": {
-                    "Delete_a_chunk": {
-                        "type": "ApiConnection",
-                        "inputs": {
-                            "host": {
-                                "connection": {
-                                    "name": "@parameters('$connections')['documentdb']['connectionId']"
+                    },
+                    "For_each_chunks": {
+                        "type": "Foreach",
+                        "foreach": "@body('Get_matching_chunks')?['value']",
+                        "actions": {
+                            "Delete_a_chunk": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                        }
+                                    },
+                                    "method": "delete",
+                                    "headers": {
+                                        "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_chunks')?['path']}\""
+                                    },
+                                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/docs/@{encodeURIComponent(items('For_each_chunks')?['id'])}"
                                 }
-                            },
-                            "method": "delete",
-                            "headers": {
-                                "x-ms-documentdb-raw-partitionkey": "\"@{items('For_each_chunks')?['path']}\""
-                            },
-                            "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_chunks'))}/docs/@{encodeURIComponent(items('For_each_chunks')?['id'])}"
+                            }
+                        },
+                        "runAfter": {
+                            "Get_matching_chunks": [
+                                "Succeeded"
+                            ]
                         }
-                    }
-                },
-                "runAfter": {
-                    "Get_matching_chunks": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "For_each_docs": {
-                "type": "Foreach",
-                "foreach": "@body('Get_AI_Search_docs')",
-                "actions": {
-                    "Delete_a_document": {
+                    },
+                    "Get_AI_Search_docs": {
                         "type": "ApiConnection",
                         "inputs": {
                             "host": {
@@ -198,59 +230,91 @@
                             },
                             "method": "post",
                             "body": {
-                                "id": "@items('For_each_docs')?['id']",
-                                "path": "@items('For_each_docs')?['path']",
-                                "fileName": "@items('For_each_docs')?['fileName']",
-                                "pageId": "@items('For_each_docs')?['pageId']",
-                                "pageLink": "@items('For_each_docs')?['pageLink']",
-                                "pageNumber": "@items('For_each_docs')?['pageNumber']",
-                                "pageContent": "@items('For_each_docs')?['pageContent']",
-                                "chunkContent": "@items('For_each_docs')?['chunkContent']"
+                                "searchText": "@variables('FileNameWithExtension')",
+                                "vectorizedSearchFields": [],
+                                "filterCondition": "fileName eq '@{variables('FileNameWithExtension')}'",
+                                "top": 500
                             },
-                            "path": "/deleteDocument",
-                            "queries": {
-                                "indexName": "@parameters('ai_search_index')"
+                            "path": "/integratedVectorSearch/@{encodeURIComponent(parameters('ai_search_index'))}"
+                        }
+                    },
+                    "For_each_docs": {
+                        "type": "Foreach",
+                        "foreach": "@body('Get_AI_Search_docs')",
+                        "actions": {
+                            "Delete_a_document": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azureaisearch']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "id": "@items('For_each_docs')?['id']",
+                                        "path": "@items('For_each_docs')?['path']",
+                                        "fileName": "@items('For_each_docs')?['fileName']",
+                                        "pageId": "@items('For_each_docs')?['pageId']",
+                                        "pageLink": "@items('For_each_docs')?['pageLink']",
+                                        "pageNumber": "@items('For_each_docs')?['pageNumber']",
+                                        "pageContent": "@items('For_each_docs')?['pageContent']",
+                                        "chunkContent": "@items('For_each_docs')?['chunkContent']"
+                                    },
+                                    "path": "/deleteDocument",
+                                    "queries": {
+                                        "indexName": "@parameters('ai_search_index')"
+                                    }
+                                }
                             }
+                        },
+                        "runAfter": {
+                            "Get_AI_Search_docs": [
+                                "Succeeded"
+                            ]
                         }
                     }
                 },
                 "runAfter": {
-                    "Get_AI_Search_docs": [
+                    "Is_valid_file": [
                         "Succeeded"
                     ]
                 }
             },
-            "Initialize_variables": {
-                "type": "InitializeVariable",
-                "inputs": {
-                    "variables": [
+            "Is_done_deletion": {
+                "type": "If",
+                "expression": {
+                    "and": [
                         {
-                            "name": "FileNameWithExtension",
-                            "type": "string",
-                            "value": "@{triggerBody()?['FileNameWithExtension']}"
+                            "equals": [
+                                "@length(\r\n  union(\r\n    body('Get_matching_files')?['value'],\r\n    body('Get_matching_pages')?['value'],\r\n    body('Get_matching_chunks')?['value'],\r\n    body('Get_AI_Search_docs')\r\n  )\r\n)",
+                                0
+                            ]
                         }
                     ]
                 },
-                "runAfter": {}
-            },
-            "Get_AI_Search_docs": {
-                "type": "ApiConnection",
-                "inputs": {
-                    "host": {
-                        "connection": {
-                            "name": "@parameters('$connections')['azureaisearch']['connectionId']"
+                "actions": {
+                    "Delete_queue": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                                }
+                            },
+                            "method": "delete",
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_delete'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                            "queries": {
+                                "popreceipt": "@triggerBody()?['PopReceipt']"
+                            }
                         }
-                    },
-                    "method": "post",
-                    "body": {
-                        "searchText": "@variables('FileNameWithExtension')",
-                        "vectorizedSearchFields": [],
-                        "filterCondition": "fileName eq '@{variables('FileNameWithExtension')}'"
-                    },
-                    "path": "/integratedVectorSearch/@{encodeURIComponent(parameters('ai_search_index'))}"
+                    }
+                },
+                "else": {
+                    "actions": {}
                 },
                 "runAfter": {
-                    "Initialize_variables": [
+                    "Delete_file": [
                         "Succeeded"
                     ]
                 }
@@ -294,6 +358,14 @@
                 "defaultValue": "robaidoc",
                 "type": "String"
             },
+            "queue_endpoint": {
+                "defaultValue": "robaidoc",
+                "type": "String"
+            },
+            "queue_name_delete": {
+                "defaultValue": "delete",
+                "type": "String"
+            },
             "$connections": {
                 "type": "Object",
                 "defaultValue": {}
@@ -304,10 +376,15 @@
         "$connections": {
             "type": "Object",
             "value": {
-                "sharepointonline": {
-                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/sharepointonline",
-                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/sharepointonline",
-                    "connectionName": "sharepointonline"
+                "azurequeues": {
+                    "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/azurequeues",
+                    "connectionId": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/resourceGroups/demo2/providers/Microsoft.Web/connections/azurequeues",
+                    "connectionName": "azurequeues",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    }
                 },
                 "documentdb": {
                     "id": "/subscriptions/860b4774-54d0-4b72-a79f-ce6e6c1011dc/providers/Microsoft.Web/locations/eastus/managedApis/documentdb",

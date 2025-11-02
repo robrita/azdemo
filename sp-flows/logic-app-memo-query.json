@@ -1,0 +1,115 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "version": "1.0.0.0",
+    "title": "search-bsp",
+    "description": "Use this tool to search for BSP (Bangko Sentral ng Pilipinas) memorandums and circulars. This tool allows you to query and retrieve information from BSP documents, including policy guidelines, regulatory requirements, and official communications. Example queries: 'What are the capital requirements for banks?', 'Find memorandums about anti-money laundering', 'Show recent BSP circulars on digital banking'"
+  },
+  "servers": [
+    {
+      "url": "https://prod-79.eastus.logic.azure.com/workflows"
+    }
+  ],
+  "security": [
+    {
+      "sig": []
+    }
+  ],
+  "paths": {
+    "/invoke": {
+      "post": {
+        "description": "Use this tool to search for BSP (Bangko Sentral ng Pilipinas) memorandums and circulars. This tool allows you to query and retrieve information from BSP documents, including policy guidelines, regulatory requirements, and official communications. Example queries: 'What are the capital requirements for banks?', 'Find memorandums about anti-money laundering', 'Show recent BSP circulars on digital banking'",
+        "operationId": "When_a_HTTP_request_is_received-invoke",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "description": "`2016-10-01` is the most common generally available version",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "2016-10-01"
+            },
+            "example": "2016-10-01"
+          },
+          {
+            "name": "sv",
+            "in": "query",
+            "description": "The version number",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "1.0"
+            },
+            "example": "1.0"
+          },
+          {
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun"
+            },
+            "example": "%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Logic App Response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "The Logic App Response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "last_user_query": {
+                    "description": "An array containing exactly 3 variations of the last user query with different phrasings or perspectives to enable comprehensive search and retrieval of BSP memorandums and circulars. Each variation should capture the last user's intent with full context, including all relevant details, background information, and specific requirements.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sig": {
+        "type": "apiKey",
+        "description": "The SHA 256 hash of the entire request URI with an internal key.",
+        "name": "sig",
+        "in": "query"
+      }
+    }
+  }
+}
