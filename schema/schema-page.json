@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "properties": {
+      "pageSummary": {
+        "title": "Page Summary",
+        "type": "string",
+        "description": "A concise overview of the page's main content, topics, and key information to provide quick understanding of the page."
+      },
+      "keyPhrases": {
+        "title": "Key Phrases",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "A collection of significant phrases and terms extracted from the content that represent the main concepts, topics, or themes discussed in the page."
+      },
+      "entities": {
+        "title": "Entities",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "A collection of named entities identified in the content, such as people, organizations, locations, dates, products, or other specific items of interest."
+      }
+    }
+  }
+}

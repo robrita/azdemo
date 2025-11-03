@@ -119,7 +119,7 @@
                                     },
                                     "method": "post",
                                     "body": "@{outputs('Set_Unique_File_Name')}--@{variables('TimeDelay')}",
-                                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent('robaidoc'))}/queues/@{encodeURIComponent('sharepoint1')}/messages"
+                                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages"
                                 },
                                 "runAfter": {
                                     "Increment_delay": [
@@ -280,10 +280,6 @@
             },
             "queue_endpoint": {
                 "defaultValue": "robaidoc",
-                "type": "String"
-            },
-            "queue_name_file": {
-                "defaultValue": "sharepoint1",
                 "type": "String"
             },
             "queue_name_pages": {
