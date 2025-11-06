@@ -13,8 +13,13 @@
                         "type": "object",
                         "properties": {
                             "last_user_query": {
-                                "description": "Last user request or query",
-                                "type": "string"
+                                "description": "An array containing exactly 3 variations of the last user query with different phrasings or perspectives to enable comprehensive search and retrieval of BSP memorandums and circulars. Each variation should capture the last user's intent with full context, including all relevant details, background information, and specific requirements.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "minItems": 3,
+                                "maxItems": 3
                             }
                         }
                     }
@@ -22,77 +27,20 @@
             }
         },
         "actions": {
-            "AI_Search_Query": {
-                "type": "Http",
-                "inputs": {
-                    "uri": "@parameters('ai_search_uri')",
-                    "method": "POST",
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "api-key": "@{parameters('ai_search_key')}"
-                    },
-                    "body": {
-                        "search": "@{triggerBody()?['last_user_query']}",
-                        "count": true,
-                        "top": 10,
-                        "vectorQueries": [
-                            {
-                                "kind": "text",
-                                "text": "@{triggerBody()?['last_user_query']}",
-                                "fields": "vector"
-                            }
-                        ]
-                    }
-                },
-                "runAfter": {
-                    "Initialize_variables": [
-                        "Succeeded"
-                    ]
-                },
-                "runtimeConfiguration": {
-                    "contentTransfer": {
-                        "transferMode": "Chunked"
-                    }
-                }
-            },
-            "Select_all_pageContent": {
-                "type": "Select",
-                "inputs": {
-                    "from": "@range(0, length(body('AI_Search_Query')?['value']))",
-                    "select": "@body('AI_Search_Query')?['value']?[item()]?['pageContent']"
-                },
-                "runAfter": {
-                    "AI_Search_Query": [
-                        "Succeeded"
-                    ]
-                }
-            },
-            "Initialize_variables": {
-                "type": "InitializeVariable",
-                "inputs": {
-                    "variables": [
-                        {
-                            "name": "pageContents",
-                            "type": "array"
-                        }
-                    ]
-                },
-                "runAfter": {}
-            },
             "HTTP_Response": {
                 "type": "Response",
                 "kind": "Http",
                 "inputs": {
                     "statusCode": 200,
-                    "body": "@if(\r\n  equals(body('RAG_LLM')?['choices']?[0]?['message']?['content'], null),\r\n  'Not Found',\r\n  body('RAG_LLM')?['choices']?[0]?['message']?['content']\r\n)"
+                    "body": "@if(\r\n  equals(body('LLM_filter')?['choices']?[0]?['message']?['content'], null),\r\n  'Not Found',\r\n  body('LLM_filter')?['choices']?[0]?['message']?['content']\r\n)"
                 },
                 "runAfter": {
-                    "RAG_LLM": [
-                        "SUCCEEDED"
+                    "LLM_filter": [
+                        "Succeeded"
                     ]
                 }
             },
-            "RAG_LLM": {
+            "LLM_filter": {
                 "type": "Http",
                 "inputs": {
                     "uri": "@parameters('openai_gpt_uri')",
@@ -105,19 +53,22 @@
                         "messages": [
                             {
                                 "role": "system",
-                                "content": "You are a helpful assistant that answers questions based solely on the provided context from document retrieval.\n\n## Instructions:\n\n1. **Answer from context only**: Base your response exclusively on the information provided in the retrieved documents below. Do not use external knowledge or make assumptions.\n\n2. **Be specific and direct**: Provide concise, factual answers that directly address the user's question. Include relevant details, data, and quotes from the context when appropriate.\n\n3. **Handle irrelevant context**: If the retrieved documents do not contain information relevant to the user's question, explicitly state: \"I cannot answer this question based on the available documents.\"\n\n4. **Preserve accuracy**: \n   - Quote exact numbers, dates, names, and technical terms as they appear in the source\n   - Do not paraphrase in ways that change meaning\n   - If the context is ambiguous or incomplete, acknowledge this limitation\n\n5. **Cite sources**: Reference specific sections or document names when providing information to help users verify the answer.\n\n6. **Output format**: Provide answers in plain text only. Do not use JSON, markdown tables, or structured formats unless the user specifically requests them.\n\n---\n\nRetrieved Documents:\n@{union(body('Select_all_pageContent'), body('Select_all_pageContent'))}"
+                                "content": "You are a data filtering assistant that extracts only the most relevant information from document retrieval results based on the user's query.\n\n## Instructions:\n\n1. **Filter for relevance**: Analyze the retrieved documents and return ONLY the content that is directly relevant to answering the user's query. Exclude any irrelevant or tangential information.\n\n2. **Return JSON format ONLY**: Your response must be a valid JSON object following the exact structure specified below. Do not include any additional text, explanations, or markdown formatting outside the JSON.\n\n3. **Output structure with relevant data**:\n```json\n{\n  \"search_result\": [\n    {\n      \"pageContent\": \"<extracted relevant content from the document>\",\n      \"pageNumber\": <page number as integer>,\n      \"pageLink\": \"<URL to the source document>\"\n    }\n  ]\n}\n```\n\n4. **Output structure when NO relevant data found**:\n```json\n{\n  \"search_result\": [\n    {\n      \"pageContent\": \"Not Found\",\n      \"pageNumber\": null,\n      \"pageLink\": \"null\"\n    }\n  ]\n}\n```\n\n5. **Filtering criteria**:\n   - Include only content that directly addresses the user's question\n   - Preserve exact quotes, numbers, dates, and technical terms from the source\n   - Each result should contain focused, relevant excerpts (not entire documents)\n   - Include multiple entries in the array if multiple relevant sections are found\n\n6. **Requirements**:\n   - Output must be valid JSON only\n   - Use the exact field names: \"search_result\", \"pageContent\", \"pageNumber\", \"pageLink\"\n   - If no relevant information exists, return the \"Not Found\" structure exactly as shown\n\n---\n\nRetrieved Documents:\n@{outputs('Merged_pageContents')}"
                             },
                             {
                                 "role": "user",
-                                "content": "@{triggerBody()?['last_user_query']}"
+                                "content": "@{triggerBody()?['last_user_query']?[0]}"
                             }
                         ],
                         "temperature": 0,
-                        "top_p": 1
+                        "top_p": 1,
+                        "response_format": {
+                            "type": "json_object"
+                        }
                     }
                 },
                 "runAfter": {
-                    "Select_all_pageContent": [
+                    "Merged_pageContents": [
                         "Succeeded"
                     ]
                 },
@@ -125,6 +76,153 @@
                     "contentTransfer": {
                         "transferMode": "Chunked"
                     }
+                }
+            },
+            "Agentic_Retrieval": {
+                "type": "Scope",
+                "actions": {
+                    "AI_Search_1": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('ai_search_uri')",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "api-key": "@{parameters('ai_search_key')}"
+                            },
+                            "body": {
+                                "search": "@{triggerBody()?['last_user_query']?[0]}",
+                                "count": true,
+                                "top": 10,
+                                "vectorQueries": [
+                                    {
+                                        "kind": "text",
+                                        "text": "@{triggerBody()?['last_user_query']?[0]}",
+                                        "fields": "vector"
+                                    }
+                                ]
+                            }
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "AI_Search_2": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('ai_search_uri')",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "api-key": "@{parameters('ai_search_key')}"
+                            },
+                            "body": {
+                                "search": "@{triggerBody()?['last_user_query']?[1]}",
+                                "count": true,
+                                "top": 10,
+                                "vectorQueries": [
+                                    {
+                                        "kind": "text",
+                                        "text": "@{triggerBody()?['last_user_query']?[1]}",
+                                        "fields": "vector"
+                                    }
+                                ]
+                            }
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "AI_Search_3": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('ai_search_uri')",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "api-key": "@{parameters('ai_search_key')}"
+                            },
+                            "body": {
+                                "search": "@{triggerBody()?['last_user_query']?[2]}",
+                                "count": true,
+                                "top": 10,
+                                "vectorQueries": [
+                                    {
+                                        "kind": "text",
+                                        "text": "@{triggerBody()?['last_user_query']?[2]}",
+                                        "fields": "vector"
+                                    }
+                                ]
+                            }
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Select_pageContent_1": {
+                        "type": "Select",
+                        "inputs": {
+                            "from": "@range(0, length(body('AI_Search_1')?['value']))",
+                            "select": {
+                                "pageContent": "@body('AI_Search_1')?['value']?[item()]?['pageContent']",
+                                "pageNumber": "@body('AI_Search_1')?['value']?[item()]?['pageNumber']",
+                                "pageLink": "@body('AI_Search_1')?['value']?[item()]?['pageLink']"
+                            }
+                        },
+                        "runAfter": {
+                            "AI_Search_1": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Select_pageContent_2": {
+                        "type": "Select",
+                        "inputs": {
+                            "from": "@range(0, length(body('AI_Search_2')?['value']))",
+                            "select": {
+                                "pageContent": "@body('AI_Search_2')?['value']?[item()]?['pageContent']",
+                                "pageNumber": "@body('AI_Search_2')?['value']?[item()]?['pageNumber']",
+                                "pageLink": "@body('AI_Search_2')?['value']?[item()]?['pageLink']"
+                            }
+                        },
+                        "runAfter": {
+                            "AI_Search_2": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Select_pageContent_3": {
+                        "type": "Select",
+                        "inputs": {
+                            "from": "@range(0, length(body('AI_Search_3')?['value']))",
+                            "select": {
+                                "pageContent": "@body('AI_Search_3')?['value']?[item()]?['pageContent']",
+                                "pageNumber": "@body('AI_Search_3')?['value']?[item()]?['pageNumber']",
+                                "pageLink": "@body('AI_Search_3')?['value']?[item()]?['pageLink']"
+                            }
+                        },
+                        "runAfter": {
+                            "AI_Search_3": [
+                                "Succeeded"
+                            ]
+                        }
+                    }
+                },
+                "runAfter": {}
+            },
+            "Merged_pageContents": {
+                "type": "Compose",
+                "inputs": "@union(body('Select_pageContent_1'), body('Select_pageContent_2'), body('Select_pageContent_3'))",
+                "runAfter": {
+                    "Agentic_Retrieval": [
+                        "Succeeded"
+                    ]
                 }
             }
         },
