@@ -3,7 +3,7 @@
         "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
         "contentVersion": "1.0.0.0",
         "triggers": {
-            "Queue_file_trigger": {
+            "Queue_page_trigger": {
                 "type": "ApiConnection",
                 "description": "Visibility timeout must be longer than the ff to avoid race condition.\n- max retry time delay\n- e2e process",
                 "inputs": {
@@ -13,7 +13,7 @@
                         }
                     },
                     "method": "get",
-                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_file'))}/message_trigger",
+                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/message_trigger",
                     "queries": {
                         "visibilitytimeout": "300"
                     }
@@ -55,7 +55,7 @@
                 "type": "Until",
                 "expression": "@equals(variables('ParseStatus'), 'Succeeded')",
                 "limit": {
-                    "count": 10,
+                    "count": 30,
                     "timeout": "PT1H"
                 },
                 "actions": {
@@ -91,7 +91,7 @@
                         "type": "Wait",
                         "inputs": {
                             "interval": {
-                                "count": 5,
+                                "count": 10,
                                 "unit": "Second"
                             }
                         },
@@ -242,7 +242,7 @@
                     ]
                 },
                 "actions": {
-                    "Delete_queue_file_1": {
+                    "Delete_queue_page_1": {
                         "type": "ApiConnection",
                         "description": "Delete file queue to stop the retry",
                         "inputs": {
@@ -252,7 +252,7 @@
                                 }
                             },
                             "method": "delete",
-                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_file'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
                             "queries": {
                                 "popreceipt": "@triggerBody()?['PopReceipt']"
                             }
@@ -268,7 +268,7 @@
                             }
                         },
                         "runAfter": {
-                            "Delete_queue_file_1": [
+                            "Delete_queue_page_1": [
                                 "Succeeded"
                             ]
                         }
@@ -297,7 +297,7 @@
                     ]
                 },
                 "actions": {
-                    "Queue_on_pages": {
+                    "Queue_on_chunks": {
                         "type": "ApiConnection",
                         "description": "Set pages queue only for those that has PageList",
                         "inputs": {
@@ -308,7 +308,7 @@
                             },
                             "method": "post",
                             "body": "@triggerBody()?['MessageText']",
-                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages"
+                            "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_chunks'))}/messages"
                         }
                     }
                 },
@@ -327,16 +327,16 @@
                     }
                 },
                 "runAfter": {
-                    "Delete_queue_file_2": [
+                    "Delete_queue_page_2": [
                         "Succeeded"
                     ]
                 }
             },
             "Get_parsed_data": {
                 "type": "Compose",
-                "inputs": "@body('ACU_Get')?['result']?['contents']?[0]?['markdown']",
+                "inputs": "@body('ACU_Get')?['result']?['contents']?[1]?['markdown']",
                 "runAfter": {
-                    "ACU_result_polling": [
+                    "Collect_entities": [
                         "Succeeded"
                     ]
                 }
@@ -452,7 +452,7 @@
                     ]
                 }
             },
-            "Delete_queue_file_2": {
+            "Delete_queue_page_2": {
                 "type": "ApiConnection",
                 "description": "Delete queue file to stop recurrence",
                 "inputs": {
@@ -462,7 +462,7 @@
                         }
                     },
                     "method": "delete",
-                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_file'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                    "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_pages'))}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
                     "queries": {
                         "popreceipt": "@triggerBody()?['PopReceipt']"
                     }
@@ -486,16 +486,70 @@
                         "Succeeded"
                     ]
                 }
+            },
+            "Get_fields_data": {
+                "type": "Compose",
+                "inputs": "@body('ACU_Get')?['result']?['contents']?[0]?['fields']",
+                "runAfter": {
+                    "ACU_result_polling": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Collect_entities": {
+                "type": "Select",
+                "inputs": {
+                    "from": "@range(0, length(outputs('Get_fields_data')?['entities']?['valueArray']))",
+                    "select": "@outputs('Get_fields_data')?['entities']?['valueArray']?[item()]?['valueString']"
+                },
+                "runAfter": {
+                    "Get_fields_data": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Update_files_DB": {
+                "type": "ApiConnection",
+                "description": "Use this as rich metadata for the knowledge base",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "body": {
+                        "id": "@{variables('DBData')?['id']}",
+                        "path": "@{variables('DBData')?['path']}",
+                        "fileName": "@{variables('DBData')?['fileName']}",
+                        "link": "@{variables('DBData')?['link']}",
+                        "fileType": "@{variables('DBData')?['fileType']}",
+                        "blobName": "@{variables('DBData')?['blobName']}",
+                        "fileSummary": "@{outputs('Get_fields_data')?['fileSummary']?['valueString']}",
+                        "contentType": "@{outputs('Get_fields_data')?['contentType']?['valueString']}",
+                        "entities": "@{body('Collect_entities')}",
+                        "updatedAt": "@{outputs('Get_fields_data')?['lastUpdated']?['valueString']}"
+                    },
+                    "headers": {
+                        "x-ms-documentdb-is-upsert": true
+                    },
+                    "path": "/v2/cosmosdb/@{encodeURIComponent(parameters('cosmosdb_account'))}/dbs/@{encodeURIComponent(parameters('cosmosdb_database'))}/colls/@{encodeURIComponent(parameters('cosmosdb_files'))}/docs"
+                },
+                "runAfter": {
+                    "Map_Pages_to_DB": [
+                        "Succeeded"
+                    ]
+                }
             }
         },
         "outputs": {},
         "parameters": {
             "acu_analyze": {
-                "defaultValue": "https://r0bfoundry.services.ai.azure.com/contentunderstanding/analyzers/bir2303-new:analyze?api-version=2025-05-01-preview&stringEncoding=utf16",
+                "defaultValue": "https://robprojaus-resource.services.ai.azure.com/contentunderstanding/analyzers/memo-doc:analyze?api-version=2025-05-01-preview&stringEncoding=utf16",
                 "type": "String"
             },
             "acu_key": {
-                "defaultValue": "<ACU KEY>",
+                "defaultValue": "<YOUR_ACU_KEY>",
                 "type": "String"
             },
             "cosmosdb_account": {
@@ -522,12 +576,12 @@
                 "defaultValue": "robaidoc",
                 "type": "String"
             },
-            "queue_name_file": {
-                "defaultValue": "sharepoint1",
-                "type": "String"
-            },
             "queue_name_pages": {
                 "defaultValue": "pages",
+                "type": "String"
+            },
+            "queue_name_chunks": {
+                "defaultValue": "chunks",
                 "type": "String"
             },
             "$connections": {
