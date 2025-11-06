@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
 from typing import Any
@@ -29,13 +30,15 @@ logging.getLogger("azure.identity").setLevel(logging.WARNING)
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 
-def require_api_key(func_to_wrap):  # type: ignore[no-untyped-def]
+def require_api_key(
+    func_to_wrap: Callable[[func.HttpRequest], func.HttpResponse],
+) -> Callable[[func.HttpRequest], func.HttpResponse]:
     """
     Decorator to require API key authentication for Azure Functions.
     Checks for 'X-API-Key' header or 'api_key' query parameter.
     """
 
-    @wraps(func_to_wrap)  # type: ignore[arg-type]
+    @wraps(func_to_wrap)
     def wrapper(req: func.HttpRequest) -> func.HttpResponse:
         request_id = str(uuid.uuid4())[:8]
 
@@ -89,10 +92,10 @@ def require_api_key(func_to_wrap):  # type: ignore[no-untyped-def]
         # Authentication successful, call the original function
         logger.info(
             f"[{request_id}] Authentication successful, proceeding to {func_to_wrap.__name__}"
-        )  # type: ignore[attr-defined]
-        return func_to_wrap(req)  # type: ignore[no-any-return]
+        )
+        return func_to_wrap(req)
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
 @app.route(route="health")
