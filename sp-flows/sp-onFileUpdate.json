@@ -15,8 +15,8 @@
                     "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://microsoftapc.sharepoint.com/teams/RobAI-MilestoneTracker'))}/tables/@{encodeURIComponent(encodeURIComponent('b0a77cf4-b6f3-4c73-8f4f-ee065deab81d'))}/onupdatedfileitems"
                 },
                 "recurrence": {
-                    "interval": 1,
-                    "frequency": "Second",
+                    "interval": 20,
+                    "frequency": "Minute",
                     "timeZone": "Singapore Standard Time"
                 },
                 "splitOn": "@triggerBody()?['value']"

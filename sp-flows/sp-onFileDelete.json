@@ -15,8 +15,8 @@
                     "path": "/v2/storageAccounts/@{encodeURIComponent(encodeURIComponent(parameters('queue_endpoint')))}/queues/@{encodeURIComponent(parameters('queue_name_delete'))}/message_trigger"
                 },
                 "recurrence": {
-                    "interval": 1,
-                    "frequency": "Second",
+                    "interval": 20,
+                    "frequency": "Minute",
                     "timeZone": "Singapore Standard Time"
                 },
                 "splitOn": "@triggerBody()?['QueueMessagesList']?['QueueMessage']"

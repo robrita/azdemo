@@ -15,8 +15,8 @@
                     "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharepoint_address')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('sharepoint_library')))}/ondeletedfileitems"
                 },
                 "recurrence": {
-                    "interval": 1,
-                    "frequency": "Second",
+                    "interval": 20,
+                    "frequency": "Minute",
                     "timeZone": "Singapore Standard Time"
                 },
                 "splitOn": "@triggerBody()?['value']"

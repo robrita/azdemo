@@ -19,8 +19,8 @@
                     }
                 },
                 "recurrence": {
-                    "interval": 1,
-                    "frequency": "Second",
+                    "interval": 20,
+                    "frequency": "Minute",
                     "timeZone": "Singapore Standard Time"
                 },
                 "splitOn": "@triggerBody()?['QueueMessagesList']?['QueueMessage']"
