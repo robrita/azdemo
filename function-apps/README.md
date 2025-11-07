@@ -8,11 +8,13 @@ Azure Function App providing unified REST API access to Azure Cosmos DB, Azure B
 - **Hybrid Vector Search**: Combine vector embeddings with full-text search using RRF
 - **Blob Storage**: Read and write operations with metadata support
 - **AI Search Integration**: Hybrid queries with text and vector fields
+- **Content Extraction**: Document and image analysis using Azure Content Understanding
 - **Parallel Execution**: Batch operations execute concurrently using async/await
 - **API Key Authentication**: Secure endpoints with X-API-Key header (query param fallback)
 - **Structured Logging**: Request ID tracking and performance metrics
 - **SQL Injection Protection**: Read-only query validation for Cosmos DB
 - **Retry Logic**: Automatic exponential backoff for Cosmos DB 429 rate limits
+- **Async Polling**: Long-running operations with configurable timeout and interval
 
 ## Endpoints
 
@@ -108,6 +110,42 @@ Hybrid text + vector search using Azure AI Search.
 {"search": ["query1", "query2"]}
 ```
 
+### Content Extraction Operations
+
+#### `POST /api/extract_content`
+Extract content from documents or images using Azure Content Understanding service. Submits analysis job and polls for results until completion or timeout.
+
+**Query Parameters**: 
+- `acu_endpoint`: Azure Content Understanding endpoint URL (required)
+- `polling_timeout`: Maximum polling time in seconds (default: 300)
+- `polling_interval`: Polling interval in seconds (default: 2)
+
+**Headers**: `X-ACU-Key` (or `acu_key` param)
+
+**Request Body**: Base64-encoded document/image content (text/plain)
+
+**Response**:
+```json
+{
+  "content_markdown": "Extracted text in markdown format",
+  "fields": {"field1": "value1", "field2": "value2"},
+  "pages": [...],
+  "request_id": "abc12345",
+  "performance": {
+    "submit_ms": 150.23,
+    "poll_ms": 2500.45,
+    "total_ms": 2650.68,
+    "poll_attempts": 5
+  }
+}
+```
+
+**Notes**:
+- Request body must contain base64-encoded document/image binary content
+- Supports various document formats (PDF, DOCX, etc.) and images (JPG, PNG, etc.)
+- Uses async polling with configurable timeout to handle long-running extractions
+- Returns 408 if extraction exceeds `polling_timeout`
+
 ### Health Check
 
 #### `GET /api/health`
@@ -192,6 +230,13 @@ curl -X POST http://localhost:7071/api/query_cosmosdb \
   &cosmos_database=db &cosmos_container=container \
   -H "X-API-Key: your-key" \
   -d "SELECT * FROM c"
+
+# Extract content from document
+curl -X POST "http://localhost:7071/api/extract_content?acu_endpoint=https://your-acu.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer:analyze?api-version=2025-09-01&polling_timeout=300&polling_interval=2" \
+  -H "X-API-Key: your-key" \
+  -H "X-ACU-Key: your-acu-key" \
+  -H "Content-Type: text/plain" \
+  -d "BASE64_ENCODED_DOCUMENT_CONTENT"
 ```
 
 ### Common Commands

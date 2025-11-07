@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -2274,6 +2275,336 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
             body=json.dumps(
                 {
                     "error": "Azure AI Search operation failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="extract_content", methods=["POST"])
+@require_api_key
+async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Extract content from documents or images using Azure Content Understanding service.
+
+    Request body should contain the binary content of the document/image.
+
+    Query parameters:
+    - acu_endpoint: Azure Content Understanding endpoint URL
+    - acu_key: API key for ACU (can also be provided via X-ACU-Key header)
+    - polling_timeout: Maximum time to poll for results in seconds (default: 300)
+    - polling_interval: Interval between polling attempts in seconds (default: 2)
+
+    Returns:
+    - content_markdown: Extracted content in markdown format
+    - fields: Extracted fields/metadata from the document
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Content extraction request initiated")
+
+    try:
+        # Extract Azure Content Understanding configuration from parameters
+        acu_endpoint = req.params.get("acu_endpoint")
+
+        # API key from header (preferred) or query parameter (fallback)
+        headers = cast(dict[str, str], req.headers)
+        acu_key = headers.get("X-ACU-Key") or req.params.get("acu_key")
+
+        polling_timeout_str = req.params.get("polling_timeout", "300")
+        polling_interval_str = req.params.get("polling_interval", "2")
+
+        # Validate required parameters
+        if not acu_endpoint or not acu_key:
+            logger.warning(f"[{request_id}] Missing required ACU parameters")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing required parameters",
+                        "message": "Please provide acu_endpoint and X-ACU-Key header (or acu_key param)",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Validate acu_endpoint URL format
+        is_valid, error_message = _validate_url_parameter(acu_endpoint, "acu_endpoint")
+        if not is_valid:
+            logger.warning(f"[{request_id}] Invalid acu_endpoint: {error_message}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": error_message,
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse polling parameters
+        try:
+            polling_timeout = int(polling_timeout_str)
+            polling_interval = int(polling_interval_str)
+            if polling_timeout <= 0 or polling_interval <= 0:
+                raise ValueError("Polling parameters must be greater than 0")
+        except ValueError as e:
+            logger.warning(f"[{request_id}] Invalid polling parameters: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"polling_timeout and polling_interval must be positive integers: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Get document content from request body (base64 encoded)
+        document_content_base64 = req.get_body()
+
+        if not document_content_base64:
+            logger.warning(f"[{request_id}] Validation failed: document content is empty")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Validation error",
+                        "message": "Request body must contain document/image content",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Decode base64 content to binary
+        try:
+            document_content = base64.b64decode(document_content_base64)
+        except Exception as e:
+            logger.warning(f"[{request_id}] Failed to decode base64 content: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Validation error",
+                        "message": "Request body must be valid base64-encoded content",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        logger.info(f"[{request_id}] Submitting content extraction job (size={len(document_content)} bytes)")
+
+        # STEP 1: Submit the analysis job
+        submit_start = time.time()
+        operation_location: str | None = None
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT_SECONDS)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    acu_endpoint,
+                    headers={
+                        "Ocp-Apim-Subscription-Key": acu_key,
+                        "Content-Type": "application/octet-stream",
+                        "x-ms-useragent": "content-understanding-document-extraction",
+                    },
+                    data=document_content,
+                    timeout=timeout,
+                ) as response,
+            ):
+                response.raise_for_status()
+
+                # Get the Operation-Location header for polling
+                operation_location = response.headers.get("Operation-Location")
+
+                if not operation_location:
+                    logger.error(f"[{request_id}] ACU service did not return Operation-Location header")
+                    return func.HttpResponse(
+                        json.dumps(
+                            {
+                                "error": "Service error",
+                                "message": "Azure Content Understanding service did not return polling URL",
+                                "request_id": request_id,
+                            }
+                        ),
+                        mimetype="application/json",
+                        status_code=500,
+                    )
+
+                submit_time = time.time() - submit_start
+                logger.info(f"[{request_id}] Content extraction job submitted (duration={submit_time:.3f}s)")
+
+        except aiohttp.ClientError as e:
+            submit_time = time.time() - submit_start
+            logger.error(f"[{request_id}] Failed to submit ACU job: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Submission failed",
+                        "message": f"Failed to submit content extraction job: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        # STEP 2: Poll for results
+        logger.info(f"[{request_id}] Polling for results (timeout={polling_timeout}s, interval={polling_interval}s)")
+
+        poll_start = time.time()
+        poll_attempts = 0
+        poll_time = 0.0
+        result_data: dict[str, Any] | None = None
+
+        try:
+            timeout_obj = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT_SECONDS)
+            async with aiohttp.ClientSession() as session:
+                while True:
+                    poll_attempts += 1
+                    elapsed = time.time() - poll_start
+
+                    # Check if we've exceeded the polling timeout
+                    if elapsed > polling_timeout:
+                        logger.warning(f"[{request_id}] Polling timeout exceeded after {poll_attempts} attempts")
+                        return func.HttpResponse(
+                            json.dumps(
+                                {
+                                    "error": "Timeout",
+                                    "message": f"Content extraction timed out after {polling_timeout} seconds",
+                                    "request_id": request_id,
+                                    "poll_attempts": poll_attempts,
+                                }
+                            ),
+                            mimetype="application/json",
+                            status_code=408,
+                        )
+
+                    async with session.get(
+                        operation_location,
+                        headers={
+                            "Ocp-Apim-Subscription-Key": acu_key,
+                        },
+                        timeout=timeout_obj,
+                    ) as poll_response:
+                        poll_response.raise_for_status()
+                        poll_data_raw = await poll_response.json()
+                        poll_data = cast(dict[str, Any], poll_data_raw)
+
+                        status = poll_data.get("status", "").lower()
+
+                        logger.info(f"[{request_id}] Poll attempt {poll_attempts}: status={status}")
+
+                        if status == "succeeded":
+                            result_data = poll_data
+                            poll_time = time.time() - poll_start
+                            logger.info(f"[{request_id}] Content extraction completed (duration={poll_time:.3f}s, attempts={poll_attempts})")
+                            break
+
+                        if status == "failed":
+                            error_info = poll_data.get("error", {})
+                            logger.error(f"[{request_id}] Content extraction failed: {error_info}")
+                            return func.HttpResponse(
+                                json.dumps(
+                                    {
+                                        "error": "Extraction failed",
+                                        "message": "Azure Content Understanding service reported failure",
+                                        "details": error_info,
+                                        "request_id": request_id,
+                                    }
+                                ),
+                                mimetype="application/json",
+                                status_code=500,
+                            )
+
+                        if status in ["running", "notstarted"]:
+                            # Wait before next poll
+                            await asyncio.sleep(polling_interval)
+                        else:
+                            logger.warning(f"[{request_id}] Unknown status: {status}")
+                            await asyncio.sleep(polling_interval)
+
+        except aiohttp.ClientError as e:
+            poll_time = time.time() - poll_start
+            logger.error(f"[{request_id}] Polling failed: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Polling failed",
+                        "message": f"Failed to poll content extraction results: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        # Extract content and fields from result
+        if not result_data:
+            logger.error(f"[{request_id}] No result data available after polling")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "No results",
+                        "message": "Content extraction completed but no results were returned",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        # Extract content_markdown and fields from the result
+        # Adjust these paths based on actual ACU response structure
+        analyze_result = result_data.get("analyzeResult", {})
+        content_markdown = analyze_result.get("content", "")
+        fields = analyze_result.get("fields", {})
+        pages = analyze_result.get("pages", [])
+
+        total_time = time.time() - start_time
+
+        logger.info(f"[{request_id}] Content extraction successful (content_length={len(content_markdown)}, fields_count={len(fields)})")
+
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "content_markdown": content_markdown,
+                    "fields": fields,
+                    "pages": pages,
+                    "request_id": request_id,
+                    "performance": {
+                        "submit_ms": round(submit_time * 1000, 2),
+                        "poll_ms": round(poll_time * 1000, 2),
+                        "total_ms": round(total_time * 1000, 2),
+                        "poll_attempts": poll_attempts,
+                    },
+                }
+            ),
+            mimetype="application/json",
+            status_code=200,
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Content extraction operation failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "error": "Content extraction operation failed",
                     "message": str(e),
                     "request_id": request_id,
                 }

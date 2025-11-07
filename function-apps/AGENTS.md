@@ -126,6 +126,21 @@ async def batch_operation(req: func.HttpRequest) -> func.HttpResponse:
 4. Update the `@variables` section if new configuration is needed
 5. Test cases serve as both documentation and manual testing tools
 
+### README Documentation
+**CRITICAL**: When adding or modifying routes:
+1. **ALWAYS** update `README.md` when adding new routes or making critical changes to existing routes
+2. **Document the following for each new endpoint**:
+   - Endpoint path and HTTP method
+   - Clear description of what the endpoint does
+   - All query parameters (with defaults if applicable)
+   - Required headers (especially authentication headers)
+   - Request body format with examples
+   - Response structure with complete example
+   - Important usage notes or limitations
+3. **Update the Features section** if the new route introduces a new capability
+4. **Add curl examples** in the Testing section for new endpoints
+5. README should always reflect the current state of the API
+
 **Test Case Pattern**:
 ```http
 ### Endpoint Name - Basic Request
@@ -521,6 +536,7 @@ Before marking any task as complete, ensure:
 - [ ] Error responses include actionable messages
 - [ ] **Both `requirements.txt` and `pyproject.toml` are updated and in sync** (if dependencies changed)
 - [ ] **Test cases added to `test.http`** (if new functionality/routes added)
+- [ ] **`README.md` updated with endpoint documentation** (if new routes added or critical route changes made)
 - [ ] **Use `aiohttp` for HTTP requests, not `requests` library**
 - [ ] **Use `asyncio.gather()` for parallel execution, not `ThreadPoolExecutor`**
 - [ ] **Route handlers and I/O functions are declared as `async def`**

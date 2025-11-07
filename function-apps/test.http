@@ -11,6 +11,8 @@
 @aiSearchEndpoint = https://your-aisearch-resource.search.windows.net/indexes/your-index-name/docs/search?api-version=2025-08-01-preview
 @aiSearchApiKey = your-aisearch-api-key-here
 @aiSearchVectorFields = vector1,vector2
+@acuEndpoint = https://your-acu-resource.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer:analyze?api-version=2025-09-01
+@acuKey = your-acu-key-here
 
 ### Health Check
 GET {{baseUrl}}/health
@@ -1573,4 +1575,67 @@ Content-Type: application/json
 {
   "search": ["test with spaces in vector fields"]
 }
+
+### Extract Content - Basic Document (Default polling settings)
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+
+### Extract Content - With Custom Polling Settings
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}&polling_timeout=600&polling_interval=3
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+
+### Extract Content - Using Header Authentication
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&polling_timeout=300&polling_interval=2
+X-API-Key: {{apiKey}}
+X-ACU-Key: {{acuKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_IMAGE_CONTENT_HERE
+
+### Extract Content - Image Document
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_IMAGE_CONTENT_HERE
+
+### Extract Content - Large Document with Extended Timeout
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}&polling_timeout=900&polling_interval=5
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_LARGE_DOCUMENT_CONTENT_HERE
+
+### Extract Content - Missing API Key (Error Scenario)
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+
+### Extract Content - Empty Body (Error Scenario)
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+### Extract Content - Invalid Endpoint (Error Scenario)
+# NOTE: Request body must be base64-encoded document/image content
+POST {{baseUrl}}/extract_content?acu_endpoint=not-a-valid-url&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+
 
