@@ -1,0 +1,1576 @@
+### Variables
+@apiKey = your-api-key-here
+@baseUrl = http://localhost:7071/api
+@cosmosEndpoint = https://your-cosmos-account.documents.azure.com:443/
+@cosmosDatabase = your-database-name
+@cosmosContainer = your-container-name
+@openaiEndpoint = https://your-openai-resource.openai.azure.com/
+@openaiKey = your-openai-key-here
+@embeddingDeployment = text-embedding-ada-002
+@blobEndpoint = https://your-storage-account.blob.core.windows.net
+@aiSearchEndpoint = https://your-aisearch-resource.search.windows.net/indexes/your-index-name/docs/search?api-version=2025-08-01-preview
+@aiSearchApiKey = your-aisearch-api-key-here
+@aiSearchVectorFields = vector1,vector2
+
+### Health Check
+GET {{baseUrl}}/health
+X-API-Key: {{apiKey}}
+
+### Search CosmosDB - Basic Search (Default top=10, Required select_fields)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "What is the project timeline?",
+    "When is the project deadline?",
+    "What are the key milestones?"
+  ]
+}
+
+### Search CosmosDB - Custom Top Value (top=5)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=5&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure Functions best practices"
+  ]
+}
+
+### Search CosmosDB - Custom Top Value (top=20)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=20&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Cosmos DB configuration guide"
+  ]
+}
+
+### Search CosmosDB - Custom Select Fields (Only fileName and pageNumber)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10&select_fields=fileName,pageNumber
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "SharePoint integration"
+  ]
+}
+
+### Search CosmosDB - Single Select Field (Only fileName)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10&select_fields=fileName
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure documentation"
+  ]
+}
+
+### Search CosmosDB - Select Fields with Spaces (Should be trimmed)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10&select_fields=%20fileName%20,%20pageLink%20,%20pageNumber%20
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "test query with spaces in select fields"
+  ]
+}
+
+### Search CosmosDB - Search with Entities
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "SharePoint integration requirements",
+    "How to integrate with SharePoint?",
+    "SharePoint API documentation",
+    "SharePoint authentication setup"
+  ],
+  "entities": ["SharePoint", "integration", "requirements"]
+}
+
+### Search CosmosDB - Multiple Entities
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure Functions deployment best practices",
+    "How to deploy Azure Functions?",
+    "Azure Functions configuration guide",
+    "Optimize Azure Functions performance",
+    "Azure Functions security recommendations"
+  ],
+  "entities": ["Azure Functions", "deployment", "best practices", "configuration"]
+}
+
+### Search CosmosDB - From testdata.json (Cosmos DB Vector Search Configuration)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+< ./testdata.json
+
+### Search CosmosDB - Cosmos DB Vector Search Configuration (Full Query)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["How do I configure Cosmos DB for vector search?"],
+  "entities": ["Cosmos DB", "vector search", "configuration", "embeddings"]
+}
+
+### Search CosmosDB - Cosmos DB Configuration (Shorter Query)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["How do I configure Cosmos DB?"],
+  "entities": ["Cosmos DB", "vector search", "configuration", "embeddings"]
+}
+
+### Search CosmosDB - Configure Cosmos DB Vector Search (Alternative Phrasing)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageLink,pageNumber,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["configure Cosmos DB for vector search"],
+  "entities": ["Cosmos DB", "vector search", "configuration", "embeddings"]
+}
+
+### Search CosmosDB - Invalid Request (Missing select_fields parameter)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (Empty select_fields parameter)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10&select_fields=
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (select_fields with only commas)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=10&select_fields=,,,
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (Invalid top parameter - zero)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=0&select_fields=fileName,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (Invalid top parameter - negative)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=-5&select_fields=fileName,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (Invalid top parameter - not a number)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&top=invalid&select_fields=fileName,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Search CosmosDB - Invalid Request (Missing search parameter)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "entities": ["test"]
+}
+
+### Search CosmosDB - Invalid Request (Empty search)
+POST {{baseUrl}}/search_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}&openai_endpoint={{openaiEndpoint}}&openai_key={{openaiKey}}&openai_embedding_deployment={{embeddingDeployment}}&select_fields=fileName,pageContent
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [],
+  "entities": ["test"]
+}
+
+### Search CosmosDB - No Authentication
+POST {{baseUrl}}/search_cosmosdb
+Content-Type: application/json
+
+{
+  "search": [
+    "test query",
+    "another test query"
+  ]
+}
+
+### Query CosmosDB - Direct SQL Query (Get document by ID)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT * FROM c WHERE c.id = "TS0yMDI0LTAxNy5wZGY.pdf"
+
+### Query CosmosDB - Query by fileName
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT c.id, c.fileName, c.pageNumber, c.pageContent FROM c WHERE c.fileName = "TS0yMDI0LTAxNy5wZGY.pdf"
+
+### Query CosmosDB - Get all documents (limit 10)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT TOP 10 * FROM c
+
+### Query CosmosDB - Count documents
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT VALUE COUNT(1) FROM c
+
+### Query CosmosDB - Get distinct fileNames
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT DISTINCT c.fileName FROM c
+
+### Query CosmosDB - WITH (CTE) Query
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+WITH filtered AS (SELECT * FROM c WHERE IS_DEFINED(c.fileName))
+SELECT TOP 5 filtered.id, filtered.fileName FROM filtered
+
+### Query CosmosDB - Invalid Request (Empty body)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+### Query CosmosDB - No Authentication
+POST {{baseUrl}}/query_cosmosdb
+Content-Type: text/plain
+
+SELECT * FROM c
+
+### Query CosmosDB - SQL Injection Test: INSERT (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+INSERT INTO c (id, name) VALUES ('malicious-id', 'malicious')
+
+### Query CosmosDB - SQL Injection Test: UPDATE (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+UPDATE c SET c.name = 'hacked' WHERE c.id = 'test'
+
+### Query CosmosDB - SQL Injection Test: DELETE (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+DELETE FROM c WHERE c.id = 'test'
+
+### Query CosmosDB - SQL Injection Test: DROP (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+DROP TABLE c
+
+### Query CosmosDB - SQL Injection Test: Multiple Statements (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+SELECT * FROM c; DROP TABLE c
+
+### Query CosmosDB - SQL Injection Test: Case Variation (Should be blocked)
+POST {{baseUrl}}/query_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+DeLeTe FrOm c
+
+### Upsert CosmosDB - Create New Document
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "id": "test-doc-001",
+  "name": "Test Document",
+  "description": "This is a test document for upsert operation",
+  "tags": ["test", "sample"],
+  "createdAt": "2025-11-07T00:00:00Z"
+}
+
+### Upsert CosmosDB - Update Existing Document
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "id": "test-doc-001",
+  "name": "Test Document Updated",
+  "description": "This document has been updated via upsert",
+  "tags": ["test", "sample", "updated"],
+  "updatedAt": "2025-11-07T12:00:00Z"
+}
+
+### Upsert CosmosDB - Complex Document with Nested Objects
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "id": "user-profile-12345",
+  "userId": "12345",
+  "profile": {
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1-555-0123"
+  },
+  "preferences": {
+    "theme": "dark",
+    "language": "en-US",
+    "notifications": true
+  },
+  "metadata": {
+    "lastLogin": "2025-11-07T10:30:00Z",
+    "loginCount": 42
+  }
+}
+
+### Upsert CosmosDB - Document with Vector Embeddings
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "id": "vector-doc-001",
+  "fileName": "sample-document.pdf",
+  "pageNumber": 1,
+  "pageContent": "This is sample content for vector search testing.",
+  "chunkContent": "Sample content for testing",
+  "vector": [0.1, 0.2, 0.3, 0.4, 0.5],
+  "pageLink": "https://example.com/docs/sample-document.pdf#page=1"
+}
+
+### Upsert CosmosDB - Invalid Request (Missing id field)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "Document Without ID",
+  "description": "This should fail because id is missing"
+}
+
+### Upsert CosmosDB - Invalid Request (Empty body)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
+
+### Upsert CosmosDB - No Authentication
+POST {{baseUrl}}/upsert_cosmosdb
+Content-Type: application/json
+
+{
+  "id": "test-doc-no-auth",
+  "name": "Test Without Auth"
+}
+
+### Batch Upsert CosmosDB - Basic Request (Two Documents)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "batch-doc-001",
+      "name": "First Batch Document",
+      "description": "This is the first document in the batch",
+      "tags": ["batch", "test", "first"],
+      "createdAt": "2025-11-07T00:00:00Z"
+    },
+    {
+      "id": "batch-doc-002",
+      "name": "Second Batch Document",
+      "description": "This is the second document in the batch",
+      "tags": ["batch", "test", "second"],
+      "createdAt": "2025-11-07T00:01:00Z"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Single Document in Array
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "batch-single-doc",
+      "name": "Single Document in Batch",
+      "description": "Testing batch operation with single document"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Multiple Documents (5 documents)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "user-001",
+      "type": "user",
+      "name": "Alice Johnson",
+      "email": "alice@example.com",
+      "role": "admin"
+    },
+    {
+      "id": "user-002",
+      "type": "user",
+      "name": "Bob Smith",
+      "email": "bob@example.com",
+      "role": "editor"
+    },
+    {
+      "id": "user-003",
+      "type": "user",
+      "name": "Charlie Brown",
+      "email": "charlie@example.com",
+      "role": "viewer"
+    },
+    {
+      "id": "user-004",
+      "type": "user",
+      "name": "Diana Prince",
+      "email": "diana@example.com",
+      "role": "editor"
+    },
+    {
+      "id": "user-005",
+      "type": "user",
+      "name": "Eve Davis",
+      "email": "eve@example.com",
+      "role": "viewer"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Large Batch (10 documents)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {"id": "product-001", "name": "Product 1", "price": 19.99, "category": "electronics"},
+    {"id": "product-002", "name": "Product 2", "price": 29.99, "category": "electronics"},
+    {"id": "product-003", "name": "Product 3", "price": 39.99, "category": "books"},
+    {"id": "product-004", "name": "Product 4", "price": 49.99, "category": "books"},
+    {"id": "product-005", "name": "Product 5", "price": 59.99, "category": "clothing"},
+    {"id": "product-006", "name": "Product 6", "price": 69.99, "category": "clothing"},
+    {"id": "product-007", "name": "Product 7", "price": 79.99, "category": "electronics"},
+    {"id": "product-008", "name": "Product 8", "price": 89.99, "category": "books"},
+    {"id": "product-009", "name": "Product 9", "price": 99.99, "category": "electronics"},
+    {"id": "product-010", "name": "Product 10", "price": 109.99, "category": "clothing"}
+  ]
+}
+
+### Batch Upsert CosmosDB - Complex Documents with Nested Objects
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "order-12345",
+      "orderNumber": "ORD-12345",
+      "customer": {
+        "id": "cust-001",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      "items": [
+        {"productId": "prod-001", "quantity": 2, "price": 19.99},
+        {"productId": "prod-002", "quantity": 1, "price": 29.99}
+      ],
+      "total": 69.97,
+      "status": "pending",
+      "createdAt": "2025-11-07T10:00:00Z"
+    },
+    {
+      "id": "order-12346",
+      "orderNumber": "ORD-12346",
+      "customer": {
+        "id": "cust-002",
+        "name": "Jane Smith",
+        "email": "jane@example.com"
+      },
+      "items": [
+        {"productId": "prod-003", "quantity": 3, "price": 39.99}
+      ],
+      "total": 119.97,
+      "status": "completed",
+      "createdAt": "2025-11-07T11:00:00Z"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Documents with Vector Embeddings
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "vector-doc-001",
+      "fileName": "document1.pdf",
+      "pageNumber": 1,
+      "pageContent": "Azure Functions is a serverless compute service.",
+      "vector": [0.1, 0.2, 0.3, 0.4, 0.5]
+    },
+    {
+      "id": "vector-doc-002",
+      "fileName": "document1.pdf",
+      "pageNumber": 2,
+      "pageContent": "Cosmos DB is a globally distributed database.",
+      "vector": [0.2, 0.3, 0.4, 0.5, 0.6]
+    },
+    {
+      "id": "vector-doc-003",
+      "fileName": "document2.pdf",
+      "pageNumber": 1,
+      "pageContent": "Azure Logic Apps enables workflow automation.",
+      "vector": [0.3, 0.4, 0.5, 0.6, 0.7]
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Update Existing Documents
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "batch-doc-001",
+      "name": "First Batch Document UPDATED",
+      "description": "This document has been updated via batch upsert",
+      "tags": ["batch", "test", "updated"],
+      "updatedAt": "2025-11-07T12:00:00Z"
+    },
+    {
+      "id": "batch-doc-002",
+      "name": "Second Batch Document UPDATED",
+      "description": "This document has also been updated via batch upsert",
+      "tags": ["batch", "test", "updated"],
+      "updatedAt": "2025-11-07T12:01:00Z"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Invalid Request (Empty documents array)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": []
+}
+
+### Batch Upsert CosmosDB - Invalid Request (Missing id field in one document)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "valid-doc",
+      "name": "Valid Document"
+    },
+    {
+      "name": "Invalid Document Without ID"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Invalid Request (Missing id field in first document)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "name": "Document Without ID"
+    }
+  ]
+}
+
+### Batch Upsert CosmosDB - Invalid Request (Empty document object)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {}
+  ]
+}
+
+### Batch Upsert CosmosDB - Invalid Request (null document)
+POST {{baseUrl}}/upsert_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "valid-doc",
+      "name": "Valid"
+    },
+    null
+  ]
+}
+
+### Batch Upsert CosmosDB - No Authentication
+POST {{baseUrl}}/upsert_cosmosdb
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "batch-doc-no-auth",
+      "name": "Batch Without Auth"
+    }
+  ]
+}
+
+### Get Blob Content - Basic Request
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=TS0yMDI0LTAzNS5wZGY.pdf.json
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - Different Container
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_container=documents&blob_name=sample-file.json
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - Nested Path (blob name with folders)
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_container=container-name&blob_name=folder1/folder2/document.txt
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - Invalid Request (Missing blob_container)
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_name=test.json
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - Invalid Request (Missing blob_name)
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - Missing Blob Endpoint Parameter
+GET {{baseUrl}}/get_blob?blob_container=sharepoint&blob_name=test.json
+X-API-Key: {{apiKey}}
+
+### Get Blob Content - No Authentication
+GET {{baseUrl}}/get_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=TS0yMDI0LTAzNS5wZGY.pdf.json
+
+### Save Blob Content - Basic Request (Plain Text)
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=test-file.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This is test content that will be saved to blob storage.
+
+### Save Blob Content - JSON Content
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=test-data.json
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "id": "test-001",
+  "name": "Test Document",
+  "description": "Sample JSON content saved to blob storage",
+  "timestamp": "2025-11-07T00:00:00Z",
+  "tags": ["test", "sample", "blob-storage"]
+}
+
+### Save Blob Content - Large JSON Content
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=documents&blob_name=large-document.json
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documentId": "doc-12345",
+  "metadata": {
+    "title": "Large Document Sample",
+    "author": "System",
+    "created": "2025-11-07T10:00:00Z",
+    "version": "1.0"
+  },
+  "sections": [
+    {
+      "id": "section-1",
+      "title": "Introduction",
+      "content": "This is the introduction section with sample content."
+    },
+    {
+      "id": "section-2",
+      "title": "Main Content",
+      "content": "This is the main content section with detailed information."
+    },
+    {
+      "id": "section-3",
+      "title": "Conclusion",
+      "content": "This is the conclusion section summarizing key points."
+    }
+  ],
+  "references": [
+    "Reference 1",
+    "Reference 2",
+    "Reference 3"
+  ]
+}
+
+### Save Blob Content - Nested Folder Path
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=documents&blob_name=2025/november/report.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+Monthly report content for November 2025.
+This demonstrates saving to a nested folder structure in blob storage.
+
+### Save Blob Content - Overwrite Existing Blob
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=test-file.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This is updated content that will overwrite the existing blob.
+
+### Save Blob Content - Binary-like Content (Base64 encoded)
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=images&blob_name=sample-data.bin
+X-API-Key: {{apiKey}}
+Content-Type: application/octet-stream
+
+SGVsbG8gV29ybGQhIFRoaXMgaXMgYmFzZTY0IGVuY29kZWQgY29udGVudC4=
+
+### Save Blob Content - CSV Content
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=data&blob_name=export-2025-11-07.csv
+X-API-Key: {{apiKey}}
+Content-Type: text/csv
+
+id,name,email,created_at
+1,John Doe,john.doe@example.com,2025-11-07T10:00:00Z
+2,Jane Smith,jane.smith@example.com,2025-11-07T10:01:00Z
+3,Bob Johnson,bob.johnson@example.com,2025-11-07T10:02:00Z
+
+### Save Blob Content - Invalid Request (Empty body)
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=empty-file.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+### Save Blob Content - Invalid Request (Missing Blob Endpoint)
+POST {{baseUrl}}/save_blob?blob_container=sharepoint&blob_name=test-file.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This should fail due to missing blob_endpoint query parameter.
+
+### Save Blob Content - Invalid Request (Missing Container Name)
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_name=test-file.txt
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This should fail due to missing blob_container query parameter.
+
+### Save Blob Content - Invalid Request (Missing Blob Name)
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This should fail due to missing blob_name query parameter.
+
+### Save Blob Content - Invalid Request (Missing All Required Parameters)
+POST {{baseUrl}}/save_blob
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+This should fail due to missing all blob storage query parameters.
+
+### Save Blob Content - No Authentication
+POST {{baseUrl}}/save_blob?blob_endpoint={{blobEndpoint}}&blob_container=sharepoint&blob_name=test-file.txt
+Content-Type: text/plain
+
+This should fail due to missing API key authentication.
+
+### Batch Delete CosmosDB - Basic Request (Two Documents)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "QXp1cmUgQ3VzdG9tZXIgSGVhbHRoIEV4cGFuc2lvbiBNb3Rpb24gRXN0aW1hdG9yIGZvciBKMiAoMSkueGxzeA.xlsx_2",
+      "partition": "Shared Documents/Others/Files/Images/PNG/Docx/PPTX/XLSX1/XLSX2/"
+    },
+    {
+      "id": "QXp1cmUgQ3VzdG9tZXIgSGVhbHRoIEV4cGFuc2lvbiBNb3Rpb24gRXN0aW1hdG9yIGZvciBKMiAoMSkueGxzeA.xlsx_3",
+      "partition": "Shared Documents/Others/Files/Images/PNG/Docx/PPTX/XLSX1/XLSX2/"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Single Document
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc-001",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Multiple Documents (5 documents)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "doc-1",
+      "partition": "partition-a"
+    },
+    {
+      "id": "doc-2",
+      "partition": "partition-a"
+    },
+    {
+      "id": "doc-3",
+      "partition": "partition-b"
+    },
+    {
+      "id": "doc-4",
+      "partition": "partition-b"
+    },
+    {
+      "id": "doc-5",
+      "partition": "partition-c"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Large Batch (10 documents)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {"id": "doc-001", "partition": "batch-1"},
+    {"id": "doc-002", "partition": "batch-1"},
+    {"id": "doc-003", "partition": "batch-1"},
+    {"id": "doc-004", "partition": "batch-2"},
+    {"id": "doc-005", "partition": "batch-2"},
+    {"id": "doc-006", "partition": "batch-2"},
+    {"id": "doc-007", "partition": "batch-3"},
+    {"id": "doc-008", "partition": "batch-3"},
+    {"id": "doc-009", "partition": "batch-4"},
+    {"id": "doc-010", "partition": "batch-4"}
+  ]
+}
+
+### Batch Delete CosmosDB - Different Partition Keys
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "user-profile-001",
+      "partition": "/users/001"
+    },
+    {
+      "id": "order-12345",
+      "partition": "/orders/2025"
+    },
+    {
+      "id": "product-abc",
+      "partition": "/products/category-a"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Empty documents array)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": []
+}
+
+### Batch Delete CosmosDB - Invalid Request (Missing documents field)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Documents not an array)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": "not-an-array"
+}
+
+### Batch Delete CosmosDB - Invalid Request (Missing id field)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Missing partition field)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Empty document object)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {}
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Mixed valid and invalid documents)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "valid-doc",
+      "partition": "valid-partition"
+    },
+    {
+      "id": "missing-partition-doc"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Invalid JSON)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition",
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Invalid Request (Empty body)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+### Batch Delete CosmosDB - Missing Cosmos Endpoint
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Missing Cosmos Database
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Missing Cosmos Container
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - No Authentication
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "test-doc",
+      "partition": "test-partition"
+    }
+  ]
+}
+
+### Batch Delete CosmosDB - Non-existent Documents (Should return detailed failure info)
+DELETE {{baseUrl}}/delete_cosmosdb?cosmos_endpoint={{cosmosEndpoint}}&cosmos_database={{cosmosDatabase}}&cosmos_container={{cosmosContainer}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "non-existent-doc-1",
+      "partition": "non-existent-partition"
+    },
+    {
+      "id": "non-existent-doc-2",
+      "partition": "non-existent-partition"
+    }
+  ]
+}
+
+### Delete Blob - Single Blob (Plain Text Body)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+sharepoint/XN0aW1hdG9yIGZvciBKMiAoMSkueGxzeA.xlsx.json
+
+### Delete Blob - Single Blob with Leading Slash (Should work)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+/sharepoint/test-file.json
+
+### Delete Blob - Multiple Blobs (JSON Array Format)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/file1.json",
+    "sharepoint/file2.json",
+    "documents/file3.txt"
+  ]
+}
+
+### Delete Blob - Multiple Blobs (Direct Array Format)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+[
+  "sharepoint/document1.pdf.json",
+  "sharepoint/document2.pdf.json",
+  "documents/report.txt"
+]
+
+### Delete Blob - Large Batch (10 blobs)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/blob1.json",
+    "sharepoint/blob2.json",
+    "sharepoint/blob3.json",
+    "documents/blob4.txt",
+    "documents/blob5.txt",
+    "images/blob6.png",
+    "images/blob7.jpg",
+    "data/blob8.csv",
+    "data/blob9.json",
+    "backup/blob10.bak"
+  ]
+}
+
+### Delete Blob - Nested Folder Paths
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "container/folder1/folder2/file1.json",
+    "container/2025/november/report.txt",
+    "documents/archives/2024/old-file.pdf"
+  ]
+}
+
+### Delete Blob - Different Containers
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/doc1.json",
+    "documents/doc2.json",
+    "images/photo.jpg",
+    "backup/archive.zip"
+  ]
+}
+
+### Delete Blob - Invalid Request (Empty body)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+### Delete Blob - Invalid Request (Missing container/blob separator)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+just-a-filename-without-container
+
+### Delete Blob - Invalid Request (Empty blobs array)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": []
+}
+
+### Delete Blob - Invalid Request (blobs field not an array)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": "not-an-array"
+}
+
+### Delete Blob - Invalid Request (Empty JSON object)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
+
+### Delete Blob - Invalid Request (Empty JSON array)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+[]
+
+### Delete Blob - Invalid Request (Invalid path format in array)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/valid-path.json",
+    "invalid-path-without-container"
+  ]
+}
+
+### Delete Blob - Missing Blob Endpoint Parameter
+DELETE {{baseUrl}}/delete_blob
+X-API-Key: {{apiKey}}
+Content-Type: text/plain
+
+sharepoint/test-file.json
+
+### Delete Blob - No Authentication
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+Content-Type: text/plain
+
+sharepoint/test-file.json
+
+### Delete Blob - Non-existent Blob (Should return detailed failure info)
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/non-existent-file1.json",
+    "documents/non-existent-file2.txt"
+  ]
+}
+
+### Delete Blob - Mixed Valid and Invalid Paths
+DELETE {{baseUrl}}/delete_blob?blob_endpoint={{blobEndpoint}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "blobs": [
+    "sharepoint/valid-file.json",
+    "invalid-format",
+    "documents/another-valid-file.txt",
+    "also-invalid"
+  ]
+}
+
+### Query AI Search - Basic Hybrid Query (Single Search Term)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "What is the subject and guidance in BSP Memorandum M-2024-017?"
+  ]
+}
+
+### Query AI Search - Multiple Search Queries
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "How do I configure Cosmos DB for vector search?",
+    "How do I configure Cosmos DB?",
+    "configure Cosmos DB for vector search"
+  ]
+}
+
+### Query AI Search - Complex Multi-Query Search
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=5&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure Functions deployment best practices",
+    "How to deploy Azure Functions?",
+    "Azure Functions configuration guide",
+    "Optimize Azure Functions performance",
+    "Azure Functions security recommendations"
+  ]
+}
+
+### Query AI Search - Single Vector Field
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields=vector1
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "SharePoint integration with Azure"
+  ]
+}
+
+### Query AI Search - Three Vector Fields
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=15&vector_fields=vector1,vector2,vector3
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "AI model integration patterns",
+    "Machine learning deployment strategies"
+  ]
+}
+
+### Query AI Search - Custom Top Value (20 results)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=20&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Database migration strategies",
+    "Cloud migration best practices"
+  ]
+}
+
+### Query AI Search - Small Top Value (3 results)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=3&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure Monitor setup",
+    "Application Insights configuration"
+  ]
+}
+
+### Query AI Search - Long Query Text
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "I need detailed information about implementing a comprehensive security strategy for Azure cloud infrastructure including identity management, network security, data encryption at rest and in transit, key vault integration, and compliance monitoring across multiple regions and subscriptions"
+  ]
+}
+
+### Query AI Search - Multiple Queries with Semantic Variations
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "What are the best practices for Azure Functions?",
+    "Azure Functions best practices",
+    "How to optimize Azure Functions?",
+    "Azure Functions optimization guide",
+    "Improve Azure Functions performance"
+  ]
+}
+
+### Query AI Search - Technical Documentation Search
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": [
+    "Azure Cosmos DB vector search implementation",
+    "Setting up vector embeddings in Cosmos DB",
+    "Cosmos DB vector search API documentation"
+  ]
+}
+
+### Query AI Search - Invalid Request (Missing search parameter)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "query": "wrong parameter name"
+}
+
+### Query AI Search - Invalid Request (Empty search array)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": []
+}
+
+### Query AI Search - Invalid Request (Search not an array)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": "should be an array not a string"
+}
+
+### Query AI Search - Invalid Request (Missing search_endpoint)
+POST {{baseUrl}}/query_aisearch?search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Missing search_api_key)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Missing vector_fields)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Empty vector_fields)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields=
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Invalid top parameter - zero)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=0&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Invalid top parameter - negative)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=-5&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Invalid top parameter - not a number)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=invalid&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - Invalid Request (Missing OpenAI parameters)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test query"]
+}
+
+### Query AI Search - No Authentication
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+Content-Type: application/json
+
+{
+  "search": ["test query without authentication"]
+}
+
+### Query AI Search - Empty Body
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+### Query AI Search - Default Top Value (Should use 10)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&vector_fields={{aiSearchVectorFields}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["query with default top value"]
+}
+
+### Query AI Search - Vector Fields with Spaces (Should be trimmed)
+POST {{baseUrl}}/query_aisearch?search_endpoint={{aiSearchEndpoint}}&search_api_key={{aiSearchApiKey}}&top=10&vector_fields=%20vector1%20,%20vector2%20,%20vector3%20
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "search": ["test with spaces in vector fields"]
+}
+
