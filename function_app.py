@@ -10,6 +10,9 @@ from typing import Any, cast
 
 import aiohttp
 import azure.functions as func
+import cv2
+import fitz  # PyMuPDF
+import numpy as np
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -30,10 +33,202 @@ MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
 MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024
 AISEARCH_TIMEOUT_SECONDS = int(os.getenv("AISEARCH_TIMEOUT_SECONDS", "60"))
 
+# Signature comparison constants
+SIGNATURE_NORMALIZED_WIDTH = 300
+SIGNATURE_NORMALIZED_HEIGHT = 150
+ALLOWED_FILE_TYPES = {".png", ".jpg", ".jpeg", ".pdf"}
+
 
 def _generate_request_id() -> str:
     """Generate a unique request ID."""
     return str(uuid.uuid4())[:8]
+
+
+def _load_image_from_bytes(image_bytes: bytes, filename: str) -> np.ndarray | None:
+    """
+    Load image from bytes, handling both regular images and PDFs.
+
+    Args:
+        image_bytes: Raw file bytes
+        filename: Original filename to determine file type
+
+    Returns:
+        numpy array (OpenCV format) or None if loading fails
+    """
+    file_ext = os.path.splitext(filename.lower())[1]
+
+    try:
+        if file_ext == ".pdf":
+            # Extract first page of PDF as image
+            pdf_document = fitz.open(stream=image_bytes, filetype="pdf")
+            if pdf_document.page_count == 0:
+                return None
+
+            # Render first page to image (150 DPI)
+            page = pdf_document[0]
+            pix = page.get_pixmap(dpi=150)
+            img_bytes = pix.tobytes("png")
+
+            # Convert to numpy array
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            return img
+        # Load regular image formats
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return img
+    except Exception:
+        return None
+
+
+def _extract_signatures(image: np.ndarray) -> list[np.ndarray]:
+    """
+    Extract signature regions from an image using contour detection.
+
+    Args:
+        image: Input image as numpy array (OpenCV format)
+
+    Returns:
+        List of extracted signature images as numpy arrays
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply Gaussian blur to reduce noise
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Apply adaptive thresholding
+    thresh = cv2.adaptiveThreshold(
+        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
+    )
+
+    # Find contours
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Filter contours by area and aspect ratio (typical signature characteristics)
+    min_area = 500
+    signatures = []
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < min_area:
+            continue
+
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = w / float(h) if h > 0 else 0
+
+        # Signatures typically have aspect ratio between 1.5 and 5.0
+        if 1.5 <= aspect_ratio <= 5.0 and w > 50 and h > 20:
+            # Extract signature region with some padding
+            padding = 10
+            x1 = max(0, x - padding)
+            y1 = max(0, y - padding)
+            x2 = min(image.shape[1], x + w + padding)
+            y2 = min(image.shape[0], y + h + padding)
+
+            signature_img = image[y1:y2, x1:x2]
+            signatures.append(signature_img)
+
+    # Sort by area (largest first) and return top 3
+    signatures.sort(key=lambda s: s.shape[0] * s.shape[1], reverse=True)
+    return signatures[:3]
+
+
+def _normalize_signature(signature: np.ndarray) -> np.ndarray:
+    """
+    Normalize a signature image for consistent comparison.
+
+    Args:
+        signature: Input signature image as numpy array
+
+    Returns:
+        Normalized signature image
+    """
+    # Resize to standard dimensions
+    normalized = cv2.resize(
+        signature, (SIGNATURE_NORMALIZED_WIDTH, SIGNATURE_NORMALIZED_HEIGHT)
+    )
+
+    # Convert to grayscale if needed
+    if len(normalized.shape) == 3:
+        normalized = cv2.cvtColor(normalized, cv2.COLOR_BGR2GRAY)
+
+    # Apply histogram equalization for consistent contrast
+    normalized = cv2.equalizeHist(normalized)
+
+    # Convert back to BGR for CLIP model (expects 3 channels)
+    normalized = cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)
+
+    return normalized
+
+
+def _extract_image_features(image: np.ndarray) -> list[float]:
+    """
+    Extract feature vector from image using OpenCV.
+    Uses HOG (Histogram of Oriented Gradients) and pixel intensity features.
+
+    Args:
+        image: Input image as numpy array (OpenCV format)
+
+    Returns:
+        Feature vector as list of floats
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+
+    # Calculate HOG features
+    win_size = (gray.shape[1] // 16 * 16, gray.shape[0] // 16 * 16)
+    if win_size[0] < 16 or win_size[1] < 16:
+        win_size = (64, 64)
+        gray = cv2.resize(gray, win_size)
+
+    hog = cv2.HOGDescriptor(
+        win_size,
+        (16, 16),  # block size
+        (8, 8),    # block stride
+        (8, 8),    # cell size
+        9          # number of bins
+    )
+    hog_features = hog.compute(gray)
+
+    # Flatten and normalize HOG features
+    hog_vector = hog_features.flatten()
+    hog_vector = hog_vector / (np.linalg.norm(hog_vector) + 1e-8)
+
+    # Calculate histogram features (additional texture information)
+    hist = cv2.calcHist([gray], [0], None, [64], [0, 256])
+    hist = hist.flatten()
+    hist = hist / (np.sum(hist) + 1e-8)
+
+    # Combine features
+    combined_features = np.concatenate([hog_vector, hist])
+
+    return combined_features.tolist()
+
+
+def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """
+    Calculate cosine similarity between two vectors.
+
+    Args:
+        vec1: First vector
+        vec2: Second vector
+
+    Returns:
+        Cosine similarity score (0 to 1, where 1 is identical)
+    """
+    arr1 = np.array(vec1)
+    arr2 = np.array(vec2)
+
+    # Calculate cosine similarity
+    dot_product = np.dot(arr1, arr2)
+    norm1 = np.linalg.norm(arr1)
+    norm2 = np.linalg.norm(arr2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return float(dot_product / (norm1 * norm2))
 
 
 def _validate_url_parameter(value: str | None, param_name: str) -> tuple[bool, str | None]:
@@ -353,6 +548,242 @@ async def health_check(req: func.HttpRequest) -> func.HttpResponse:
         mimetype="application/json",
         status_code=200,
     )
+
+
+@app.route(route="compare_signatures", methods=["POST"])
+@require_api_key
+async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Compare signatures between specimen signatures on ID and selfie with ID.
+
+    Accepts multipart/form-data with 3 files:
+    - valid_id: Image of valid ID (front)
+    - specimen_signatures: Image of valid ID with 3 specimen signatures
+    - selfie_with_id: Selfie photo holding valid ID
+
+    Returns similarity scores between signatures using computer vision features.
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Signature comparison request initiated")
+
+    try:
+        # Parse multipart form data
+        files = req.files
+
+        # Validate required files
+        required_files = ["valid_id", "specimen_signatures", "selfie_with_id"]
+        for file_key in required_files:
+            if file_key not in files:
+                logger.warning(f"[{request_id}] Missing required file: {file_key}")
+                return func.HttpResponse(
+                    json.dumps({
+                        "error": "Missing required files",
+                        "message": f"Please provide all required files: {', '.join(required_files)}",
+                        "request_id": request_id,
+                    }),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+        # Load and validate files
+        valid_id_file = files["valid_id"]
+        specimen_file = files["specimen_signatures"]
+        selfie_file = files["selfie_with_id"]
+
+        # Validate file types
+        for file_obj, name in [
+            (valid_id_file, "valid_id"),
+            (specimen_file, "specimen_signatures"),
+            (selfie_file, "selfie_with_id"),
+        ]:
+            file_ext = os.path.splitext(file_obj.filename.lower())[1]
+            if file_ext not in ALLOWED_FILE_TYPES:
+                logger.warning(f"[{request_id}] Invalid file type for {name}: {file_ext}")
+                return func.HttpResponse(
+                    json.dumps({
+                        "error": "Invalid file type",
+                        "message": f"{name} must be one of: {', '.join(ALLOWED_FILE_TYPES)}",
+                        "request_id": request_id,
+                    }),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+        logger.info(f"[{request_id}] Loading images from uploaded files")
+
+        # Load images
+        valid_id_bytes = valid_id_file.read()
+        specimen_bytes = specimen_file.read()
+        selfie_bytes = selfie_file.read()
+
+        valid_id_img = _load_image_from_bytes(valid_id_bytes, valid_id_file.filename)
+        specimen_img = _load_image_from_bytes(specimen_bytes, specimen_file.filename)
+        selfie_img = _load_image_from_bytes(selfie_bytes, selfie_file.filename)
+
+        if valid_id_img is None or specimen_img is None or selfie_img is None:
+            logger.error(f"[{request_id}] Failed to load one or more images")
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Image loading failed",
+                    "message": "Failed to load one or more uploaded images. Please check file format.",
+                    "request_id": request_id,
+                }),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Extract signatures from images
+        extraction_start = time.time()
+        logger.info(f"[{request_id}] Extracting signatures from images")
+
+        valid_id_signatures = _extract_signatures(valid_id_img)
+        specimen_signatures = _extract_signatures(specimen_img)
+        selfie_signatures = _extract_signatures(selfie_img)
+
+        extraction_time = time.time() - extraction_start
+
+        logger.info(
+            f"[{request_id}] Extracted signatures: valid_id={len(valid_id_signatures)}, "
+            f"specimen={len(specimen_signatures)}, selfie={len(selfie_signatures)}"
+        )
+
+        if len(specimen_signatures) < 3:
+            logger.warning(f"[{request_id}] Expected 3 specimen signatures, found {len(specimen_signatures)}")
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Insufficient specimen signatures",
+                    "message": f"Expected 3 specimen signatures, found only {len(specimen_signatures)}. "
+                               "Please ensure the image clearly shows 3 specimen signatures.",
+                    "request_id": request_id,
+                }),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Normalize all signatures
+        normalization_start = time.time()
+        logger.info(f"[{request_id}] Normalizing signatures")
+
+        normalized_specimen = [_normalize_signature(sig) for sig in specimen_signatures[:3]]
+        normalized_valid_id = [_normalize_signature(sig) for sig in valid_id_signatures] if valid_id_signatures else []
+        normalized_selfie = [_normalize_signature(sig) for sig in selfie_signatures] if selfie_signatures else []
+
+        normalization_time = time.time() - normalization_start
+
+        # Extract features from all signatures (using OpenCV - no external API needed)
+        feature_start = time.time()
+        logger.info(f"[{request_id}] Extracting image features")
+
+        # Extract features using OpenCV (runs locally, no API calls)
+        specimen_features = [_extract_image_features(sig) for sig in normalized_specimen]
+        valid_id_features = [_extract_image_features(sig) for sig in normalized_valid_id]
+        selfie_features = [_extract_image_features(sig) for sig in normalized_selfie]
+
+        feature_time = time.time() - feature_start
+
+        # Calculate similarities
+        similarity_start = time.time()
+        logger.info(f"[{request_id}] Calculating similarity scores")
+
+        # 1. Check if specimen signatures match each other
+        specimen_similarity_matrix = []
+        for i in range(3):
+            row = []
+            for j in range(3):
+                if i == j:
+                    row.append(1.0)
+                else:
+                    similarity = _cosine_similarity(specimen_features[i], specimen_features[j])
+                    row.append(round(similarity, 4))
+            specimen_similarity_matrix.append(row)
+
+        # Average similarity between specimen signatures
+        specimen_avg_similarity = sum(
+            specimen_similarity_matrix[i][j]
+            for i in range(3)
+            for j in range(i + 1, 3)
+        ) / 3
+
+        # 2. Compare specimen signatures against valid ID signature(s)
+        valid_id_similarities = []
+        if valid_id_features:
+            for spec_feat in specimen_features:
+                best_match = max(
+                    _cosine_similarity(spec_feat, id_feat) for id_feat in valid_id_features
+                )
+                valid_id_similarities.append(round(best_match, 4))
+
+        # 3. Compare specimen signatures against selfie signature(s)
+        selfie_similarities = []
+        if selfie_features:
+            for spec_feat in specimen_features:
+                best_match = max(
+                    _cosine_similarity(spec_feat, selfie_feat) for selfie_feat in selfie_features
+                )
+                selfie_similarities.append(round(best_match, 4))
+
+        similarity_time = time.time() - similarity_start
+        total_time = time.time() - start_time
+
+        # Prepare response
+        result = {
+            "request_id": request_id,
+            "specimen_signatures_count": 3,
+            "valid_id_signatures_count": len(valid_id_signatures),
+            "selfie_signatures_count": len(selfie_signatures),
+            "specimen_internal_consistency": {
+                "similarity_matrix": specimen_similarity_matrix,
+                "average_similarity": round(specimen_avg_similarity, 4),
+                "status": "MATCH" if specimen_avg_similarity >= 0.85 else "MISMATCH",
+            },
+            "specimen_vs_valid_id": {
+                "similarities": valid_id_similarities,
+                "average_similarity": round(sum(valid_id_similarities) / len(valid_id_similarities), 4) if valid_id_similarities else 0.0,
+                "status": "MATCH" if valid_id_similarities and sum(valid_id_similarities) / len(valid_id_similarities) >= 0.80 else "MISMATCH",
+            } if valid_id_similarities else {"status": "NO_SIGNATURE_FOUND"},
+            "specimen_vs_selfie": {
+                "similarities": selfie_similarities,
+                "average_similarity": round(sum(selfie_similarities) / len(selfie_similarities), 4) if selfie_similarities else 0.0,
+                "status": "MATCH" if selfie_similarities and sum(selfie_similarities) / len(selfie_similarities) >= 0.80 else "MISMATCH",
+            } if selfie_similarities else {"status": "NO_SIGNATURE_FOUND"},
+            "performance": {
+                "extraction_ms": round(extraction_time * 1000, 2),
+                "normalization_ms": round(normalization_time * 1000, 2),
+                "feature_extraction_ms": round(feature_time * 1000, 2),
+                "similarity_ms": round(similarity_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        logger.info(
+            f"[{request_id}] Signature comparison completed: "
+            f"specimen_consistency={specimen_avg_similarity:.4f}, "
+            f"valid_id_match={sum(valid_id_similarities) / len(valid_id_similarities) if valid_id_similarities else 0:.4f}, "
+            f"selfie_match={sum(selfie_similarities) / len(selfie_similarities) if selfie_similarities else 0:.4f}"
+        )
+
+        return func.HttpResponse(
+            json.dumps(result),
+            mimetype="application/json",
+            status_code=200,
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Signature comparison failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps({
+                "error": "Signature comparison failed",
+                "message": str(e),
+                "request_id": request_id,
+            }),
+            mimetype="application/json",
+            status_code=500,
+        )
 
 
 @app.route(route="query_aisearch", methods=["POST"])

@@ -1,17 +1,91 @@
-# Azure AI Search Function App
+# Azure Functions App - AI Search & Signature Comparison
 
-Azure Function App providing REST API access to Azure AI Search with hybrid vector search capabilities.
+Azure Function App providing REST API access to Azure AI Search with hybrid vector search capabilities and signature verification using computer vision and AI embeddings.
 
 ## Features
 
 - **AI Search Integration**: Hybrid queries with text and vector fields
+- **Signature Comparison**: Automated signature verification using OpenCV and OpenAI CLIP embeddings
 - **Parallel Execution**: Batch operations execute concurrently using async/await
+- **Multi-Format Support**: Handles PNG, JPG, JPEG, and PDF files
 - **API Key Authentication**: Secure endpoints with X-API-Key header (query param fallback)
 - **Structured Logging**: Request ID tracking and performance metrics
 
 ## Endpoints
 
 All endpoints require authentication via `X-API-Key` header (or `api_key` query parameter).
+
+### Signature Comparison Operations
+
+#### `POST /api/compare_signatures`
+Compare signatures between specimen signatures, valid ID, and selfie with ID using computer vision feature extraction.
+
+**Use Case**: Verify identity documents by comparing signatures from:
+1. **Specimen signatures** (3 signatures on ID) - Source of truth
+2. **Valid ID signature** - Compare against specimens
+3. **Selfie with ID signature** - Compare against specimens
+
+**Headers**: 
+- `X-API-Key`: API key for authentication (required)
+
+**Request Body** (multipart/form-data):
+- `valid_id`: Image file of valid ID (front) - PNG, JPG, JPEG, or PDF
+- `specimen_signatures`: Image file with 3 specimen signatures - PNG, JPG, JPEG, or PDF
+- `selfie_with_id`: Selfie photo holding valid ID - PNG, JPG, JPEG, or PDF
+
+**Response**:
+```json
+{
+  "request_id": "abc12345",
+  "specimen_signatures_count": 3,
+  "valid_id_signatures_count": 1,
+  "selfie_signatures_count": 1,
+  "specimen_internal_consistency": {
+    "similarity_matrix": [
+      [1.0, 0.92, 0.89],
+      [0.92, 1.0, 0.91],
+      [0.89, 0.91, 1.0]
+    ],
+    "average_similarity": 0.9067,
+    "status": "MATCH"
+  },
+  "specimen_vs_valid_id": {
+    "similarities": [0.88, 0.87, 0.86],
+    "average_similarity": 0.8700,
+    "status": "MATCH"
+  },
+  "specimen_vs_selfie": {
+    "similarities": [0.85, 0.84, 0.83],
+    "average_similarity": 0.8400,
+    "status": "MATCH"
+  },
+  "performance": {
+    "extraction_ms": 250.12,
+    "normalization_ms": 45.23,
+    "feature_extraction_ms": 120.45,
+    "similarity_ms": 12.34,
+    "total_ms": 428.14
+  }
+}
+```
+
+**Similarity Thresholds**:
+- **Specimen Internal Consistency**: ≥0.85 = MATCH (all 3 specimen signatures should match)
+- **Specimen vs Valid ID**: ≥0.80 = MATCH
+- **Specimen vs Selfie**: ≥0.80 = MATCH
+
+**Status Values**:
+- `MATCH`: Signatures match (confidence score above threshold)
+- `MISMATCH`: Signatures do not match (confidence score below threshold)
+- `NO_SIGNATURE_FOUND`: No signature detected in the image
+
+**Important Notes**:
+1. The function automatically extracts signatures from images using contour detection
+2. All signatures are normalized to 300x150 pixels for consistent comparison
+3. Features are extracted using HOG (Histogram of Oriented Gradients) and histogram analysis - **no external API calls required**
+4. Cosine similarity is used to calculate confidence scores (0.0 to 1.0)
+5. At least 3 specimen signatures must be detected from the specimen_signatures image
+6. All processing is done locally using OpenCV - no cloud API dependencies
 
 ### AI Search Operations
 
@@ -150,6 +224,13 @@ Use `test.http` (REST Client extension) or curl:
 curl http://localhost:7071/api/health \
   -H "X-API-Key: your-key"
 
+# Compare signatures (using multipart form data)
+curl -X POST "http://localhost:7071/api/compare_signatures" \
+  -H "X-API-Key: your-key" \
+  -F "valid_id=@./testdata/valid_id.jpg" \
+  -F "specimen_signatures=@./testdata/specimen_signatures.jpg" \
+  -F "selfie_with_id=@./testdata/selfie_with_id.jpg"
+
 # Query AI Search
 curl -X POST "http://localhost:7071/api/query_aisearch?search_endpoint=https://your-search.search.windows.net/indexes/your-index/docs/search?api-version=2025-08-01-preview&top=10&vector_fields=vector1,vector2" \
   -H "X-API-Key: your-key" \
@@ -157,6 +238,11 @@ curl -X POST "http://localhost:7071/api/query_aisearch?search_endpoint=https://y
   -H "Content-Type: application/json" \
   -d '{"search": ["azure functions best practices"]}'
 ```
+
+**Note**: For signature comparison testing, you'll need to prepare test images:
+- Create a `testdata/` directory
+- Add sample images: `valid_id.jpg`, `specimen_signatures.jpg`, `selfie_with_id.jpg`
+- Supported formats: PNG, JPG, JPEG, PDF
 
 ### Common Commands
 

@@ -255,4 +255,174 @@ Content-Type: application/json
   "search": ["test with spaces in vector fields"]
 }
 
+###############################################################################
+### SIGNATURE COMPARISON ENDPOINTS
+###############################################################################
+
+### Compare Signatures - Complete Valid Request
+# Note: You need to replace the file paths with actual image files
+# Files should be: valid_id.jpg, specimen_signatures.jpg, selfie_with_id.jpg
+# All processing done locally with OpenCV - no external API calls
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/specimen_signatures.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/selfie_with_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - PNG Files
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.png"
+Content-Type: image/png
+
+< ./testdata/valid_id.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.png"
+Content-Type: image/png
+
+< ./testdata/specimen_signatures.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.png"
+Content-Type: image/png
+
+< ./testdata/selfie_with_id.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - PDF File (specimen_signatures as PDF)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.pdf"
+Content-Type: application/pdf
+
+< ./testdata/specimen_signatures.pdf
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/selfie_with_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - Missing Required File (valid_id)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - Missing Required File (valid_id)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+X-OpenAI-Key: {{openaiApiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/specimen_signatures.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/selfie_with_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - Missing Required File (specimen_signatures)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/selfie_with_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - Missing Required File (selfie_with_id)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/specimen_signatures.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - Invalid File Type (.txt)
+POST {{baseUrl}}/compare_signatures
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.txt"
+Content-Type: text/plain
+
+< ./testdata/valid_id.txt
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen_signatures.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/specimen_signatures.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie_with_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/selfie_with_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Compare Signatures - No Authentication
+POST {{baseUrl}}/compare_signatures
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id.jpg"
+Content-Type: image/jpeg
+
+< ./testdata/valid_id.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
 
