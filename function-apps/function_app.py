@@ -1445,12 +1445,12 @@ async def search_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 )
 
-        # Remove duplicates based on fileName and pageNumber
-        seen: set[tuple[str, str]] = set()
+        # Remove duplicates based on all fields from select_fields_param
+        seen: set[tuple[Any, ...]] = set()
         unique_results: list[dict[str, Any]] = []
         for item in all_results:
-            # Create a unique key from fileName and pageNumber
-            key = (item.get("fileName", ""), item.get("pageNumber", ""))
+            # Create a unique key from all selected fields
+            key = tuple(item.get(field, "") for field in field_names)
             if key not in seen:
                 seen.add(key)
                 unique_results.append(item)
