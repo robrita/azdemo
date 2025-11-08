@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import json
 import logging
 import os
@@ -11,12 +10,7 @@ from typing import Any, cast
 
 import aiohttp
 import azure.functions as func
-from azure.cosmos import CosmosClient
-from azure.cosmos import exceptions as cosmos_exceptions
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
-from openai import AzureOpenAI
 
 # Load environment variables
 load_dotenv()
@@ -28,55 +22,15 @@ logger = logging.getLogger(__name__)
 # Suppress verbose Azure SDK logging
 logging.getLogger("azure").setLevel(logging.WARNING)
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
-logging.getLogger("azure.cosmos").setLevel(logging.WARNING)
-logging.getLogger("azure.identity").setLevel(logging.WARNING)
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # Configuration constants
 MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
 MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024
-DEFAULT_TIMEOUT_SECONDS = int(os.getenv("DEFAULT_TIMEOUT_SECONDS", "30"))
 AISEARCH_TIMEOUT_SECONDS = int(os.getenv("AISEARCH_TIMEOUT_SECONDS", "60"))
-HEALTH_CHECK_TIMEOUT_SECONDS = int(os.getenv("HEALTH_CHECK_TIMEOUT_SECONDS", "5"))
-COSMOS_RETRY_MAX_ATTEMPTS = int(os.getenv("COSMOS_RETRY_MAX_ATTEMPTS", "3"))
-COSMOS_RETRY_BASE_DELAY = float(os.getenv("COSMOS_RETRY_BASE_DELAY", "1.0"))
-RRF_WEIGHTS = [10, 1]  # Weights for full-text score and vector distance in RRF ranking
-
-# Module-level client cache (singleton pattern)
-_cosmos_clients: dict[str, CosmosClient] = {}
-_blob_service_clients: dict[str, BlobServiceClient] = {}
-_openai_clients: dict[str, AzureOpenAI] = {}
-_credential: DefaultAzureCredential = DefaultAzureCredential()
 
 
-def _get_cosmos_client(endpoint: str) -> CosmosClient:
-    """Get or create a cached Cosmos DB client."""
-    if endpoint not in _cosmos_clients:
-        _cosmos_clients[endpoint] = CosmosClient(url=endpoint, credential=_credential)
-        logger.info(f"Created new Cosmos DB client for endpoint: {endpoint[:30]}...")
-    return _cosmos_clients[endpoint]
-
-
-def _get_blob_service_client(account_url: str) -> BlobServiceClient:
-    """Get or create a cached Blob Service client."""
-    if account_url not in _blob_service_clients:
-        _blob_service_clients[account_url] = BlobServiceClient(
-            account_url=account_url, credential=_credential
-        )
-        logger.info(f"Created new Blob Service client for account: {account_url[:30]}...")
-    return _blob_service_clients[account_url]
-
-
-def _get_openai_client(azure_endpoint: str, api_key: str) -> AzureOpenAI:
-    """Get or create a cached OpenAI client."""
-    client_key = f"{azure_endpoint}:{api_key[:8]}"
-    if client_key not in _openai_clients:
-        _openai_clients[client_key] = AzureOpenAI(
-            azure_endpoint=azure_endpoint, api_key=api_key, api_version="2024-02-01"
-        )
-        logger.info(f"Created new OpenAI client for endpoint: {azure_endpoint[:30]}...")
-    return _openai_clients[client_key]
 
 
 def _generate_request_id() -> str:

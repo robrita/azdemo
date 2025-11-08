@@ -3,9 +3,5 @@
 # azure-monitor-opentelemetry
 
 aiohttp==3.13.2
-azure-cosmos==4.14.1
 azure-functions==1.24.0
-azure-identity==1.25.1
-azure-storage-blob==12.27.1
-openai==2.7.1
 python-dotenv==1.2.1
