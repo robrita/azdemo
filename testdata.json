@@ -1,13 +1,115 @@
 {
-  "search": [
-    "How do I configure Cosmos DB for vector search?",
-    "How do I configure Cosmos DB?",
-    "configure Cosmos DB for vector search"
+  "route": "compare_signatures",
+  "description": "Test data for signature comparison endpoint",
+  "required_files": [
+    "valid_id",
+    "specimen_signatures",
+    "selfie_with_id"
   ],
-  "entities": [
-    "Cosmos DB",
-    "vector search",
-    "configuration",
-    "embeddings"
+  "allowed_file_types": [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".pdf"
+  ],
+  "headers": {
+    "X-API-Key": "your-api-key-here",
+    "Content-Type": "multipart/form-data"
+  },
+  "expected_response": {
+    "request_id": "abc12345",
+    "specimen_signatures_count": 3,
+    "valid_id_signatures_count": 1,
+    "selfie_signatures_count": 1,
+    "specimen_internal_consistency": {
+      "similarity_matrix": [
+        [1.0, 0.89, 0.91],
+        [0.89, 1.0, 0.88],
+        [0.91, 0.88, 1.0]
+      ],
+      "average_similarity": 0.8933,
+      "status": "MATCH"
+    },
+    "specimen_vs_valid_id": {
+      "similarities": [0.87, 0.85, 0.86],
+      "average_similarity": 0.86,
+      "status": "MATCH"
+    },
+    "specimen_vs_selfie": {
+      "similarities": [0.82, 0.84, 0.83],
+      "average_similarity": 0.83,
+      "status": "MATCH"
+    },
+    "performance": {
+      "extraction_ms": 150.25,
+      "normalization_ms": 45.12,
+      "feature_extraction_ms": 230.67,
+      "similarity_ms": 15.89,
+      "total_ms": 450.34
+    }
+  },
+  "error_scenarios": {
+    "missing_files": {
+      "error": "Missing required files",
+      "message": "Please provide all required files: valid_id, specimen_signatures, selfie_with_id"
+    },
+    "invalid_file_type": {
+      "error": "Invalid file type",
+      "message": "valid_id must be one of: .png, .jpg, .jpeg, .pdf"
+    },
+    "insufficient_signatures": {
+      "error": "Insufficient specimen signatures",
+      "message": "Expected 3 specimen signatures, found only 2. Please ensure the image clearly shows 3 specimen signatures."
+    },
+    "image_loading_failed": {
+      "error": "Image loading failed",
+      "message": "Failed to load one or more uploaded images. Please check file format."
+    }
+  },
+  "test_scenarios": [
+    {
+      "name": "Valid comparison with all matching signatures",
+      "description": "All 3 specimen signatures match each other and match signatures in both valid_id and selfie_with_id",
+      "expected_status": "MATCH"
+    },
+    {
+      "name": "Inconsistent specimen signatures",
+      "description": "The 3 specimen signatures do not match each other internally",
+      "expected_internal_consistency_status": "MISMATCH"
+    },
+    {
+      "name": "Specimen signatures don't match valid ID",
+      "description": "Specimen signatures are consistent but don't match the valid_id signature",
+      "expected_valid_id_status": "MISMATCH"
+    },
+    {
+      "name": "Specimen signatures don't match selfie",
+      "description": "Specimen signatures are consistent but don't match the selfie_with_id signature",
+      "expected_selfie_status": "MISMATCH"
+    },
+    {
+      "name": "No signature found in valid ID",
+      "description": "Valid ID image doesn't contain any detectable signatures",
+      "expected_valid_id_status": "NO_SIGNATURE_FOUND"
+    },
+    {
+      "name": "No signature found in selfie",
+      "description": "Selfie image doesn't contain any detectable signatures",
+      "expected_selfie_status": "NO_SIGNATURE_FOUND"
+    }
+  ],
+  "similarity_thresholds": {
+    "specimen_internal_consistency": 0.85,
+    "specimen_vs_valid_id": 0.80,
+    "specimen_vs_selfie": 0.80
+  },
+  "notes": [
+    "The endpoint uses multipart/form-data encoding, not JSON",
+    "All three files are required in each request",
+    "The specimen_signatures file should contain exactly 3 visible signatures",
+    "Signature detection uses contour detection with area and aspect ratio filtering",
+    "Features are extracted using OpenCV HOG (Histogram of Oriented Gradients) and histogram features",
+    "Similarity is calculated using cosine similarity between feature vectors",
+    "No external API calls are made - all processing is done locally with OpenCV"
   ]
 }

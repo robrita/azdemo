@@ -550,6 +550,196 @@ async def health_check(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
+@app.route(route="query_aisearch", methods=["POST"])
+@require_api_key
+async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Azure AI Search query request initiated")
+
+    search_queries = None
+    try:
+        # Extract and validate Azure AI Search configuration using helper
+        aisearch_config = get_aisearch_config(req, request_id)
+        if isinstance(aisearch_config, func.HttpResponse):
+            return aisearch_config
+        search_endpoint, search_api_key, top, vector_fields = aisearch_config
+
+        # Get request body
+        req_body = req.get_json()
+        search_queries: list[str] | None = req_body.get("search")
+
+    except ValueError as e:
+        logger.error(f"[{request_id}] Invalid JSON in request body: {str(e)}")
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Invalid request body",
+                    "message": "Please provide valid JSON with a 'search' parameter",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+    except Exception as e:
+        logger.error(f"[{request_id}] Failed to parse request: {str(e)}")
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Initialization error",
+                    "message": "Failed to parse Azure AI Search request",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+    # Validate search parameter - expecting an array
+    if not isinstance(search_queries, list):
+        logger.warning(f"[{request_id}] Validation failed: search parameter is not a list/array")
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Validation error",
+                    "message": "'search' parameter must be an array of strings",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+
+    # Type narrowing: at this point, search_queries is list[str] after isinstance check
+    if len(search_queries) == 0:
+        logger.warning(f"[{request_id}] Validation failed: search array is empty")
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Validation error",
+                    "message": "'search' array must contain at least one query",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+
+    try:
+        logger.info(
+            f"[{request_id}] Processing {len(search_queries)} Azure AI Search queries in parallel"
+        )
+
+        # Execute all searches in parallel using asyncio
+        all_results: list[dict[str, Any]] = []
+        total_query_time = 0.0
+        query_details: list[dict[str, Any]] = []
+        failed_queries: list[dict[str, Any]] = []
+
+        # Create tasks for all search queries
+        tasks = [
+            _execute_aisearch_query(
+                search_text,
+                search_endpoint,
+                search_api_key,
+                top,
+                vector_fields,
+                request_id,
+            )
+            for search_text in search_queries
+        ]
+
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                failed_queries.append(
+                    {
+                        "query": search_queries[i],
+                        "error": str(result),
+                    }
+                )
+                logger.error(f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}")
+                continue
+
+            # Type guard: ensure result is a tuple with expected length
+            if isinstance(result, tuple) and len(result) == 3:
+                search_text_result, items_result, query_time_result = result
+                all_results.extend(items_result)
+                total_query_time += query_time_result
+                query_details.append(
+                    {
+                        "query": search_text_result,
+                        "result_count": len(items_result),
+                        "query_ms": round(query_time_result * 1000, 2),
+                    }
+                )
+
+        # Remove duplicates based on unique document identifier
+        # Azure AI Search typically uses '@search.score' and a document id field
+        seen: set[str] = set()
+        unique_results: list[dict[str, Any]] = []
+        for item in all_results:
+            # Try common id fields - adjust based on your index schema
+            doc_id = item.get("id") or item.get("@search.documentKey") or str(item)
+            if doc_id not in seen:
+                seen.add(doc_id)
+                unique_results.append(item)
+
+        total_time = time.time() - start_time
+
+        logger.info(
+            f"[{request_id}] Azure AI Search completed: {len(all_results)} total results, {len(unique_results)} unique results"
+        )
+
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "search_queries": search_queries,
+                    "vector_fields": vector_fields,
+                    "top": top,
+                    "results": unique_results,
+                    "total_results": len(all_results),
+                    "unique_results": len(unique_results),
+                    "duplicates_removed": len(all_results) - len(unique_results),
+                    "request_id": request_id,
+                    "query_details": query_details,
+                    "failed_queries": failed_queries,
+                    "queries_failed": len(failed_queries),
+                    "performance": {
+                        "total_query_ms": round(total_query_time * 1000, 2),
+                        "total_ms": round(total_time * 1000, 2),
+                        "queries_executed": len(search_queries),
+                        "queries_succeeded": len(query_details),
+                    },
+                }
+            ),
+            mimetype="application/json",
+            status_code=200,
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Azure AI Search operation failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "error": "Azure AI Search operation failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
 @app.route(route="compare_signatures", methods=["POST"])
 @require_api_key
 async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
@@ -781,196 +971,6 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
                 "message": str(e),
                 "request_id": request_id,
             }),
-            mimetype="application/json",
-            status_code=500,
-        )
-
-
-@app.route(route="query_aisearch", methods=["POST"])
-@require_api_key
-async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
-    request_id = _generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] Azure AI Search query request initiated")
-
-    search_queries = None
-    try:
-        # Extract and validate Azure AI Search configuration using helper
-        aisearch_config = get_aisearch_config(req, request_id)
-        if isinstance(aisearch_config, func.HttpResponse):
-            return aisearch_config
-        search_endpoint, search_api_key, top, vector_fields = aisearch_config
-
-        # Get request body
-        req_body = req.get_json()
-        search_queries: list[str] | None = req_body.get("search")
-
-    except ValueError as e:
-        logger.error(f"[{request_id}] Invalid JSON in request body: {str(e)}")
-        return func.HttpResponse(
-            json.dumps(
-                {
-                    "error": "Invalid request body",
-                    "message": "Please provide valid JSON with a 'search' parameter",
-                    "request_id": request_id,
-                }
-            ),
-            mimetype="application/json",
-            status_code=400,
-        )
-    except Exception as e:
-        logger.error(f"[{request_id}] Failed to parse request: {str(e)}")
-        return func.HttpResponse(
-            json.dumps(
-                {
-                    "error": "Initialization error",
-                    "message": "Failed to parse Azure AI Search request",
-                    "request_id": request_id,
-                }
-            ),
-            mimetype="application/json",
-            status_code=500,
-        )
-
-    # Validate search parameter - expecting an array
-    if not isinstance(search_queries, list):
-        logger.warning(f"[{request_id}] Validation failed: search parameter is not a list/array")
-        return func.HttpResponse(
-            json.dumps(
-                {
-                    "error": "Validation error",
-                    "message": "'search' parameter must be an array of strings",
-                    "request_id": request_id,
-                }
-            ),
-            mimetype="application/json",
-            status_code=400,
-        )
-
-    # Type narrowing: at this point, search_queries is list[str] after isinstance check
-    if len(search_queries) == 0:
-        logger.warning(f"[{request_id}] Validation failed: search array is empty")
-        return func.HttpResponse(
-            json.dumps(
-                {
-                    "error": "Validation error",
-                    "message": "'search' array must contain at least one query",
-                    "request_id": request_id,
-                }
-            ),
-            mimetype="application/json",
-            status_code=400,
-        )
-
-    try:
-        logger.info(
-            f"[{request_id}] Processing {len(search_queries)} Azure AI Search queries in parallel"
-        )
-
-        # Execute all searches in parallel using asyncio
-        all_results: list[dict[str, Any]] = []
-        total_query_time = 0.0
-        query_details: list[dict[str, Any]] = []
-        failed_queries: list[dict[str, Any]] = []
-
-        # Create tasks for all search queries
-        tasks = [
-            _execute_aisearch_query(
-                search_text,
-                search_endpoint,
-                search_api_key,
-                top,
-                vector_fields,
-                request_id,
-            )
-            for search_text in search_queries
-        ]
-
-        # Execute all tasks concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                failed_queries.append(
-                    {
-                        "query": search_queries[i],
-                        "error": str(result),
-                    }
-                )
-                logger.error(f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}")
-                continue
-
-            # Type guard: ensure result is a tuple with expected length
-            if isinstance(result, tuple) and len(result) == 3:
-                search_text_result, items_result, query_time_result = result
-                all_results.extend(items_result)
-                total_query_time += query_time_result
-                query_details.append(
-                    {
-                        "query": search_text_result,
-                        "result_count": len(items_result),
-                        "query_ms": round(query_time_result * 1000, 2),
-                    }
-                )
-
-        # Remove duplicates based on unique document identifier
-        # Azure AI Search typically uses '@search.score' and a document id field
-        seen: set[str] = set()
-        unique_results: list[dict[str, Any]] = []
-        for item in all_results:
-            # Try common id fields - adjust based on your index schema
-            doc_id = item.get("id") or item.get("@search.documentKey") or str(item)
-            if doc_id not in seen:
-                seen.add(doc_id)
-                unique_results.append(item)
-
-        total_time = time.time() - start_time
-
-        logger.info(
-            f"[{request_id}] Azure AI Search completed: {len(all_results)} total results, {len(unique_results)} unique results"
-        )
-
-        return func.HttpResponse(
-            body=json.dumps(
-                {
-                    "search_queries": search_queries,
-                    "vector_fields": vector_fields,
-                    "top": top,
-                    "results": unique_results,
-                    "total_results": len(all_results),
-                    "unique_results": len(unique_results),
-                    "duplicates_removed": len(all_results) - len(unique_results),
-                    "request_id": request_id,
-                    "query_details": query_details,
-                    "failed_queries": failed_queries,
-                    "queries_failed": len(failed_queries),
-                    "performance": {
-                        "total_query_ms": round(total_query_time * 1000, 2),
-                        "total_ms": round(total_time * 1000, 2),
-                        "queries_executed": len(search_queries),
-                        "queries_succeeded": len(query_details),
-                    },
-                }
-            ),
-            mimetype="application/json",
-            status_code=200,
-        )
-
-    except Exception as e:
-        total_time = time.time() - start_time
-        logger.error(
-            f"[{request_id}] Azure AI Search operation failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
-            exc_info=True,
-        )
-        return func.HttpResponse(
-            body=json.dumps(
-                {
-                    "error": "Azure AI Search operation failed",
-                    "message": str(e),
-                    "request_id": request_id,
-                }
-            ),
             mimetype="application/json",
             status_code=500,
         )
