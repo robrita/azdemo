@@ -11,8 +11,9 @@ from typing import Any, cast
 import aiohttp
 import azure.functions as func
 import cv2
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF  # type: ignore[import-untyped]
 import numpy as np
+import numpy.typing as npt
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -44,7 +45,7 @@ def _generate_request_id() -> str:
     return str(uuid.uuid4())[:8]
 
 
-def _load_image_from_bytes(image_bytes: bytes, filename: str) -> np.ndarray | None:
+def _load_image_from_bytes(image_bytes: bytes, filename: str) -> Any:
     """
     Load image from bytes, handling both regular images and PDFs.
 
@@ -60,14 +61,14 @@ def _load_image_from_bytes(image_bytes: bytes, filename: str) -> np.ndarray | No
     try:
         if file_ext == ".pdf":
             # Extract first page of PDF as image
-            pdf_document = fitz.open(stream=image_bytes, filetype="pdf")
+            pdf_document: Any = fitz.open(stream=image_bytes, filetype="pdf")
             if pdf_document.page_count == 0:
                 return None
 
             # Render first page to image (150 DPI)
-            page = pdf_document[0]
-            pix = page.get_pixmap(dpi=150)
-            img_bytes = pix.tobytes("png")
+            page: Any = pdf_document[0]
+            pix: Any = page.get_pixmap(dpi=150)
+            img_bytes: bytes = pix.tobytes("png")
 
             # Convert to numpy array
             nparr = np.frombuffer(img_bytes, np.uint8)
@@ -81,40 +82,42 @@ def _load_image_from_bytes(image_bytes: bytes, filename: str) -> np.ndarray | No
         return None
 
 
-def _extract_signatures(image: np.ndarray) -> list[np.ndarray]:
+def _extract_signatures(image: Any, debug_prefix: str = "") -> list[Any]:
     """
     Extract signature regions from an image using contour detection.
 
     Args:
         image: Input image as numpy array (OpenCV format)
+        debug_prefix: Optional prefix for saved debug images (e.g., "valid_id", "specimen")
 
     Returns:
         List of extracted signature images as numpy arrays
     """
     # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray: Any = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # type: ignore[assignment]
 
     # Apply Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    blurred: Any = cv2.GaussianBlur(gray, (5, 5), 0)  # type: ignore[arg-type]
 
     # Apply adaptive thresholding
-    thresh = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
+    thresh: Any = cv2.adaptiveThreshold(  # type: ignore[assignment]
+        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2  # type: ignore[arg-type]
     )
 
     # Find contours
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours_result: Any = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # type: ignore[arg-type]
+    contours: Any = contours_result[0]  # type: ignore[assignment]
 
     # Filter contours by area and aspect ratio (typical signature characteristics)
     min_area = 500
-    signatures = []
+    signatures: list[Any] = []
 
-    for contour in contours:
-        area = cv2.contourArea(contour)
+    for contour in contours:  # type: ignore[attr-defined]
+        area = cv2.contourArea(contour)  # type: ignore[arg-type]
         if area < min_area:
             continue
 
-        x, y, w, h = cv2.boundingRect(contour)
+        x, y, w, h = cv2.boundingRect(contour)  # type: ignore[arg-type]
         aspect_ratio = w / float(h) if h > 0 else 0
 
         # Signatures typically have aspect ratio between 1.5 and 5.0
@@ -131,38 +134,71 @@ def _extract_signatures(image: np.ndarray) -> list[np.ndarray]:
 
     # Sort by area (largest first) and return top 3
     signatures.sort(key=lambda s: s.shape[0] * s.shape[1], reverse=True)
-    return signatures[:3]
+    top_signatures = signatures[:3]
+
+    # Save extracted signatures for local debugging (only in local development)
+    enable_local = os.getenv("ENABLE_LOCAL", "false").lower() == "true"
+    if debug_prefix and enable_local:
+        try:
+            tmp_dir = "./tmp"
+            os.makedirs(tmp_dir, exist_ok=True)
+            timestamp = str(int(time.time() * 1000))
+            for idx, sig_img in enumerate(top_signatures):
+                filename = f"{tmp_dir}/{debug_prefix}_sig_{idx + 1}_{timestamp}.png"
+                cv2.imwrite(filename, sig_img)  # type: ignore[arg-type]
+                logger.debug(f"Saved debug signature: {filename}")
+        except Exception as e:
+            # Don't fail the request if debug saving fails
+            logger.warning(f"Failed to save debug signature: {str(e)}")
+
+    return top_signatures
 
 
-def _normalize_signature(signature: np.ndarray) -> np.ndarray:
+def _normalize_signature(signature: Any, debug_prefix: str = "", index: int = 0) -> Any:
     """
     Normalize a signature image for consistent comparison.
 
     Args:
         signature: Input signature image as numpy array
+        debug_prefix: Optional prefix for saved debug images (e.g., "valid_id", "specimen")
+        index: Index of the signature for unique naming
 
     Returns:
         Normalized signature image
     """
     # Resize to standard dimensions
-    normalized = cv2.resize(
+    normalized: Any = cv2.resize(  # type: ignore[assignment]
         signature, (SIGNATURE_NORMALIZED_WIDTH, SIGNATURE_NORMALIZED_HEIGHT)
     )
 
     # Convert to grayscale if needed
-    if len(normalized.shape) == 3:
-        normalized = cv2.cvtColor(normalized, cv2.COLOR_BGR2GRAY)
+    if len(normalized.shape) == 3:  # type: ignore[arg-type]  # type: ignore[arg-type]
+        normalized = cv2.cvtColor(normalized, cv2.COLOR_BGR2GRAY)  # type: ignore[arg-type,assignment]
 
     # Apply histogram equalization for consistent contrast
-    normalized = cv2.equalizeHist(normalized)
+    normalized = cv2.equalizeHist(normalized)  # type: ignore[arg-type,assignment]
 
     # Convert back to BGR for CLIP model (expects 3 channels)
-    normalized = cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)
+    normalized = cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)  # type: ignore[arg-type,assignment]
 
-    return normalized
+    # Save normalized signature for local debugging (only in local development)
+    enable_local = os.getenv("ENABLE_LOCAL", "false").lower() == "true"
+    if debug_prefix and enable_local:
+        try:
+            tmp_dir = "./tmp"
+            os.makedirs(tmp_dir, exist_ok=True)
+            timestamp = str(int(time.time() * 1000))
+            filename = f"{tmp_dir}/{debug_prefix}_normalized_{index}_{timestamp}.png"
+            cv2.imwrite(filename, normalized)  # type: ignore[arg-type]
+            logger.debug(f"Saved normalized signature: {filename}")
+        except Exception as e:
+            # Don't fail the request if debug saving fails
+            logger.warning(f"Failed to save normalized signature: {str(e)}")
+
+    return normalized  # type: ignore[return-value]
 
 
-def _extract_image_features(image: np.ndarray) -> list[float]:
+def _extract_image_features(image: Any) -> list[float]:
     """
     Extract feature vector from image using OpenCV.
     Uses HOG (Histogram of Oriented Gradients) and pixel intensity features.
@@ -174,29 +210,30 @@ def _extract_image_features(image: np.ndarray) -> list[float]:
         Feature vector as list of floats
     """
     # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+    gray: Any = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image  # type: ignore[assignment]
 
     # Calculate HOG features
-    win_size = (gray.shape[1] // 16 * 16, gray.shape[0] // 16 * 16)
-    if win_size[0] < 16 or win_size[1] < 16:
+    win_size = (gray.shape[1] // 16 * 16, gray.shape[0] // 16 * 16)  # type: ignore[attr-defined]
+    if win_size[0] < 16 or win_size[1] < 16:  # type: ignore[misc]
         win_size = (64, 64)
-        gray = cv2.resize(gray, win_size)
+        gray = cv2.resize(gray, win_size)  # type: ignore[assignment]
 
     hog = cv2.HOGDescriptor(
-        win_size,
+        win_size,  # type: ignore[arg-type]
         (16, 16),  # block size
         (8, 8),    # block stride
         (8, 8),    # cell size
         9          # number of bins
     )
-    hog_features = hog.compute(gray)
+    hog_features_raw: Any = hog.compute(gray)  # type: ignore[arg-type]
 
     # Flatten and normalize HOG features
-    hog_vector = hog_features.flatten()
+    hog_vector: npt.NDArray[np.floating[Any]] = np.array(hog_features_raw).flatten()
     hog_vector = hog_vector / (np.linalg.norm(hog_vector) + 1e-8)
 
     # Calculate histogram features (additional texture information)
-    hist = cv2.calcHist([gray], [0], None, [64], [0, 256])
+    hist_raw: Any = cv2.calcHist([gray], [0], None, [64], [0, 256])  # type: ignore[list-item]
+    hist: npt.NDArray[np.floating[Any]] = np.array(hist_raw)
     hist = hist.flatten()
     hist = hist / (np.sum(hist) + 1e-8)
 
@@ -762,7 +799,7 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         files = req.files
 
         # Validate required files
-        required_files = ["valid_id", "specimen_signatures", "selfie_with_id"]
+        required_files = ["valid_id", "specimen_signatures"]
         for file_key in required_files:
             if file_key not in files:
                 logger.warning(f"[{request_id}] Missing required file: {file_key}")
@@ -779,15 +816,19 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         # Load and validate files
         valid_id_file = files["valid_id"]
         specimen_file = files["specimen_signatures"]
-        selfie_file = files["selfie_with_id"]
+        selfie_file = files.get("selfie_with_id")
 
         # Validate file types
-        for file_obj, name in [
+        files_to_validate = [
             (valid_id_file, "valid_id"),
             (specimen_file, "specimen_signatures"),
-            (selfie_file, "selfie_with_id"),
-        ]:
-            file_ext = os.path.splitext(file_obj.filename.lower())[1]
+        ]
+        if selfie_file:
+            files_to_validate.append((selfie_file, "selfie_with_id"))
+        
+        for file_obj, name in files_to_validate:
+            filename = file_obj.filename or ""
+            file_ext = os.path.splitext(filename.lower())[1]
             if file_ext not in ALLOWED_FILE_TYPES:
                 logger.warning(f"[{request_id}] Invalid file type for {name}: {file_ext}")
                 return func.HttpResponse(
@@ -805,13 +846,13 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         # Load images
         valid_id_bytes = valid_id_file.read()
         specimen_bytes = specimen_file.read()
-        selfie_bytes = selfie_file.read()
+        selfie_bytes = selfie_file.read() if selfie_file else None
 
-        valid_id_img = _load_image_from_bytes(valid_id_bytes, valid_id_file.filename)
-        specimen_img = _load_image_from_bytes(specimen_bytes, specimen_file.filename)
-        selfie_img = _load_image_from_bytes(selfie_bytes, selfie_file.filename)
+        valid_id_img = _load_image_from_bytes(valid_id_bytes, valid_id_file.filename or "valid_id")
+        specimen_img = _load_image_from_bytes(specimen_bytes, specimen_file.filename or "specimen_signatures")
+        selfie_img = _load_image_from_bytes(selfie_bytes, selfie_file.filename or "selfie_with_id") if selfie_file and selfie_bytes else None
 
-        if valid_id_img is None or specimen_img is None or selfie_img is None:
+        if valid_id_img is None or specimen_img is None:
             logger.error(f"[{request_id}] Failed to load one or more images")
             return func.HttpResponse(
                 json.dumps({
@@ -827,9 +868,9 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         extraction_start = time.time()
         logger.info(f"[{request_id}] Extracting signatures from images")
 
-        valid_id_signatures = _extract_signatures(valid_id_img)
-        specimen_signatures = _extract_signatures(specimen_img)
-        selfie_signatures = _extract_signatures(selfie_img)
+        valid_id_signatures = _extract_signatures(valid_id_img, f"{request_id}_valid_id")
+        specimen_signatures = _extract_signatures(specimen_img, f"{request_id}_specimen")
+        selfie_signatures = _extract_signatures(selfie_img, f"{request_id}_selfie") if selfie_img is not None else []
 
         extraction_time = time.time() - extraction_start
 
@@ -855,15 +896,18 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         normalization_start = time.time()
         logger.info(f"[{request_id}] Normalizing signatures")
 
-        normalized_specimen = [_normalize_signature(sig) for sig in specimen_signatures[:3]]
-        normalized_valid_id = [_normalize_signature(sig) for sig in valid_id_signatures] if valid_id_signatures else []
-        normalized_selfie = [_normalize_signature(sig) for sig in selfie_signatures] if selfie_signatures else []
+        normalized_specimen = [_normalize_signature(sig, f"{request_id}_specimen", i) for i, sig in enumerate(specimen_signatures[:3])]
+        normalized_valid_id = [_normalize_signature(sig, f"{request_id}_valid_id", i) for i, sig in enumerate(valid_id_signatures)] if valid_id_signatures else []
+        normalized_selfie = [_normalize_signature(sig, f"{request_id}_selfie", i) for i, sig in enumerate(selfie_signatures)] if selfie_signatures else []
 
         normalization_time = time.time() - normalization_start
 
         # Extract features from all signatures (using OpenCV - no external API needed)
         feature_start = time.time()
         logger.info(f"[{request_id}] Extracting image features")
+        # # this is for debugging purposes only
+        # if normalized_valid_id:
+        #     raise Exception("this is for debugging purposes only")
 
         # Extract features using OpenCV (runs locally, no API calls)
         specimen_features = [_extract_image_features(sig) for sig in normalized_specimen]
@@ -877,9 +921,9 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         logger.info(f"[{request_id}] Calculating similarity scores")
 
         # 1. Check if specimen signatures match each other
-        specimen_similarity_matrix = []
+        specimen_similarity_matrix: list[list[float]] = []
         for i in range(3):
-            row = []
+            row: list[float] = []
             for j in range(3):
                 if i == j:
                     row.append(1.0)
@@ -896,7 +940,7 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         ) / 3
 
         # 2. Compare specimen signatures against valid ID signature(s)
-        valid_id_similarities = []
+        valid_id_similarities: list[float] = []
         if valid_id_features:
             for spec_feat in specimen_features:
                 best_match = max(
@@ -905,7 +949,7 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
                 valid_id_similarities.append(round(best_match, 4))
 
         # 3. Compare specimen signatures against selfie signature(s)
-        selfie_similarities = []
+        selfie_similarities: list[float] = []
         if selfie_features:
             for spec_feat in specimen_features:
                 best_match = max(
@@ -917,7 +961,7 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         total_time = time.time() - start_time
 
         # Prepare response
-        result = {
+        result: dict[str, Any] = {
             "request_id": request_id,
             "specimen_signatures_count": 3,
             "valid_id_signatures_count": len(valid_id_signatures),

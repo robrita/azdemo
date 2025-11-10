@@ -176,6 +176,9 @@ API_KEY=your-api-key-here
 # Performance Tuning
 MAX_REQUEST_SIZE_MB=10                 # Default: 10
 AISEARCH_TIMEOUT_SECONDS=60            # Default: 60
+
+# Local Development
+ENABLE_LOCAL=true                      # Default: false (enables local-only features)
 ```
 
 ### Authentication & Authorization
@@ -196,16 +199,41 @@ Service connection details (endpoints, API keys) are provided as **query paramet
 
 ### Prerequisites
 
-- **Python 3.11+**
-- **Azure Functions Core Tools** ([Install](https://learn.microsoft.com/azure/azure-functions/functions-run-local))
+- **Python 3.10 or 3.11** (Python 3.12+ requires Azure Functions Core Tools v4.0.6464+)
+- **Azure Functions Core Tools v4** ([Install/Update](https://learn.microsoft.com/azure/azure-functions/functions-run-local))
 - **uv** (recommended) or pip
+
+**Important**: 
+- Azure Functions now supports Python 3.10-3.13 (GA), but your Core Tools version determines which Python versions work
+- If using Core Tools v4.0.6280 or earlier, use Python 3.11
+- For Python 3.12+, update Core Tools to v4.0.6464 or later:
+  ```bash
+  # Windows (using npm)
+  npm install -g azure-functions-core-tools@4 --unsafe-perm true
+  
+  # Or download latest MSI installer:
+  # https://go.microsoft.com/fwlink/?linkid=2174087
+  ```
 
 ### Setup
 
 ```bash
+# Create and activate virtual environment
+# Using uv (recommended):
+uv venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# Linux/Mac: source .venv/bin/activate
+
+# Or using standard venv:
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# Linux/Mac: source .venv/bin/activate
+
 # Install dependencies
-uv venv && uv sync
-# or: pip install -r requirements.txt
+# Using uv:
+uv sync
+# Or using pip:
+pip install -r requirements.txt
 
 # Configure API key
 echo 'API_KEY=your-api-key' > .env
@@ -243,6 +271,30 @@ curl -X POST "http://localhost:7071/api/query_aisearch?search_endpoint=https://y
 - Create a `testdata/` directory
 - Add sample images: `valid_id.jpg`, `specimen_signatures.jpg`, `selfie_with_id.jpg`
 - Supported formats: PNG, JPG, JPEG, PDF
+
+### Local Debugging
+
+For local development, you can enable local-only features by setting `ENABLE_LOCAL=true` in your `.env` file. When enabled, extracted signature images are automatically saved to `./tmp/` directory for debugging and verification purposes. 
+
+Each extracted signature is saved with:
+- Prefix indicating source image (`valid_id`, `specimen`, `selfie`)
+- Request ID for tracking
+- Signature index (1, 2, 3)
+- Timestamp in milliseconds
+
+Example filenames:
+```
+./tmp/abc12345_valid_id_sig_1_1699632000123.png
+./tmp/abc12345_specimen_sig_1_1699632000123.png
+./tmp/abc12345_specimen_sig_2_1699632000123.png
+./tmp/abc12345_specimen_sig_3_1699632000123.png
+./tmp/abc12345_selfie_sig_1_1699632000123.png
+```
+
+**Important**: 
+- Local features are disabled by default (`ENABLE_LOCAL=false`)
+- This should only be enabled in local development
+- Do not enable in Azure Functions production environment to avoid file system operations
 
 ### Common Commands
 
