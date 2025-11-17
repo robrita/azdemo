@@ -262,7 +262,11 @@ Content-Type: application/json
 ### Compare Signatures - Complete Valid Request
 # Note: You need to replace the file paths with actual image files
 # Files should be: valid_id.jpg, specimen_signatures.jpg, selfie_with_id.jpg
-# All processing done locally with OpenCV - no external API calls
+#
+# Signature Extraction:
+# - If AZURE_DI_ENDPOINT and AZURE_DI_KEY are configured, uses Azure Document Intelligence
+# - Otherwise, falls back to OpenCV contour detection
+# - Feature extraction and comparison always done locally (no external API calls)
 POST {{baseUrl}}/compare_signatures
 X-API-Key: {{apiKey}}
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
@@ -424,5 +428,262 @@ Content-Type: image/jpeg
 
 < ./testdata/valid_id.jpg
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Crop Signature - Basic Request (Valid ID)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - JPG Image
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id.jpg",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - Custom Padding (10%)
+POST {{baseUrl}}/gpt_crop?padding=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - No Padding (0%)
+POST {{baseUrl}}/gpt_crop?padding=0
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - Custom Model
+POST {{baseUrl}}/gpt_crop?model=gpt-4o
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - All Parameters
+POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=8
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - With OpenCV Post-Processing (Grayscale + Sharpen + Upscale 2x)
+POST {{baseUrl}}/gpt_crop?opencv_process=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - OpenCV Processing + Custom Padding
+POST {{baseUrl}}/gpt_crop?opencv_process=true&padding=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - OpenCV Processing + All Parameters
+POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=8&opencv_process=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - Missing Filename (Error Case)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - Missing Content (Error Case)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png"
+}
+
+### Crop Signature - Empty Request Body (Error Case)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
+
+### Crop Signature - Invalid JSON (Error Case)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{invalid json}
+
+### Crop Signature - Invalid Base64 Content (Error Case)
+POST {{baseUrl}}/gpt_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "not-valid-base64!!!"
+}
+
+### Crop Signature - Invalid Padding Value (Error Case)
+POST {{baseUrl}}/gpt_crop?padding=invalid
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Crop Signature - No Authentication (Error Case)
+POST {{baseUrl}}/gpt_crop
+Content-Type: application/json
+
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS..."
+Content-Disposition: form-data; name="image"; filename="document.txt"
+Content-Type: text/plain
+
+This is not an image file.
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### ============================================
+### Signature Compare Forward Endpoint
+### ============================================
+
+### Sig Compare - Basic Request
+POST {{baseUrl}}/sig_compare?forward_endpoint=https://your-target-endpoint.com/api/compare
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id1.png"
+Content-Type: image/png
+
+< ./testdata/valid-id/testing/valid_id1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen1.png"
+Content-Type: image/png
+
+< ./testdata/specimen/testing/specimen1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Sig Compare - Missing Required File (Error Case)
+POST {{baseUrl}}/sig_compare?forward_endpoint=https://your-target-endpoint.com/api/compare
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id1.png"
+Content-Type: image/png
+
+< ./testdata/valid-id/testing/valid_id1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Sig Compare - Missing forward_endpoint Parameter (Error Case)
+POST {{baseUrl}}/sig_compare
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id1.png"
+Content-Type: image/png
+
+< ./testdata/valid-id/testing/valid_id1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen1.png"
+Content-Type: image/png
+
+< ./testdata/specimen/testing/specimen1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Sig Compare - Invalid URL Format (Error Case)
+POST {{baseUrl}}/sig_compare?forward_endpoint=not-a-valid-url
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id1.png"
+Content-Type: image/png
+
+< ./testdata/valid-id/testing/valid_id1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen1.png"
+Content-Type: image/png
+
+< ./testdata/specimen/testing/specimen1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Sig Compare - No Authentication (Error Case)
+POST {{baseUrl}}/sig_compare?forward_endpoint=https://your-target-endpoint.com/api/compare
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="valid_id1.png"
+Content-Type: image/png
+
+< ./testdata/valid-id/testing/valid_id1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen1.png"
+Content-Type: image/png
+
+< ./testdata/specimen/testing/specimen1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Sig Compare - Invalid File Type (Error Case)
+POST {{baseUrl}}/sig_compare?forward_endpoint=https://your-target-endpoint.com/api/compare
+X-API-Key: {{apiKey}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="valid_id"; filename="document.txt"
+Content-Type: text/plain
+
+This is not an image file.
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="specimen_signatures"; filename="specimen1.png"
+Content-Type: image/png
+
+< ./testdata/specimen/testing/specimen1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
 
 

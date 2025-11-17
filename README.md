@@ -6,6 +6,7 @@ Azure Function App providing REST API access to Azure AI Search with hybrid vect
 
 - **AI Search Integration**: Hybrid queries with text and vector fields
 - **Signature Comparison**: Automated signature verification using OpenCV and OpenAI CLIP embeddings
+- **Signature Extraction & Enhancement**: AI-powered signature detection with optional OpenCV post-processing (grayscale, sharpen, 2x upscale)
 - **Parallel Execution**: Batch operations execute concurrently using async/await
 - **Multi-Format Support**: Handles PNG, JPG, JPEG, and PDF files
 - **API Key Authentication**: Secure endpoints with X-API-Key header (query param fallback)
@@ -18,22 +19,27 @@ All endpoints require authentication via `X-API-Key` header (or `api_key` query 
 ### Signature Comparison Operations
 
 #### `POST /api/compare_signatures`
+
 Compare signatures between specimen signatures, valid ID, and selfie with ID using computer vision feature extraction.
 
 **Use Case**: Verify identity documents by comparing signatures from:
+
 1. **Specimen signatures** (3 signatures on ID) - Source of truth
 2. **Valid ID signature** - Compare against specimens
 3. **Selfie with ID signature** - Compare against specimens
 
-**Headers**: 
+**Headers**:
+
 - `X-API-Key`: API key for authentication (required)
 
 **Request Body** (multipart/form-data):
+
 - `valid_id`: Image file of valid ID (front) - PNG, JPG, JPEG, or PDF
 - `specimen_signatures`: Image file with 3 specimen signatures - PNG, JPG, JPEG, or PDF
 - `selfie_with_id`: Selfie photo holding valid ID - PNG, JPG, JPEG, or PDF
 
 **Response**:
+
 ```json
 {
   "request_id": "abc12345",
@@ -51,12 +57,12 @@ Compare signatures between specimen signatures, valid ID, and selfie with ID usi
   },
   "specimen_vs_valid_id": {
     "similarities": [0.88, 0.87, 0.86],
-    "average_similarity": 0.8700,
+    "average_similarity": 0.87,
     "status": "MATCH"
   },
   "specimen_vs_selfie": {
     "similarities": [0.85, 0.84, 0.83],
-    "average_similarity": 0.8400,
+    "average_similarity": 0.84,
     "status": "MATCH"
   },
   "performance": {
@@ -70,48 +76,291 @@ Compare signatures between specimen signatures, valid ID, and selfie with ID usi
 ```
 
 **Similarity Thresholds**:
+
 - **Specimen Internal Consistency**: ≥0.85 = MATCH (all 3 specimen signatures should match)
 - **Specimen vs Valid ID**: ≥0.80 = MATCH
 - **Specimen vs Selfie**: ≥0.80 = MATCH
 
 **Status Values**:
+
 - `MATCH`: Signatures match (confidence score above threshold)
 - `MISMATCH`: Signatures do not match (confidence score below threshold)
 - `NO_SIGNATURE_FOUND`: No signature detected in the image
 
+**Signature Extraction Methods**:
+The function supports two signature extraction methods:
+
+1. **Azure Document Intelligence (Optional)** - AI-powered signature detection:
+
+   - Uses custom neural models or prebuilt-layout model to detect signature regions
+   - More accurate for complex documents and various signature styles
+   - Requires Azure Document Intelligence endpoint and key (configured via environment variables)
+   - Automatically falls back to OpenCV if not configured or if extraction fails
+
+2. **OpenCV Contour Detection (Default)** - Traditional computer vision:
+   - Uses adaptive thresholding and contour analysis
+   - No external dependencies or API calls required
+   - Works well for clean signatures with good contrast
+
 **Important Notes**:
-1. The function automatically extracts signatures from images using contour detection
+
+1. Signatures are automatically extracted using Document Intelligence (if configured) or OpenCV contour detection
 2. All signatures are normalized to 300x150 pixels for consistent comparison
 3. Features are extracted using HOG (Histogram of Oriented Gradients) and histogram analysis - **no external API calls required**
 4. Cosine similarity is used to calculate confidence scores (0.0 to 1.0)
 5. At least 3 specimen signatures must be detected from the specimen_signatures image
-6. All processing is done locally using OpenCV - no cloud API dependencies
+6. Feature extraction and comparison are done locally using OpenCV - no cloud API dependencies
+
+#### `POST /api/gpt_crop`
+
+Extract and crop handwritten signature from an image using Azure OpenAI Vision API (GPT-4.1).
+
+**Use Case**: Automatically detect and extract signature regions from documents, ID cards, or contracts. Returns the cropped signature as a base64-encoded PNG for further processing or storage.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Query Parameters** (all optional):
+
+- `model`: Azure OpenAI model deployment name (default: from `AZURE_OPENAI_MODEL` env var, typically `gpt-4.1`)
+- `padding`: Additional padding around signature in percent (0-50, default: 5.0)
+- `opencv_process`: Enable OpenCV post-processing (`true` or `false`, default: `false`)
+  - When enabled, applies grayscale conversion, sharpening (unsharp masking), and 2x upscaling using LapSRN
+  - Output image will be grayscale, clearer (not blurred), and 2x larger
+  - Useful for improving low-quality or blurry signature images
+
+**Request Body** (application/json):
+
+```json
+{
+  "filename": "valid_id1.png",
+  "content": "iVBORw0KGgoAAAANS...base64_encoded_image_data..."
+}
+```
+
+- `filename` (required): Name of the image file
+- `content` (required): Base64-encoded image content (PNG, JPG, JPEG formats supported)
+
+**Response** (Success - 200):
+
+```json
+{
+  "cropped_signature": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_png_data...",
+  "signature_info": {
+    "id": 1,
+    "location_description": "bottom right corner, on signature line",
+    "bounding_box": {
+      "x": 65.5,
+      "y": 78.2,
+      "width": 25.3,
+      "height": 8.5
+    },
+    "confidence": "High",
+    "characteristics": "cursive script in blue ink with underline flourish",
+    "is_owner_signature": true
+  },
+  "signatures_found": 2,
+  "owner_signatures_found": 1,
+  "model_used": "gpt-4.1",
+  "opencv_processing": false,
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 2150.45,
+    "crop_ms": 12.34,
+    "total_ms": 2162.79
+  }
+}
+```
+
+**Response** (No Signatures Found - 404):
+
+```json
+{
+  "error": "No signatures found",
+  "message": "No handwritten signatures were detected in the image",
+  "analysis_notes": "Document appears to be a printed form with no handwritten elements",
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 2100.12,
+    "total_ms": 2100.12
+  }
+}
+```
+
+**Response** (No Owner Signatures Found - 404):
+
+```json
+{
+  "error": "No owner signatures found",
+  "message": "Found 2 signature(s), but none were identified as owner signatures. All detected signatures appear to be from witnesses, chairmen, or other third parties.",
+  "signatures_found": 2,
+  "owner_signatures_found": 0,
+  "analysis_notes": "Detected signatures from 'Witness' and 'Chairman' fields",
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 2150.34,
+    "total_ms": 2150.34
+  }
+}
+```
+
+**Response** (Specific Signature Not Found - 404):
+
+```json
+{
+  "error": "Signature not found",
+  "message": "Signature ID 3 not found in owner signatures. Only 2 owner signature(s) were detected.",
+  "signatures_found": 3,
+  "owner_signatures_found": 2,
+  "available_owner_ids": [1, 2],
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 2200.34,
+    "total_ms": 2200.34
+  }
+}
+```
+
+**Signature Detection Logic**:
+
+- Azure OpenAI Vision API analyzes the image to detect handwritten signatures
+- Returns bounding box coordinates as percentages of image dimensions
+- Distinguishes between owner signatures and third-party signatures (witness, chairman, etc.)
+- By default, extracts the first owner signature (typically the primary signer)
+- Use `signature_id` parameter to extract a specific signature if multiple are found
+
+#### `POST /api/sig_compare`
+
+Forward signature images to another endpoint for comparison processing. This endpoint acts as a proxy, capturing multipart form data files, encoding them as base64, and forwarding them to a target API endpoint **asynchronously** (fire-and-forget pattern).
+
+**Use Case**: Integration with external signature comparison services or custom processing pipelines that expect base64-encoded image data. Returns immediately without waiting for the target endpoint to respond.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Query Parameters**:
+
+- `forward_endpoint` (required): Target endpoint URL to forward the files to (must be a valid HTTP/HTTPS URL)
+
+**Request Body** (multipart/form-data):
+
+- `valid_id`: Image file of valid ID (front) - PNG, JPG, JPEG, or PDF (required)
+- `specimen_signatures`: Image file with specimen signatures - PNG, JPG, JPEG, or PDF (required)
+
+**Response** (Accepted - 202):
+
+```json
+{
+  "status": "accepted",
+  "request_id": "abc12345",
+  "forward_endpoint": "https://your-target-endpoint.com/api/compare",
+  "files_forwarded": {
+    "valid_id": {
+      "filename": "valid_id1.png",
+      "size_bytes": 125430
+    },
+    "specimen_signatures": {
+      "filename": "specimen1.png",
+      "size_bytes": 98765
+    }
+  },
+  "message": "Files accepted and forwarding initiated in background",
+  "performance": {
+    "read_ms": 12.34,
+    "total_ms": 25.67
+  }
+}
+```
+
+**Forwarded Payload Format**:
+
+The endpoint sends a JSON POST request to the `forward_endpoint` with the following structure:
+
+```json
+{
+  "valid_id": {
+    "filename": "valid_id1.png",
+    "content": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_content...",
+    "size_bytes": 125430
+  },
+  "specimen_signatures": {
+    "filename": "specimen1.png",
+    "content": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_content...",
+    "size_bytes": 98765
+  },
+  "request_id": "abc12345"
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request**: Missing required files, invalid file types, or missing `forward_endpoint` parameter
+- **500 Internal Server Error**: Server-side processing error
+
+**Important Notes**:
+
+1. **Asynchronous Processing**: Returns immediately (HTTP 202 Accepted) without waiting for the target endpoint's response
+2. **Fire-and-Forget Pattern**: The forward request runs in the background - success/failure is logged but not returned to the client
+3. Both `valid_id` and `specimen_signatures` files are required
+4. Files are converted to base64 strings before forwarding
+5. Forward request timeout is 120 seconds (2 minutes) for the background task
+6. All file validation (type, size) happens before accepting the request
+7. Uses `aiohttp` for async HTTP requests to the target endpoint
+8. Use the `request_id` to correlate requests with server logs for debugging
+
+**Bounding Box Format**:
+
+- `x`: Left edge position (percentage, 0-100)
+- `y`: Top edge position (percentage, 0-100)
+- `width`: Box width (percentage, 0-100)
+- `height`: Box height (percentage, 0-100)
+- Additional padding is applied based on the `padding` parameter
+
+**Configuration Requirements**:
+
+- Requires Azure OpenAI with vision-capable model (e.g., GPT-4.1, GPT-4o)
+- Set `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, and `AZURE_OPENAI_API_VERSION` environment variables
+- See Configuration section below for details
+
+**Important Notes**:
+
+1. Uses Azure OpenAI Vision API for signature detection (cloud-based, requires API key)
+2. Returns cropped signature as base64-encoded PNG string
+3. All processing is serverless-compatible (in-memory only, no file system writes)
+4. **Only processes owner signatures** - filters out witness, chairman, and other third-party signatures
+5. Supports multiple owner signatures - specify `signature_id` to choose which one to extract
+6. Automatically identifies owner vs non-owner signatures based on labels and document context
+7. Padding parameter adds extra space around the detected signature (useful for downstream processing)
 
 ### AI Search Operations
 
 #### `POST /api/query_aisearch`
+
 Hybrid text + vector search using Azure AI Search.
 
-**Query Parameters**: 
+**Query Parameters**:
+
 - `search_endpoint`: Azure AI Search endpoint URL (required)
 - `top`: Number of results to return (default: 10)
 - `vector_fields`: Comma-separated list of vector field names (required)
 
-**Headers**: 
+**Headers**:
+
 - `X-API-Key`: API key for authentication (required)
 - `X-Search-Key`: Azure AI Search API key (or use `search_api_key` query param)
 
 **Request Body**:
+
 ```json
 {
-  "search": [
-    "query1",
-    "query2"
-  ]
+  "search": ["query1", "query2"]
 }
 ```
 
 **Response**:
+
 ```json
 {
   "search_queries": ["query1", "query2"],
@@ -143,11 +392,13 @@ Hybrid text + vector search using Azure AI Search.
 ### Health Check
 
 #### `GET /api/health`
+
 Service health status.
 
 **Note**: This endpoint does NOT require authentication for monitoring purposes.
 
-**Response**: 
+**Response**:
+
 - `200` (healthy)
 
 ```json
@@ -177,8 +428,26 @@ API_KEY=your-api-key-here
 MAX_REQUEST_SIZE_MB=10                 # Default: 10
 AISEARCH_TIMEOUT_SECONDS=60            # Default: 60
 
-# Local Development
-ENABLE_LOCAL=true                      # Default: false (enables local-only features)
+# Azure Document Intelligence (Optional)
+# If provided, signature extraction will use AI-powered detection
+# If not provided, falls back to traditional OpenCV contour detection
+AZURE_DI_ENDPOINT=https://your-di-instance.cognitiveservices.azure.com/
+AZURE_DI_KEY=your-document-intelligence-key
+AZURE_DI_MODEL_ID=prebuilt-layout      # Default: prebuilt-layout (or use custom model ID)
+
+# Azure OpenAI (Required for /crop_signature endpoint)
+# Vision-capable model required (e.g., GPT-4.1, GPT-4o)
+AZURE_OPENAI_API_KEY=your-openai-api-key
+AZURE_OPENAI_ENDPOINT=https://your-openai-instance.openai.azure.com/
+AZURE_OPENAI_API_VERSION=2024-12-01-preview  # Default: 2024-12-01-preview
+AZURE_OPENAI_MODEL=gpt-4.1                   # Default: gpt-4.1 (must support vision)
+
+# OpenCV Post-Processing (Required for opencv_process=true in /gpt_crop)
+LAPSRN_MODEL_PATH=notebook/LapSRN_x2.pb      # Default: notebook/LapSRN_x2.pb
+                                              # Download from: https://github.com/opencv/opencv_contrib/tree/master/modules/dnn_superres
+
+# Debug/Development
+SAVE_CROPS=true                        # Default: false (saves cropped signatures to ./tmp/)
 ```
 
 ### Authentication & Authorization
@@ -203,14 +472,16 @@ Service connection details (endpoints, API keys) are provided as **query paramet
 - **Azure Functions Core Tools v4** ([Install/Update](https://learn.microsoft.com/azure/azure-functions/functions-run-local))
 - **uv** (recommended) or pip
 
-**Important**: 
+**Important**:
+
 - Azure Functions now supports Python 3.10-3.13 (GA), but your Core Tools version determines which Python versions work
 - If using Core Tools v4.0.6280 or earlier, use Python 3.11
 - For Python 3.12+, update Core Tools to v4.0.6464 or later:
+
   ```bash
   # Windows (using npm)
   npm install -g azure-functions-core-tools@4 --unsafe-perm true
-  
+
   # Or download latest MSI installer:
   # https://go.microsoft.com/fwlink/?linkid=2174087
   ```
@@ -265,24 +536,39 @@ curl -X POST "http://localhost:7071/api/query_aisearch?search_endpoint=https://y
   -H "X-Search-Key: your-search-key" \
   -H "Content-Type: application/json" \
   -d '{"search": ["azure functions best practices"]}'
+
+# Crop signature from image (Azure OpenAI Vision-based extraction)
+curl -X POST "http://localhost:7071/api/gpt_crop?padding=5" \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "valid_id.jpg", "content": "iVBORw0KGgoAAAANS..."}'
+
+# Crop signature with OpenCV post-processing (grayscale, sharpen, upscale 2x)
+curl -X POST "http://localhost:7071/api/gpt_crop?opencv_process=true&padding=10" \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "valid_id.jpg", "content": "iVBORw0KGgoAAAANS..."}'
 ```
 
 **Note**: For signature comparison testing, you'll need to prepare test images:
+
 - Create a `testdata/` directory
 - Add sample images: `valid_id.jpg`, `specimen_signatures.jpg`, `selfie_with_id.jpg`
 - Supported formats: PNG, JPG, JPEG, PDF
 
 ### Local Debugging
 
-For local development, you can enable local-only features by setting `ENABLE_LOCAL=true` in your `.env` file. When enabled, extracted signature images are automatically saved to `./tmp/` directory for debugging and verification purposes. 
+For development and debugging, you can enable saving of cropped signature images by setting `SAVE_CROPS=true` in your `.env` file. When enabled, extracted signature images are automatically saved to `./tmp/` directory for verification purposes.
 
 Each extracted signature is saved with:
+
 - Prefix indicating source image (`valid_id`, `specimen`, `selfie`)
 - Request ID for tracking
 - Signature index (1, 2, 3)
 - Timestamp in milliseconds
 
 Example filenames:
+
 ```
 ./tmp/abc12345_valid_id_sig_1_1699632000123.png
 ./tmp/abc12345_specimen_sig_1_1699632000123.png
@@ -291,8 +577,9 @@ Example filenames:
 ./tmp/abc12345_selfie_sig_1_1699632000123.png
 ```
 
-**Important**: 
-- Local features are disabled by default (`ENABLE_LOCAL=false`)
+**Important**:
+
+- Crop saving is disabled by default (`SAVE_CROPS=false`)
 - This should only be enabled in local development
 - Do not enable in Azure Functions production environment to avoid file system operations
 

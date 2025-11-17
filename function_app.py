@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import io
 import json
 import logging
 import os
@@ -14,7 +16,11 @@ import cv2
 import fitz  # PyMuPDF  # type: ignore[import-untyped]
 import numpy as np
 import numpy.typing as npt
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
+from openai import AzureOpenAI
+from PIL import Image
 
 # Load environment variables
 load_dotenv()
@@ -39,60 +45,723 @@ SIGNATURE_NORMALIZED_WIDTH = 300
 SIGNATURE_NORMALIZED_HEIGHT = 150
 ALLOWED_FILE_TYPES = {".png", ".jpg", ".jpeg", ".pdf"}
 
+# Azure Document Intelligence configuration (optional)
+AZURE_DI_ENDPOINT = os.getenv("AZURE_DI_ENDPOINT")
+AZURE_DI_KEY = os.getenv("AZURE_DI_KEY")
+AZURE_DI_MODEL_ID = os.getenv("AZURE_DI_MODEL_ID", "prebuilt-layout")
+PDF_RENDER_DPI = 200  # DPI for PDF rendering
+PADDING_PIXELS = 4  # Extra padding around crop
+
+# Azure OpenAI configuration (for vision-based signature extraction)
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+AZURE_OPENAI_MODEL = os.getenv("AZURE_OPENAI_MODEL", "gpt-4.1")
+
+# OpenCV post-processing configuration
+LAPSRN_MODEL_PATH = os.getenv("LAPSRN_MODEL_PATH", "./LapSRN_x2.pb")
+
+# Signature extraction prompt for Azure OpenAI Vision API - No Center
+SIGNATURE_EXTRACTION_PROMPT_NOCENTER = """
+You are an expert computer vision assistant specializing in document analysis and signature detection. Your task is to identify and locate handwritten signatures within images.
+
+## Task
+Analyze the provided image and identify all handwritten signatures present. A signature is a person's name written in a distinctive, personalized handwriting style, typically used for authentication or authorization purposes.
+
+## Instructions
+
+1. **Carefully examine the entire image** for handwritten signatures
+2. **Distinguish signatures from other handwritten text** - signatures typically have:
+   - A more stylized, flowing, or cursive appearance
+   - Personal flourishes or unique characteristics
+   - Different ink color or pen pressure than printed text
+   - Placement in typical signature locations (bottom of documents, signature lines, etc.)
+
+3. **For each signature found**, provide:
+   - **Location**: Describe where in the image the signature appears (e.g., "bottom right corner", "below the printed text", "on the signature line")
+   - **Bounding box coordinates**: Estimated x, y, width, height as percentages of image dimensions
+   - **Confidence level**: High, Medium, or Low
+   - **Characteristics**: Brief description of the signature's appearance (e.g., "cursive script in blue ink", "printed signature in black")
+   - **Legibility**: Whether the signature is legible enough to read the name
+   - **Is owner signature**: Boolean indicating if this signature is by the owner/cardholder of the document
+     - Set to `true` if the signature appears to be from the document owner, cardholder, Licensee, or primary subject
+     - Set to `false` ONLY if there is clear evidence the signature is from an authorized representative, chairman, witness, guarantor, or other third party
+     - Look for explicit labels ("Chairman", "Witness", "Authorized Signatory", "Guardian", etc.)
+     - **Default to `true` when ownership is ambiguous or unclear**
+
+4. **Exclude the following**:
+   - Printed signatures or typed names
+   - Initials alone (unless clearly part of a signature)
+   - Random handwritten notes that are not signatures
+   - Stamps or seal impressions (unless they contain a handwritten component)
+
+## Output Format
+
+Provide your response in the following JSON structure:
+
+```json
+{
+  "signatures_found": <number>,
+  "signatures": [
+    {
+      "id": 1,
+      "location_description": "<descriptive location>",
+      "bounding_box": {
+        "x": <percentage>,
+        "y": <percentage>,
+        "width": <percentage>,
+        "height": <percentage>
+      },
+      "confidence": "<High|Medium|Low>",
+      "characteristics": "<description>",
+      "legible": <true|false>,
+      "estimated_name": "<name if legible, otherwise null>",
+      "is_owner_signature": <true|false>
+    }
+  ],
+  "analysis_notes": "<any additional observations or challenges>"
+}
+```
+
+## Examples of What to Look For
+
+**Typical Signature Characteristics:**
+- Flowing, connected cursive writing
+- Underlines or flourishes beneath the name
+- Rapid, confident strokes
+- May be partially illegible due to speed of writing
+- Often appears on designated signature lines
+- May include date nearby
+
+**Common Locations:**
+- Bottom of contracts or forms
+- Next to "Signature:" or "Signed by:" labels
+- On signature lines (indicated by "___________")
+- In signature blocks with printed name underneath
+- On checks, receipts, or official documents
+
+**Owner vs Non-Owner Signatures:**
+- **Owner signatures** typically appear on:
+  - Primary signature line of ID cards or documents
+  - "Cardholder signature" or "Owner signature" sections
+  - Main applicant or account holder fields
+  - Licensee signature fields (holder of a license)
+  - Any signature without explicit third-party labels
+- **Non-owner signatures** (set to `false` only with clear evidence) typically appear on:
+  - Witness signature lines with "Witness" label
+  - "Chairman", "Director", or "Authorized Officer" sections with explicit titles
+  - Guardian, parent, or representative signature fields with clear labels
+  - Co-signer or guarantor sections with "Guarantor" or "Co-signer" labels
+
+## Edge Cases
+
+- **Multiple signatures**: If there are multiple signatures (e.g., witness signatures, co-signers), identify each separately and determine which is the owner's signature
+- **Digital signatures**: If you see a digital signature (typed name in script font), note it but mark it as "digital/printed" rather than handwritten
+- **Unclear marks**: If you're uncertain whether a mark is a signature, note it with Low confidence
+- **Partially visible signatures**: If a signature is cut off or partially obscured, describe what is visible
+- **Ambiguous ownership**: If it's unclear whether a signature is from the owner or another party, **default to `true` (owner signature)** unless there is explicit evidence otherwise
+
+## Analysis Approach
+
+1. First, scan for common signature locations
+2. Look for handwriting that differs from printed text
+3. Identify flowing or stylized writing patterns
+4. Check for signature lines or labels
+5. Assess each potential signature against the characteristics listed above
+6. **Determine signature ownership** by examining:
+   - Labels or titles near the signature (e.g., "Owner", "Cardholder", "Witness", "Chairman")
+   - Position on the document (primary vs secondary signature locations)
+   - Document type and context
+   - **When in doubt, default to owner signature (`true`)**
+7. Provide clear, actionable results with confidence levels
+
+Remember: Be thorough but conservative. It's better to report Low confidence than to misidentify non-signature elements as signatures.
+"""
+
+
+# Signature extraction prompt for Azure OpenAI Vision API - Center
+SIGNATURE_EXTRACTION_PROMPT_CENTER = """
+You are an expert computer vision assistant specializing in document analysis and signature detection. Your task is to identify and locate handwritten signatures within images.
+
+## Task
+Analyze the provided image and identify all handwritten signatures present. A signature is a person's name written in a distinctive, personalized handwriting style, typically used for authentication or authorization purposes.
+
+## Instructions
+
+1. **Carefully examine the entire image** for handwritten signatures
+2. **Distinguish signatures from other handwritten text** - signatures typically have:
+   - A more stylized, flowing, or cursive appearance
+   - Personal flourishes or unique characteristics
+   - Different ink color or pen pressure than printed text
+   - Placement in typical signature locations (bottom of documents, signature lines, etc.)
+
+3. **For each signature found**, provide:
+   - **Location**: Describe where in the image the signature appears (e.g., "bottom right corner", "below the printed text", "on the signature line")
+   - **Bounding box coordinates**: Estimated x, y, width, height as percentages of image dimensions
+     - **IMPORTANT**: Ensure the bounding box is **centered on the signature** with **balanced padding on all sides**
+     - Include approximately **10-15% padding** around the actual signature strokes (not too tight, not too loose)
+     - The signature should be **visually centered** within the bounding box
+     - Adjust the bounding box to maintain symmetry - equal space on left/right and top/bottom where possible
+   - **Confidence level**: High, Medium, or Low
+   - **Characteristics**: Brief description of the signature's appearance (e.g., "cursive script in blue ink", "printed signature in black")
+   - **Legibility**: Whether the signature is legible enough to read the name
+   - **Is owner signature**: Boolean indicating if this signature is by the owner/cardholder of the document
+     - Set to `true` if the signature appears to be from the document owner, cardholder, Licensee, or primary subject
+     - Set to `false` ONLY if there is clear evidence the signature is from an authorized representative, chairman, witness, guarantor, or other third party
+     - Look for explicit labels ("Chairman", "Witness", "Authorized Signatory", "Guardian", etc.)
+     - **Default to `true` when ownership is ambiguous or unclear**
+
+4. **Exclude the following**:
+   - Printed signatures or typed names
+   - Initials alone (unless clearly part of a signature)
+   - Random handwritten notes that are not signatures
+   - Stamps or seal impressions (unless they contain a handwritten component)
+
+## Output Format
+
+Provide your response in the following JSON structure:
+
+```json
+{
+  "signatures_found": <number>,
+  "signatures": [
+    {
+      "id": 1,
+      "location_description": "<descriptive location>",
+      "bounding_box": {
+        "x": <percentage>,
+        "y": <percentage>,
+        "width": <percentage>,
+        "height": <percentage>
+      },
+      "confidence": "<High|Medium|Low>",
+      "characteristics": "<description>",
+      "legible": <true|false>,
+      "estimated_name": "<name if legible, otherwise null>",
+      "is_owner_signature": <true|false>
+    }
+  ],
+  "analysis_notes": "<any additional observations or challenges>"
+}
+```
+
+## Analysis Approach
+
+1. First, scan for common signature locations
+2. Look for handwriting that differs from printed text
+3. Identify flowing or stylized writing patterns
+4. Check for signature lines or labels
+5. Assess each potential signature against the characteristics listed above
+6. **Determine signature ownership** by examining:
+   - Labels or titles near the signature (e.g., "Owner", "Cardholder", "Witness", "Chairman")
+   - Position on the document (primary vs secondary signature locations)
+   - Document type and context
+   - **When in doubt, default to owner signature (`true`)**
+7. **Calculate precise bounding boxes**:
+   - Identify the exact extent of the signature strokes (leftmost, rightmost, topmost, bottommost points)
+   - Add equal padding on all sides (approximately 10-15% of the signature dimensions)
+   - Ensure the signature is centered horizontally and vertically within the bounding box
+   - Verify the bounding box doesn't include unnecessary whitespace or adjacent elements
+8. Provide clear, actionable results with confidence levels
+
+Remember: Be thorough but conservative. It's better to report Low confidence than to misidentify non-signature elements as signatures.
+
+**Bounding Box Quality Checklist:**
+- ✓ Signature is centered within the box (not pushed to one edge)
+- ✓ Equal padding on left and right sides
+- ✓ Equal padding on top and bottom sides
+- ✓ Box captures the complete signature including all flourishes
+- ✓ Minimal excess whitespace beyond the padding
+- ✓ No adjacent text or elements included unless part of the signature
+"""
+
+# Client singleton cache
+_openai_client: AzureOpenAI | None = None
+
 
 def _generate_request_id() -> str:
     """Generate a unique request ID."""
     return str(uuid.uuid4())[:8]
 
 
-def _load_image_from_bytes(image_bytes: bytes, filename: str) -> Any:
+def _get_openai_client() -> AzureOpenAI:
     """
-    Load image from bytes, handling both regular images and PDFs.
-
-    Args:
-        image_bytes: Raw file bytes
-        filename: Original filename to determine file type
+    Get or create singleton Azure OpenAI client instance.
+    Uses module-level cache to prevent resource exhaustion.
 
     Returns:
-        numpy array (OpenCV format) or None if loading fails
+        AzureOpenAI client instance
+
+    Raises:
+        ValueError: If Azure OpenAI credentials are not configured
+    """
+    global _openai_client
+
+    if _openai_client is None:
+        if not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT:
+            raise ValueError(
+                "Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT environment variables."
+            )
+
+        _openai_client = AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        )
+        logger.info("Initialized Azure OpenAI client singleton")
+
+    return _openai_client
+
+
+async def _extract_signature_with_openai(
+    image_bytes: bytes, request_id: str, model: str | None = None
+) -> dict[str, Any]:
+    """
+    Extract handwritten signatures from an image using Azure OpenAI Vision API.
+    Uses asyncio.to_thread to wrap the synchronous OpenAI SDK call.
+
+    Args:
+        image_bytes: Image file bytes (PNG, JPG, etc.)
+        request_id: Request ID for logging
+        model: Azure OpenAI model deployment name (defaults to AZURE_OPENAI_MODEL)
+
+    Returns:
+        Dictionary containing signature extraction results with structure:
+        {
+            "signatures_found": int,
+            "signatures": [{"id": int, "bounding_box": {...}, ...}],
+            "analysis_notes": str
+        }
+
+    Raises:
+        ValueError: If OpenAI is not configured
+        Exception: If API call fails
+    """
+    if model is None:
+        model = AZURE_OPENAI_MODEL
+
+    # Get OpenAI client (singleton pattern)
+    client = _get_openai_client()
+
+    # Encode image to base64
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    # Wrap synchronous OpenAI call in asyncio.to_thread for non-blocking execution
+    def _call_openai() -> dict[str, Any]:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert at analyzing documents and detecting handwritten signatures. Always respond with valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": SIGNATURE_EXTRACTION_PROMPT_CENTER},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}",
+                                "detail": "high",
+                            },
+                        },
+                    ],
+                },
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+
+        # Extract and parse response
+        content = response.choices[0].message.content
+
+        # Handle None content
+        if content is None:
+            return {
+                "signatures_found": 0,
+                "signatures": [],
+                "analysis_notes": "No content returned from API",
+            }
+
+        # Try to extract JSON from response (in case it's wrapped in markdown)
+        if "```json" in content:
+            json_start = content.find("```json") + 7
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+        elif "```" in content:
+            json_start = content.find("```") + 3
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+
+        result: dict[str, Any] = json.loads(content)
+        return result
+
+    logger.info(f"[{request_id}] Calling Azure OpenAI Vision API for signature extraction")
+    result = await asyncio.to_thread(_call_openai)
+    logger.info(
+        f"[{request_id}] Azure OpenAI returned {result.get('signatures_found', 0)} signature(s)"
+    )
+
+    return result
+
+
+def _opencv_postprocess_image(
+    image_bytes: bytes, request_id: str
+) -> bytes:
+    """
+    Apply OpenCV post-processing to enhance signature image:
+    1. Upscale 2x using LapSRN model (requires BGR input)
+    2. Convert to grayscale
+    3. Sharpen using unsharp masking
+
+    All processing is done in-memory (serverless-compatible).
+
+    Args:
+        image_bytes: PNG image bytes
+        request_id: Request ID for logging
+
+    Returns:
+        Processed PNG image bytes (upscaled 2x, grayscale, sharpened)
+
+    Raises:
+        FileNotFoundError: If LapSRN model file not found
+        ValueError: If image processing fails
+    """
+    # Load image from bytes (BGR format for super resolution)
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Failed to decode image bytes")
+
+    logger.info(f"[{request_id}] OpenCV post-processing: input size {img.shape[1]}x{img.shape[0]}")
+
+    # Load and apply LapSRN model
+    sr_obj: Any = cv2.dnn_superres.DnnSuperResImpl_create()  # type: ignore[attr-defined]
+    sr = cast(Any, sr_obj)
+    sr.readModel(LAPSRN_MODEL_PATH)
+    sr.setModel("lapsrn", 2)  # 2x upscaling
+
+    upscaled = sr.upsample(img)
+    logger.info(f"[{request_id}] Upscaled 2x using LapSRN: output size {upscaled.shape[1]}x{upscaled.shape[0]}")
+
+    # 2. Convert to grayscale
+    gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+    logger.info(f"[{request_id}] Converted to grayscale")
+
+    # 3. Sharpen using unsharp masking
+    # Parameters tuned for signature clarity
+    gaussian_radius = 1.5
+    amount = 1.5
+
+    blur = cv2.GaussianBlur(gray, ksize=(0, 0), sigmaX=gaussian_radius)
+    mask = cv2.subtract(gray, blur)
+    sharpened = cv2.add(gray, cv2.multiply(mask, amount))
+    sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+    logger.info(f"[{request_id}] Applied unsharp masking (radius={gaussian_radius}, amount={amount})")
+
+    # Encode to PNG bytes
+    success, encoded = cv2.imencode(".png", sharpened)
+    if not success:
+        raise ValueError("Failed to encode processed image to PNG")
+
+    return encoded.tobytes()
+
+
+def _crop_signature_from_image(
+    image_bytes: bytes,
+    bounding_box: dict[str, float],
+    padding_percent: float = 5.0,
+    opencv_process: bool = False,
+    request_id: str | None = None,
+) -> str:
+    """
+    Crop signature region from image based on bounding box and return as base64 string.
+    All processing is done in-memory (serverless-compatible).
+
+    Args:
+        image_bytes: Image file bytes
+        bounding_box: Dict with keys 'x', 'y', 'width', 'height' (all as percentages 0-100)
+        padding_percent: Additional padding to add around bounding box (percentage of image dimensions)
+        opencv_process: If True, apply OpenCV post-processing (grayscale, sharpen, upscale 2x)
+        request_id: Request ID for logging (required if opencv_process=True)
+
+    Returns:
+        Base64-encoded PNG image string of the cropped signature
+
+    Raises:
+        ValueError: If bounding box is invalid
+    """
+    # Load image from bytes (serverless pattern)
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    img_width, img_height = image.size
+
+    # Extract bounding box percentages
+    x_pct = bounding_box.get("x", 0)
+    y_pct = bounding_box.get("y", 0)
+    width_pct = bounding_box.get("width", 0)
+    height_pct = bounding_box.get("height", 0)
+
+    # Validate bounding box
+    if not (0 <= x_pct <= 100 and 0 <= y_pct <= 100):
+        raise ValueError(f"Invalid bounding box position: x={x_pct}, y={y_pct}")
+    if not (0 < width_pct <= 100 and 0 < height_pct <= 100):
+        raise ValueError(f"Invalid bounding box dimensions: width={width_pct}, height={height_pct}")
+
+    # Convert percentage-based coordinates to pixel coordinates
+    x1 = int((x_pct / 100) * img_width)
+    y1 = int((y_pct / 100) * img_height)
+    x2 = int(((x_pct + width_pct) / 100) * img_width)
+    y2 = int(((y_pct + height_pct) / 100) * img_height)
+
+    # Add padding (in pixels based on percentage of image dimensions)
+    padding_x = int((padding_percent / 100) * img_width)
+    padding_y = int((padding_percent / 100) * img_height)
+    x1 = max(0, x1 - padding_x)
+    y1 = max(0, y1 - padding_y)
+    x2 = min(img_width, x2 + padding_x)
+    y2 = min(img_height, y2 + padding_y)
+
+    # Crop the signature region
+    cropped = image.crop((x1, y1, x2, y2))
+
+    # Convert to PNG bytes
+    img_byte_arr = io.BytesIO()
+    cropped.save(img_byte_arr, format="PNG")
+    png_bytes = img_byte_arr.getvalue()
+
+    # Apply OpenCV post-processing if requested
+    if opencv_process:
+        if request_id is None:
+            raise ValueError("request_id is required when opencv_process=True")
+        png_bytes = _opencv_postprocess_image(png_bytes, request_id)
+
+    # Encode to base64 string
+    base64_string = base64.b64encode(png_bytes).decode("utf-8")
+
+    return base64_string
+
+
+def _convert_pdf_to_image_bytes(file_bytes: bytes, filename: str, dpi: int = 200) -> bytes:
+    """
+    Convert PDF first page to image bytes, or return original bytes if already an image.
+
+    Args:
+        file_bytes: Raw file bytes (PDF or image)
+        filename: Original filename to determine file type
+        dpi: DPI for PDF rendering (default: 200)
+
+    Returns:
+        PNG image bytes
     """
     file_ext = os.path.splitext(filename.lower())[1]
 
-    try:
-        if file_ext == ".pdf":
-            # Extract first page of PDF as image
-            pdf_document: Any = fitz.open(stream=image_bytes, filetype="pdf")
-            if pdf_document.page_count == 0:
-                return None
+    if file_ext == ".pdf":
+        # Extract first page of PDF as PNG image bytes
+        pdf_document: Any = fitz.open(stream=file_bytes, filetype="pdf")
+        if pdf_document.page_count == 0:
+            raise ValueError("PDF has no pages")
 
-            # Render first page to image (150 DPI)
-            page: Any = pdf_document[0]
-            pix: Any = page.get_pixmap(dpi=150)
-            img_bytes: bytes = pix.tobytes("png")
+        # Render first page to image at specified DPI
+        page: Any = pdf_document[0]
+        pix: Any = page.get_pixmap(dpi=dpi)
+        png_bytes: bytes = pix.tobytes("png")
+        return png_bytes
 
-            # Convert to numpy array
-            nparr = np.frombuffer(img_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            return img
-        # Load regular image formats
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        return img
-    except Exception:
-        return None
+    # Already an image, return as-is
+    return file_bytes
 
 
-def _extract_signatures(image: Any, debug_prefix: str = "") -> list[Any]:
+def _polygon_to_bbox(points: list[float]) -> tuple[float, float, float, float]:
+    """Convert polygon [x1,y1,x2,y2,...] -> (min_x, min_y, max_x, max_y)."""
+    xs = points[::2]
+    ys = points[1::2]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _save_crop_from_image(
+    image_bytes: bytes, bbox_px: tuple[float, float, float, float], out_path: str, padding: int = 0
+) -> bytes:
     """
-    Extract signature regions from an image using contour detection.
+    Crop region from image bytes (serverless-compatible, in-memory only).
 
     Args:
-        image: Input image as numpy array (OpenCV format)
+        image_bytes: Image file bytes
+        bbox_px: Bounding box in pixels (min_x, min_y, max_x, max_y)
+        out_path: Output path for local debugging
+        padding: Padding in pixels
+
+    Returns:
+        PNG image bytes of the cropped region
+    """
+    # Load image from bytes (serverless pattern)
+    im = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    min_x, min_y, max_x, max_y = bbox_px
+    box = (
+        max(int(min_x) - padding, 0),
+        max(int(min_y) - padding, 0),
+        min(int(max_x) + padding, im.width),
+        min(int(max_y) + padding, im.height),
+    )
+    crop = im.crop(box)
+
+    # Save crops to tmp/ folder if enabled
+    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
+    if save_crops:
+        crop.save(out_path, "PNG")
+
+    # Return cropped image as PNG bytes
+    img_byte_arr = io.BytesIO()
+    crop.save(img_byte_arr, format="PNG")
+    return img_byte_arr.getvalue()
+
+
+def _extract_signatures_with_doc_intelligence(
+    image_bytes: bytes, debug_prefix: str = ""
+) -> list[Any]:
+    """
+    Extract signature regions using Azure Document Intelligence.
+
+    Args:
+        image_bytes: Image file bytes (PNG, JPG, etc. - PDFs already converted)
+        debug_prefix: Debug prefix for saved images
+
+    Returns:
+        List of extracted signature images as numpy arrays
+    """
+    if not AZURE_DI_ENDPOINT or not AZURE_DI_KEY:
+        logger.warning("Azure Document Intelligence not configured, skipping")
+        return []
+
+    try:
+        # Initialize Document Intelligence client
+        client = DocumentIntelligenceClient(AZURE_DI_ENDPOINT, AzureKeyCredential(AZURE_DI_KEY))
+
+        # Analyze document with Document Intelligence
+        logger.debug(f"Analyzing document with Document Intelligence model '{AZURE_DI_MODEL_ID}'")
+        # Wrap bytes in BytesIO for SDK compatibility
+        image_stream = io.BytesIO(image_bytes)
+        poller = client.begin_analyze_document(
+            AZURE_DI_MODEL_ID, body=image_stream, content_type="application/octet-stream"
+        )
+        result: Any = poller.result()
+
+        # Collect signature regions
+        regions: list[tuple[str, int, list[float]]] = []
+
+        # Strategy 1: Try to find Signature fields from custom model
+        documents_attr: Any = getattr(result, "documents", None)
+        if documents_attr:
+            for doc in documents_attr:
+                fields_attr: Any = getattr(doc, "fields", None)
+                if fields_attr:
+                    for fname, fobj in fields_attr.items():
+                        # Match signature fields by type or name
+                        value_type: str = str(getattr(fobj, "value_type", ""))
+                        fname_str: str = str(fname)
+                        if value_type.lower() == "signature" or "signature" in fname_str.lower():
+                            bounding_regions_attr: Any = getattr(fobj, "bounding_regions", None)
+                            if bounding_regions_attr:
+                                for br in bounding_regions_attr:
+                                    page_num: int = int(getattr(br, "page_number", 1))
+                                    polygon: list[float] = list(getattr(br, "polygon", []))
+                                    regions.append(("signature", page_num, polygon))
+
+        # Strategy 2: Fallback to figures (Layout model)
+        figures_attr: Any = getattr(result, "figures", None)
+        if not regions and figures_attr:
+            for idx, fig in enumerate(figures_attr):
+                bounding_regions_attr_fig: Any = getattr(fig, "bounding_regions", [])
+                for br in bounding_regions_attr_fig:
+                    page_num_fig: int = int(getattr(br, "page_number", 1))
+                    polygon_fig: list[float] = list(getattr(br, "polygon", []))
+                    regions.append((f"figure_{idx + 1}", page_num_fig, polygon_fig))
+
+        if not regions:
+            logger.info("No signature/figure regions found by Document Intelligence")
+            return []
+
+        # Extract and crop signatures (coordinates are in pixels for images)
+        signatures: list[Any] = []
+        save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
+        timestamp = str(int(time.time() * 1000))
+
+        for i, (name, page_no, poly) in enumerate(regions, start=1):
+            min_x, min_y, max_x, max_y = _polygon_to_bbox(poly)
+
+            # Crop from image bytes (in-memory)
+            out_path = f"./tmp/{debug_prefix}_di_{name}_p{page_no}_{i}_{timestamp}.png"
+            if save_crops:
+                os.makedirs("./tmp", exist_ok=True)
+
+            # Get cropped image bytes
+            cropped_bytes = _save_crop_from_image(
+                image_bytes,
+                (min_x, min_y, max_x, max_y),
+                out_path,
+                padding=PADDING_PIXELS,
+            )
+
+            # Convert PNG bytes to OpenCV image (in-memory)
+            nparr = np.frombuffer(cropped_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is not None:
+                signatures.append(img)
+                logger.debug(f"Extracted signature: {out_path}")
+
+        logger.info(
+            f"Document Intelligence extracted {len(signatures)} signature(s) using {AZURE_DI_MODEL_ID}"
+        )
+        return signatures
+
+    except Exception as e:
+        logger.warning(f"Document Intelligence extraction failed: {str(e)}, falling back to OpenCV")
+        return []
+
+
+def _extract_signatures(file_bytes: bytes, filename: str, debug_prefix: str = "") -> list[Any]:
+    """
+    Extract signature regions from an image/PDF using Document Intelligence (if configured)
+    or traditional contour detection (fallback).
+
+    Args:
+        file_bytes: Raw file bytes (PDF or image)
+        filename: Original filename (to detect file type)
         debug_prefix: Optional prefix for saved debug images (e.g., "valid_id", "specimen")
 
     Returns:
         List of extracted signature images as numpy arrays
     """
+    # Try Azure Document Intelligence first if configured
+    if AZURE_DI_ENDPOINT and AZURE_DI_KEY:
+        logger.info(f"Using Azure Document Intelligence for signature extraction: {debug_prefix}")
+
+        # Process with Document Intelligence using higher DPI (200) for better accuracy
+        try:
+            image_bytes_di = _convert_pdf_to_image_bytes(file_bytes, filename, dpi=PDF_RENDER_DPI)
+            di_signatures = _extract_signatures_with_doc_intelligence(image_bytes_di, debug_prefix)
+            if di_signatures:
+                return di_signatures
+            logger.info("Falling back to OpenCV contour detection")
+        except Exception as e:
+            logger.warning(
+                f"Document Intelligence processing failed: {str(e)}, falling back to OpenCV"
+            )
+
+    # Fallback to traditional OpenCV contour detection
+    # Convert PDF/image to bytes at lower DPI (150) for faster OpenCV processing
+    try:
+        image_bytes = _convert_pdf_to_image_bytes(file_bytes, filename, dpi=150)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            logger.error("Failed to decode image bytes for OpenCV processing")
+            return []
+    except Exception as e:
+        logger.error(f"Failed to convert file to image for OpenCV: {str(e)}")
+        return []
+
     # Convert to grayscale
     gray: Any = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # type: ignore[assignment]
 
@@ -101,7 +770,12 @@ def _extract_signatures(image: Any, debug_prefix: str = "") -> list[Any]:
 
     # Apply adaptive thresholding
     thresh: Any = cv2.adaptiveThreshold(  # type: ignore[assignment]
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2  # type: ignore[arg-type]
+        blurred,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV,
+        11,
+        2,  # type: ignore[arg-type]
     )
 
     # Find contours
@@ -136,9 +810,9 @@ def _extract_signatures(image: Any, debug_prefix: str = "") -> list[Any]:
     signatures.sort(key=lambda s: s.shape[0] * s.shape[1], reverse=True)
     top_signatures = signatures[:3]
 
-    # Save extracted signatures for local debugging (only in local development)
-    enable_local = os.getenv("ENABLE_LOCAL", "false").lower() == "true"
-    if debug_prefix and enable_local:
+    # Save extracted signatures for debugging (save crops to tmp/ if enabled)
+    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
+    if debug_prefix and save_crops:
         try:
             tmp_dir = "./tmp"
             os.makedirs(tmp_dir, exist_ok=True)
@@ -181,9 +855,9 @@ def _normalize_signature(signature: Any, debug_prefix: str = "", index: int = 0)
     # Convert back to BGR for CLIP model (expects 3 channels)
     normalized = cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)  # type: ignore[arg-type,assignment]
 
-    # Save normalized signature for local debugging (only in local development)
-    enable_local = os.getenv("ENABLE_LOCAL", "false").lower() == "true"
-    if debug_prefix and enable_local:
+    # Save normalized signature for debugging (save crops to tmp/ if enabled)
+    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
+    if debug_prefix and save_crops:
         try:
             tmp_dir = "./tmp"
             os.makedirs(tmp_dir, exist_ok=True)
@@ -221,9 +895,9 @@ def _extract_image_features(image: Any) -> list[float]:
     hog = cv2.HOGDescriptor(
         win_size,  # type: ignore[arg-type]
         (16, 16),  # block size
-        (8, 8),    # block stride
-        (8, 8),    # cell size
-        9          # number of bins
+        (8, 8),  # block stride
+        (8, 8),  # cell size
+        9,  # number of bins
     )
     hog_features_raw: Any = hog.compute(gray)  # type: ignore[arg-type]
 
@@ -288,9 +962,7 @@ def _validate_url_parameter(value: str | None, param_name: str) -> tuple[bool, s
     return True, None
 
 
-def _validate_api_key_and_size(
-    req: func.HttpRequest, request_id: str
-) -> func.HttpResponse | None:
+def _validate_api_key_and_size(req: func.HttpRequest, request_id: str) -> func.HttpResponse | None:
     """
     Common validation logic for API key and request size.
     Returns HttpResponse with error if validation fails, None if valid.
@@ -554,7 +1226,9 @@ async def _execute_aisearch_query(
             )
             query_time = time.time() - query_start
 
-            logger.info(f"[{request_id}] AI Search query returned {len(items)} results (duration={query_time:.3f}s)")
+            logger.info(
+                f"[{request_id}] AI Search query returned {len(items)} results (duration={query_time:.3f}s)"
+            )
 
             return (search_text, items, query_time)
     except aiohttp.ClientError as e:
@@ -699,7 +1373,9 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
                         "error": str(result),
                     }
                 )
-                logger.error(f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}")
+                logger.error(
+                    f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}"
+                )
                 continue
 
             # Type guard: ensure result is a tuple with expected length
@@ -804,11 +1480,13 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
             if file_key not in files:
                 logger.warning(f"[{request_id}] Missing required file: {file_key}")
                 return func.HttpResponse(
-                    json.dumps({
-                        "error": "Missing required files",
-                        "message": f"Please provide all required files: {', '.join(required_files)}",
-                        "request_id": request_id,
-                    }),
+                    json.dumps(
+                        {
+                            "error": "Missing required files",
+                            "message": f"Please provide all required files: {', '.join(required_files)}",
+                            "request_id": request_id,
+                        }
+                    ),
                     mimetype="application/json",
                     status_code=400,
                 )
@@ -825,52 +1503,53 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         ]
         if selfie_file:
             files_to_validate.append((selfie_file, "selfie_with_id"))
-        
+
         for file_obj, name in files_to_validate:
             filename = file_obj.filename or ""
             file_ext = os.path.splitext(filename.lower())[1]
             if file_ext not in ALLOWED_FILE_TYPES:
                 logger.warning(f"[{request_id}] Invalid file type for {name}: {file_ext}")
                 return func.HttpResponse(
-                    json.dumps({
-                        "error": "Invalid file type",
-                        "message": f"{name} must be one of: {', '.join(ALLOWED_FILE_TYPES)}",
-                        "request_id": request_id,
-                    }),
+                    json.dumps(
+                        {
+                            "error": "Invalid file type",
+                            "message": f"{name} must be one of: {', '.join(ALLOWED_FILE_TYPES)}",
+                            "request_id": request_id,
+                        }
+                    ),
                     mimetype="application/json",
                     status_code=400,
                 )
 
         logger.info(f"[{request_id}] Loading images from uploaded files")
 
-        # Load images
+        # Read raw file bytes
         valid_id_bytes = valid_id_file.read()
         specimen_bytes = specimen_file.read()
         selfie_bytes = selfie_file.read() if selfie_file else None
 
-        valid_id_img = _load_image_from_bytes(valid_id_bytes, valid_id_file.filename or "valid_id")
-        specimen_img = _load_image_from_bytes(specimen_bytes, specimen_file.filename or "specimen_signatures")
-        selfie_img = _load_image_from_bytes(selfie_bytes, selfie_file.filename or "selfie_with_id") if selfie_file and selfie_bytes else None
-
-        if valid_id_img is None or specimen_img is None:
-            logger.error(f"[{request_id}] Failed to load one or more images")
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Image loading failed",
-                    "message": "Failed to load one or more uploaded images. Please check file format.",
-                    "request_id": request_id,
-                }),
-                mimetype="application/json",
-                status_code=400,
-            )
-
-        # Extract signatures from images
+        # Extract signatures - _extract_signatures handles PDF conversion internally
+        # (200 DPI for Azure DI, 150 DPI for OpenCV)
         extraction_start = time.time()
         logger.info(f"[{request_id}] Extracting signatures from images")
 
-        valid_id_signatures = _extract_signatures(valid_id_img, f"{request_id}_valid_id")
-        specimen_signatures = _extract_signatures(specimen_img, f"{request_id}_specimen")
-        selfie_signatures = _extract_signatures(selfie_img, f"{request_id}_selfie") if selfie_img is not None else []
+        valid_id_signatures = _extract_signatures(
+            valid_id_bytes, valid_id_file.filename or "valid_id", f"{request_id}_valid_id"
+        )
+        specimen_signatures = _extract_signatures(
+            specimen_bytes,
+            specimen_file.filename or "specimen_signatures",
+            f"{request_id}_specimen",
+        )
+        selfie_signatures = (
+            _extract_signatures(
+                selfie_bytes,
+                (selfie_file.filename if selfie_file else None) or "selfie_with_id",
+                f"{request_id}_selfie",
+            )
+            if selfie_bytes
+            else []
+        )
 
         extraction_time = time.time() - extraction_start
 
@@ -880,14 +1559,18 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         )
 
         if len(specimen_signatures) < 3:
-            logger.warning(f"[{request_id}] Expected 3 specimen signatures, found {len(specimen_signatures)}")
+            logger.warning(
+                f"[{request_id}] Expected 3 specimen signatures, found {len(specimen_signatures)}"
+            )
             return func.HttpResponse(
-                json.dumps({
-                    "error": "Insufficient specimen signatures",
-                    "message": f"Expected 3 specimen signatures, found only {len(specimen_signatures)}. "
-                               "Please ensure the image clearly shows 3 specimen signatures.",
-                    "request_id": request_id,
-                }),
+                json.dumps(
+                    {
+                        "error": "Insufficient specimen signatures",
+                        "message": f"Expected 3 specimen signatures, found only {len(specimen_signatures)}. "
+                        "Please ensure the image clearly shows 3 specimen signatures.",
+                        "request_id": request_id,
+                    }
+                ),
                 mimetype="application/json",
                 status_code=400,
             )
@@ -896,18 +1579,32 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         normalization_start = time.time()
         logger.info(f"[{request_id}] Normalizing signatures")
 
-        normalized_specimen = [_normalize_signature(sig, f"{request_id}_specimen", i) for i, sig in enumerate(specimen_signatures[:3])]
-        normalized_valid_id = [_normalize_signature(sig, f"{request_id}_valid_id", i) for i, sig in enumerate(valid_id_signatures)] if valid_id_signatures else []
-        normalized_selfie = [_normalize_signature(sig, f"{request_id}_selfie", i) for i, sig in enumerate(selfie_signatures)] if selfie_signatures else []
+        normalized_specimen = [
+            _normalize_signature(sig, f"{request_id}_specimen", i)
+            for i, sig in enumerate(specimen_signatures[:3])
+        ]
+        normalized_valid_id = (
+            [
+                _normalize_signature(sig, f"{request_id}_valid_id", i)
+                for i, sig in enumerate(valid_id_signatures)
+            ]
+            if valid_id_signatures
+            else []
+        )
+        normalized_selfie = (
+            [
+                _normalize_signature(sig, f"{request_id}_selfie", i)
+                for i, sig in enumerate(selfie_signatures)
+            ]
+            if selfie_signatures
+            else []
+        )
 
         normalization_time = time.time() - normalization_start
 
         # Extract features from all signatures (using OpenCV - no external API needed)
         feature_start = time.time()
         logger.info(f"[{request_id}] Extracting image features")
-        # # this is for debugging purposes only
-        # if normalized_valid_id:
-        #     raise Exception("this is for debugging purposes only")
 
         # Extract features using OpenCV (runs locally, no API calls)
         specimen_features = [_extract_image_features(sig) for sig in normalized_specimen]
@@ -933,11 +1630,9 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
             specimen_similarity_matrix.append(row)
 
         # Average similarity between specimen signatures
-        specimen_avg_similarity = sum(
-            specimen_similarity_matrix[i][j]
-            for i in range(3)
-            for j in range(i + 1, 3)
-        ) / 3
+        specimen_avg_similarity = (
+            sum(specimen_similarity_matrix[i][j] for i in range(3) for j in range(i + 1, 3)) / 3
+        )
 
         # 2. Compare specimen signatures against valid ID signature(s)
         valid_id_similarities: list[float] = []
@@ -973,14 +1668,30 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
             },
             "specimen_vs_valid_id": {
                 "similarities": valid_id_similarities,
-                "average_similarity": round(sum(valid_id_similarities) / len(valid_id_similarities), 4) if valid_id_similarities else 0.0,
-                "status": "MATCH" if valid_id_similarities and sum(valid_id_similarities) / len(valid_id_similarities) >= 0.80 else "MISMATCH",
-            } if valid_id_similarities else {"status": "NO_SIGNATURE_FOUND"},
+                "average_similarity": round(
+                    sum(valid_id_similarities) / len(valid_id_similarities), 4
+                )
+                if valid_id_similarities
+                else 0.0,
+                "status": "MATCH"
+                if valid_id_similarities
+                and sum(valid_id_similarities) / len(valid_id_similarities) >= 0.80
+                else "MISMATCH",
+            }
+            if valid_id_similarities
+            else {"status": "NO_SIGNATURE_FOUND"},
             "specimen_vs_selfie": {
                 "similarities": selfie_similarities,
-                "average_similarity": round(sum(selfie_similarities) / len(selfie_similarities), 4) if selfie_similarities else 0.0,
-                "status": "MATCH" if selfie_similarities and sum(selfie_similarities) / len(selfie_similarities) >= 0.80 else "MISMATCH",
-            } if selfie_similarities else {"status": "NO_SIGNATURE_FOUND"},
+                "average_similarity": round(sum(selfie_similarities) / len(selfie_similarities), 4)
+                if selfie_similarities
+                else 0.0,
+                "status": "MATCH"
+                if selfie_similarities
+                and sum(selfie_similarities) / len(selfie_similarities) >= 0.80
+                else "MISMATCH",
+            }
+            if selfie_similarities
+            else {"status": "NO_SIGNATURE_FOUND"},
             "performance": {
                 "extraction_ms": round(extraction_time * 1000, 2),
                 "normalization_ms": round(normalization_time * 1000, 2),
@@ -1010,11 +1721,514 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
             exc_info=True,
         )
         return func.HttpResponse(
-            json.dumps({
-                "error": "Signature comparison failed",
-                "message": str(e),
-                "request_id": request_id,
-            }),
+            json.dumps(
+                {
+                    "error": "Signature comparison failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="gpt_crop", methods=["POST"])
+@require_api_key
+async def crop_signature(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Extract and crop handwritten signature from an image using Azure OpenAI Vision API.
+    Returns the cropped signature as a base64-encoded PNG string.
+
+    Query Parameters:
+        - model (optional): Azure OpenAI model name (default: from env AZURE_OPENAI_MODEL)
+        - padding (optional): Additional padding around signature in percent (default: 5.0)
+        - opencv_process (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
+
+    Request Body:
+        JSON with the following fields:
+        - filename (required): Name of the image file
+        - content (required): Base64-encoded image content
+
+    Returns:
+        JSON response with cropped signature in base64 format (first owner signature found)
+        If opencv_process=true, the output will be grayscale, sharpened, and upscaled 2x
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Signature cropping request initiated")
+
+    try:
+        # Check if Azure OpenAI is configured
+        if not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT:
+            logger.error(f"[{request_id}] Azure OpenAI is not configured")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Configuration error",
+                        "message": "Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT.",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        # Get optional parameters
+        model = req.params.get("model")
+        padding_str = req.params.get("padding", "5.0")
+        opencv_process_str = req.params.get("opencv_process", "false").lower()
+
+        try:
+            padding = float(padding_str)
+        except ValueError:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameters",
+                        "message": "padding must be a number",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        opencv_process = opencv_process_str in ("true", "1", "yes")
+
+        # Validate parameters
+        if not (0 <= padding <= 50):
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameters",
+                        "message": "padding must be between 0 and 50 percent",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse JSON body
+        try:
+            body = req.get_json()
+        except ValueError:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid request",
+                        "message": "Request body must be valid JSON",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Validate required fields
+        if not body:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing request body",
+                        "message": "Request body is required with 'filename' and 'content' fields",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        filename = body.get("filename")
+        base64_content = body.get("content")
+
+        if not filename or not base64_content:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing required fields",
+                        "message": "Both 'filename' and 'content' fields are required",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Decode base64 content
+        try:
+            image_bytes = base64.b64decode(base64_content)
+        except Exception as e:
+            logger.error(f"[{request_id}] Failed to decode base64 content: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid content",
+                        "message": "Failed to decode base64 content. Please ensure 'content' is a valid base64 string.",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        logger.info(
+            f"[{request_id}] Processing file: {filename} ({len(image_bytes)} bytes)"
+        )
+
+        # Extract signatures using Azure OpenAI Vision API
+        extraction_start = time.time()
+        extraction_result = await _extract_signature_with_openai(image_bytes, request_id, model)
+        extraction_time = time.time() - extraction_start
+
+        signatures_found = extraction_result.get("signatures_found", 0)
+        signatures = extraction_result.get("signatures", [])
+
+        if signatures_found == 0:
+            logger.warning(f"[{request_id}] No signatures found in image")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "No signatures found",
+                        "message": "No handwritten signatures were detected in the image",
+                        "analysis_notes": extraction_result.get("analysis_notes", ""),
+                        "request_id": request_id,
+                        "performance": {
+                            "extraction_ms": round(extraction_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=404,
+            )
+
+        # Filter signatures to only include owner signatures
+        owner_signatures = [sig for sig in signatures if sig.get("is_owner_signature", False)]
+
+        if not owner_signatures:
+            logger.warning(f"[{request_id}] No owner signatures found (total signatures: {signatures_found})")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "No owner signatures found",
+                        "message": f"Found {signatures_found} signature(s), but none were identified as owner signatures. All detected signatures appear to be from witnesses, chairmen, or other third parties.",
+                        "signatures_found": signatures_found,
+                        "owner_signatures_found": 0,
+                        "analysis_notes": extraction_result.get("analysis_notes", ""),
+                        "request_id": request_id,
+                        "performance": {
+                            "extraction_ms": round(extraction_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=404,
+            )
+
+        logger.info(f"[{request_id}] Found {len(owner_signatures)} owner signature(s) out of {signatures_found} total")
+
+        # Use the first owner signature
+        target_signature = owner_signatures[0]
+        logger.info(
+            f"[{request_id}] Using first owner signature (ID: {target_signature.get('id')})"
+        )
+
+        # Crop signature from image
+        crop_start = time.time()
+        bounding_box = target_signature.get("bounding_box", {})
+        try:
+            cropped_base64 = _crop_signature_from_image(
+                image_bytes, bounding_box, padding, opencv_process, request_id
+            )
+        except ValueError as e:
+            logger.error(f"[{request_id}] Failed to crop signature: {str(e)}")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Cropping failed",
+                        "message": str(e),
+                        "request_id": request_id,
+                        "performance": {
+                            "extraction_ms": round(extraction_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+        except FileNotFoundError as e:
+            logger.error(f"[{request_id}] Model file not found: {str(e)}")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Configuration error",
+                        "message": str(e),
+                        "request_id": request_id,
+                        "performance": {
+                            "extraction_ms": round(extraction_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        crop_time = time.time() - crop_start
+        total_time = time.time() - start_time
+
+        # Build response
+        result = {
+            "cropped_signature": cropped_base64,
+            "signature_info": {
+                "id": target_signature.get("id"),
+                "location_description": target_signature.get("location_description"),
+                "bounding_box": bounding_box,
+                "confidence": target_signature.get("confidence"),
+                "characteristics": target_signature.get("characteristics"),
+                "is_owner_signature": target_signature.get("is_owner_signature"),
+            },
+            "signatures_found": signatures_found,
+            "owner_signatures_found": len(owner_signatures),
+            "model_used": model or AZURE_OPENAI_MODEL,
+            "opencv_processing": opencv_process,
+            "request_id": request_id,
+            "performance": {
+                "extraction_ms": round(extraction_time * 1000, 2),
+                "crop_ms": round(crop_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        logger.info(
+            f"[{request_id}] Signature cropping completed: "
+            f"total_signatures={signatures_found}, "
+            f"owner_signatures={len(owner_signatures)}, "
+            f"used_id={target_signature.get('id')}, "
+            f"confidence={target_signature.get('confidence')}, "
+            f"total_time={total_time:.3f}s"
+        )
+
+        return func.HttpResponse(
+            json.dumps(result), mimetype="application/json", status_code=200
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Signature cropping failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Signature cropping failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="sig_compare", methods=["POST"])
+@require_api_key
+async def sig_compare(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Capture signature images and forward them to another endpoint for comparison.
+
+    Accepts multipart/form-data with 2 required files:
+    - valid_id: Image of valid ID (front)
+    - specimen_signatures: Image of valid ID with specimen signatures
+
+    Query Parameters:
+    - forward_endpoint (required): Target endpoint URL to forward the files to
+
+    Forwards files as base64-encoded strings in a POST request to the specified endpoint.
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Signature comparison forwarding request initiated")
+
+    try:
+        # Get forward endpoint from query parameters
+        forward_endpoint = req.params.get("forward_endpoint")
+
+        # Validate forward_endpoint URL format
+        is_valid, error_message = _validate_url_parameter(forward_endpoint, "forward_endpoint")
+        if not is_valid:
+            logger.warning(f"[{request_id}] Invalid forward_endpoint: {error_message}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": error_message,
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse multipart form data
+        files = req.files
+
+        # Validate required files
+        required_files = ["valid_id", "specimen_signatures"]
+        for file_key in required_files:
+            if file_key not in files:
+                logger.warning(f"[{request_id}] Missing required file: {file_key}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing required files",
+                            "message": f"Please provide all required files: {', '.join(required_files)}",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+        # Load and validate files
+        valid_id_file = files["valid_id"]
+        specimen_file = files["specimen_signatures"]
+
+        # Validate file types
+        files_to_validate = [
+            (valid_id_file, "valid_id"),
+            (specimen_file, "specimen_signatures"),
+        ]
+
+        for file_obj, name in files_to_validate:
+            filename = file_obj.filename or ""
+            file_ext = os.path.splitext(filename.lower())[1]
+            if file_ext not in ALLOWED_FILE_TYPES:
+                logger.warning(f"[{request_id}] Invalid file type for {name}: {file_ext}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid file type",
+                            "message": f"{name} must be one of: {', '.join(ALLOWED_FILE_TYPES)}",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+        logger.info(f"[{request_id}] Reading uploaded files")
+        read_start = time.time()
+
+        # Read raw file bytes
+        valid_id_bytes = valid_id_file.read()
+        specimen_bytes = specimen_file.read()
+
+        # Encode files to base64
+        valid_id_base64 = base64.b64encode(valid_id_bytes).decode("utf-8")
+        specimen_base64 = base64.b64encode(specimen_bytes).decode("utf-8")
+
+        read_time = time.time() - read_start
+
+        # Prepare payload for forwarding
+        forward_payload = {
+            "valid_id": {
+                "filename": valid_id_file.filename or "valid_id",
+                "content": valid_id_base64,
+                "size_bytes": len(valid_id_bytes),
+            },
+            "specimen_signatures": {
+                "filename": specimen_file.filename or "specimen_signatures",
+                "content": specimen_base64,
+                "size_bytes": len(specimen_bytes),
+            },
+            "request_id": request_id,
+        }
+
+        logger.info(
+            f"[{request_id}] Forwarding files to {forward_endpoint} "
+            f"(valid_id: {len(valid_id_bytes)} bytes, specimen: {len(specimen_bytes)} bytes)"
+        )
+
+        # Create background task to forward to target endpoint (fire-and-forget)
+        async def _forward_in_background() -> None:
+            """Forward payload to target endpoint without blocking the response."""
+            try:
+                timeout = aiohttp.ClientTimeout(total=120)  # 2 minutes timeout for external call
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        forward_endpoint,
+                        json=forward_payload,
+                        timeout=timeout,
+                    ) as response,
+                ):
+                    response.raise_for_status()
+                    logger.info(
+                        f"[{request_id}] Forward request successful (status={response.status})"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"[{request_id}] Background forward request failed: {str(e)}",
+                    exc_info=True,
+                )
+
+        # Start background task without awaiting
+        asyncio.create_task(_forward_in_background())
+
+        total_time = time.time() - start_time
+
+        result = {
+            "status": "accepted",
+            "request_id": request_id,
+            "forward_endpoint": forward_endpoint,
+            "files_forwarded": {
+                "valid_id": {
+                    "filename": valid_id_file.filename or "valid_id",
+                    "size_bytes": len(valid_id_bytes),
+                },
+                "specimen_signatures": {
+                    "filename": specimen_file.filename or "specimen_signatures",
+                    "size_bytes": len(specimen_bytes),
+                },
+            },
+            "message": "Files accepted and forwarding initiated in background",
+            "performance": {
+                "read_ms": round(read_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        return func.HttpResponse(
+            json.dumps(result),
+            mimetype="application/json",
+            status_code=202,  # Accepted - request accepted for processing
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Signature comparison forwarding failed after {total_time:.3f}s: "
+            f"{type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Signature comparison forwarding failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
             mimetype="application/json",
             status_code=500,
         )
