@@ -449,7 +449,7 @@ Content-Type: application/json
   "content": "iVBORw0KGgoAAAANS..."
 }
 
-### Crop Signature - Custom Padding (10%)
+### Crop Signature - Custom Padding (10 pixels)
 POST {{baseUrl}}/gpt_crop?padding=10
 X-API-Key: {{apiKey}}
 Content-Type: application/json
@@ -459,7 +459,7 @@ Content-Type: application/json
   "content": "iVBORw0KGgoAAAANS..."
 }
 
-### Crop Signature - No Padding (0%)
+### Crop Signature - No Padding (0 pixels)
 POST {{baseUrl}}/gpt_crop?padding=0
 X-API-Key: {{apiKey}}
 Content-Type: application/json
@@ -480,7 +480,7 @@ Content-Type: application/json
 }
 
 ### Crop Signature - All Parameters
-POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=8
+POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=150
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -500,7 +500,7 @@ Content-Type: application/json
 }
 
 ### Crop Signature - OpenCV Processing + Custom Padding
-POST {{baseUrl}}/gpt_crop?opencv_process=true&padding=10
+POST {{baseUrl}}/gpt_crop?opencv_process=true&padding=150
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -510,7 +510,7 @@ Content-Type: application/json
 }
 
 ### Crop Signature - OpenCV Processing + All Parameters
-POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=8&opencv_process=true
+POST {{baseUrl}}/gpt_crop?model=gpt-4.1&padding=150&opencv_process=true
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -593,7 +593,7 @@ Content-Type: application/json
   "content": "iVBORw0KGgoAAAANS..."
 }
 
-### Azure DI Crop Signature - Custom Padding (10%)
+### Azure DI Crop Signature - Custom Padding (10 pixels)
 POST {{baseUrl}}/adi_crop?padding=10
 X-API-Key: {{apiKey}}
 Content-Type: application/json
@@ -621,7 +621,7 @@ Content-Type: application/json
 }
 
 ### Azure DI Crop Signature - OpenCV Processing + Custom Padding
-POST {{baseUrl}}/adi_crop?opencv_process=true&padding=10
+POST {{baseUrl}}/adi_crop?opencv_process=true&padding=20
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -630,7 +630,7 @@ Content-Type: application/json
 }
 
 ### Azure DI Crop Signature - All Parameters
-POST {{baseUrl}}/adi_crop?model_id=valid_id2&padding=8&opencv_process=true
+POST {{baseUrl}}/adi_crop?model_id=valid_id2&padding=20&opencv_process=true
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 

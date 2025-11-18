@@ -314,7 +314,7 @@ def _get_openai_client() -> AzureOpenAI:
 
 
 async def _extract_signature_with_openai(
-    image_bytes: bytes, request_id: str, model: str | None = None
+    image_bytes: bytes, request_id: str, model: str | None = None, prompt_center: bool = False
 ) -> dict[str, Any]:
     """
     Extract handwritten signatures from an image using Azure OpenAI Vision API.
@@ -324,6 +324,8 @@ async def _extract_signature_with_openai(
         image_bytes: Image file bytes (PNG, JPG, etc.)
         request_id: Request ID for logging
         model: Azure OpenAI model deployment name (defaults to AZURE_OPENAI_MODEL)
+        prompt_center: If True, uses SIGNATURE_EXTRACTION_PROMPT_CENTER (centered bounding boxes with balanced padding).
+                      If False, uses SIGNATURE_EXTRACTION_PROMPT_NOCENTER (default)
 
     Returns:
         Dictionary containing signature extraction results with structure:
@@ -346,6 +348,9 @@ async def _extract_signature_with_openai(
     # Encode image to base64
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
+    # Choose prompt based on prompt_center parameter
+    selected_prompt = SIGNATURE_EXTRACTION_PROMPT_CENTER if prompt_center else SIGNATURE_EXTRACTION_PROMPT_NOCENTER
+
     # Wrap synchronous OpenAI call in asyncio.to_thread for non-blocking execution
     def _call_openai() -> dict[str, Any]:
         response = client.chat.completions.create(
@@ -358,7 +363,7 @@ async def _extract_signature_with_openai(
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": SIGNATURE_EXTRACTION_PROMPT_CENTER},
+                        {"type": "text", "text": selected_prompt},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -413,8 +418,12 @@ def _opencv_crop_signature(
     """
     Crop the signature region from an image using OpenCV contour detection.
     Uses adaptive thresholding, morphological operations, and contour filtering
-    to isolate the handwritten signature. Ensures the signature is centered
-    in the output with balanced padding on all sides.
+    to isolate the handwritten signature.
+
+    Implementation follows crop_signatures_opencv() from signature_extraction_opencv.ipynb:
+    - Extracts individual signature regions with padding
+    - Sorts by area and keeps top 3 candidates
+    - Returns largest signature by area
 
     All processing is done in-memory (serverless-compatible).
 
@@ -423,7 +432,7 @@ def _opencv_crop_signature(
         request_id: Request ID for logging
 
     Returns:
-        Cropped PNG image bytes containing only the signature region, centered
+        Cropped PNG image bytes containing the largest signature region
 
     Raises:
         ValueError: If image processing fails or no signature found
@@ -459,7 +468,7 @@ def _opencv_crop_signature(
 
     # Filter contours by area and aspect ratio (typical signature characteristics)
     min_area = 500
-    valid_contours: list[dict[str, Any]] = []
+    signatures: list[dict[str, Any]] = []
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -470,64 +479,94 @@ def _opencv_crop_signature(
         aspect_ratio = w / float(h) if h > 0 else 0
 
         # Signatures typically have aspect ratio between 1.5 and 5.0
-        # Store individual contour bounding boxes
         if 1.5 <= aspect_ratio <= 5.0 and w > 50 and h > 20:
-            valid_contours.append({
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
+            # Extract signature region with padding
+            padding = 10
+            x1 = max(0, x - padding)
+            y1 = max(0, y - padding)
+            x2 = min(img_width, x + w + padding)
+            y2 = min(img_height, y + h + padding)
+
+            signature_img = image[y1:y2, x1:x2]
+            signatures.append({
+                "image": signature_img,
+                "bbox": (x1, y1, x2, y2),
                 "area": area,
                 "aspect_ratio": aspect_ratio,
             })
 
     # If no valid contours found, return original image
-    if not valid_contours:
+    if not signatures:
         logger.warning(f"[{request_id}] No signature contours found, returning original image")
         return image_bytes
 
-    logger.info(
-        f"[{request_id}] OpenCV contour detection identified {len(valid_contours)} signature contour(s)"
-    )
+    logger.info(f"[{request_id}] Detected {len(signatures)} signature candidate(s)")
 
-    # Calculate merged bounding box encompassing all valid contours
-    # This ensures we capture the complete signature including all disconnected strokes
-    min_x = min(c["x"] for c in valid_contours)
-    min_y = min(c["y"] for c in valid_contours)
-    max_x = max(c["x"] + c["w"] for c in valid_contours)
-    max_y = max(c["y"] + c["h"] for c in valid_contours)
-
-    # Calculate signature dimensions
-    sig_width = max_x - min_x
-    sig_height = max_y - min_y
-    total_area = sum(c["area"] for c in valid_contours)
+    # Sort by area (largest first) and keep top 3
+    signatures.sort(key=lambda s: s["area"], reverse=True)
+    top_signatures = signatures[:3]
 
     logger.info(
-        f"[{request_id}] Merged signature region: "
-        f"position=({min_x}, {min_y}), "
-        f"size={sig_width}x{sig_height}, "
-        f"total_area={total_area}"
+        f"[{request_id}] Keeping top {len(top_signatures)} signature(s) by area"
     )
 
-    # Add balanced padding around the signature (15% of signature dimensions)
-    padding_pct = 0.25
-    padding_x = max(int(sig_width * padding_pct), 20)  # At least 20px
-    padding_y = max(int(sig_height * padding_pct), 20)  # At least 20px
+    # If there are 2 or more signatures, combine them vertically
+    if len(signatures) >= 2:
+        logger.info(f"[{request_id}] Multiple signatures detected, combining vertically with 50px padding")
 
-    # Calculate crop coordinates with padding, ensuring they stay within image bounds
-    crop_x1 = max(0, min_x - padding_x)
-    crop_y1 = max(0, min_y - padding_y)
-    crop_x2 = min(img_width, max_x + padding_x)
-    crop_y2 = min(img_height, max_y + padding_y)
+        # Convert OpenCV images to PIL for easier combining
+        pil_images = []
+        for sig in signatures:
+            # Convert BGR to RGB for PIL
+            rgb_img = cv2.cvtColor(sig["image"], cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(rgb_img)
+            pil_images.append(pil_img)
 
-    # Crop the signature region (now centered with balanced padding)
-    cropped_img = image[crop_y1:crop_y2, crop_x1:crop_x2]
+        # Calculate canvas dimensions
+        max_width = max(img.width for img in pil_images)
+        padding = 100
+        total_height = sum(img.height for img in pil_images) + padding * (len(pil_images) - 1)
 
-    logger.info(
-        f"[{request_id}] Cropped signature: "
-        f"output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}, "
-        f"padding=({padding_x}, {padding_y})"
-    )
+        logger.info(
+            f"[{request_id}] Canvas size: {max_width}x{total_height} "
+            f"({len(pil_images)} signatures with {padding}px padding)"
+        )
+
+        # Create white canvas (RGB mode)
+        combined_canvas = Image.new("RGB", (max_width, total_height), (255, 255, 255))
+
+        # Paste each signature centered horizontally
+        current_y = 0
+        for idx, pil_img in enumerate(pil_images):
+            # Center horizontally
+            x_offset = (max_width - pil_img.width) // 2
+            combined_canvas.paste(pil_img, (x_offset, current_y))
+            current_y += pil_img.height + padding
+
+            logger.info(
+                f"[{request_id}] Pasted signature {idx + 1}/{len(pil_images)}: "
+                f"size={pil_img.width}x{pil_img.height}, position=({x_offset}, {current_y - pil_img.height - padding})"
+            )
+
+        # Convert back to OpenCV format
+        cropped_img = cv2.cvtColor(np.array(combined_canvas), cv2.COLOR_RGB2BGR)
+
+        logger.info(
+            f"[{request_id}] Combined signature: output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}"
+        )
+    else:
+        # Single signature - return the largest one
+        largest_signature = top_signatures[0]
+        cropped_img = largest_signature["image"]
+        x1, y1, x2, y2 = largest_signature["bbox"]
+
+        logger.info(
+            f"[{request_id}] Single signature: "
+            f"position=({x1}, {y1}), "
+            f"output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}, "
+            f"area={largest_signature['area']:.0f}, "
+            f"aspect_ratio={largest_signature['aspect_ratio']:.2f}"
+        )
 
     # Encode cropped signature to PNG bytes
     success, encoded = cv2.imencode(".png", cropped_img)
@@ -744,10 +783,10 @@ async def _extract_signature_with_doc_intelligence(
     return result
 
 
-def _crop_signature_from_image(
+def _crop_signature_from_gpt(
     image_bytes: bytes,
     bounding_box: dict[str, float],
-    padding_percent: float = 5.0,
+    padding: int = 100,
     opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
@@ -759,7 +798,7 @@ def _crop_signature_from_image(
     Args:
         image_bytes: Image file bytes
         bounding_box: Dict with keys 'x', 'y', 'width', 'height' (all as percentages 0-100)
-        padding_percent: Additional padding to add around bounding box (percentage of image dimensions)
+        padding: Additional padding to add around bounding box in pixels (default: 100)
         opencv_upscale: If True, apply OpenCV post-processing (grayscale, sharpen, upscale 2x)
         opencv_crop: If True, apply OpenCV signature cropping using contour detection to isolate handwritten signature
         request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
@@ -792,13 +831,11 @@ def _crop_signature_from_image(
     x2 = int(((x_pct + width_pct) / 100) * img_width)
     y2 = int(((y_pct + height_pct) / 100) * img_height)
 
-    # Add padding (in pixels based on percentage of image dimensions)
-    padding_x = int((padding_percent / 100) * img_width)
-    padding_y = int((padding_percent / 100) * img_height)
-    x1 = max(0, x1 - padding_x)
-    y1 = max(0, y1 - padding_y)
-    x2 = min(img_width, x2 + padding_x)
-    y2 = min(img_height, y2 + padding_y)
+    # Add padding (in pixels)
+    x1 = max(0, x1 - padding)
+    y1 = max(0, y1 - padding)
+    x2 = min(img_width, x2 + padding)
+    y2 = min(img_height, y2 + padding)
 
     # Crop the signature region
     cropped = image.crop((x1, y1, x2, y2))
@@ -826,10 +863,10 @@ def _crop_signature_from_image(
     return base64_string
 
 
-def _crop_signature_from_pixels(
+def _crop_signature_from_adi(
     image_bytes: bytes,
     bbox: dict[str, float],
-    padding_percent: float = 5.0,
+    padding: int = 4,
     opencv_crop: bool = False,
     request_id: str | None = None,
 ) -> str:
@@ -841,7 +878,7 @@ def _crop_signature_from_pixels(
     Args:
         image_bytes: Image file bytes
         bbox: Dict with keys 'min_x', 'min_y', 'max_x', 'max_y' (in pixels)
-        padding_percent: Additional padding to add around bounding box (percentage of bbox dimensions)
+        padding: Additional padding to add around bounding box in pixels (default: 4)
         opencv_crop: If True, apply OpenCV signature cropping using contour detection to isolate handwritten signature
         request_id: Request ID for logging (required if opencv_crop=True)
 
@@ -869,17 +906,11 @@ def _crop_signature_from_pixels(
             f"Invalid bounding box dimensions: max_x={max_x}, max_y={max_y}"
         )
 
-    # Calculate padding (in pixels based on percentage of bbox dimensions)
-    bbox_width = max_x - min_x
-    bbox_height = max_y - min_y
-    padding_x = int((padding_percent / 100) * bbox_width)
-    padding_y = int((padding_percent / 100) * bbox_height)
-
-    # Apply padding and ensure within image bounds
-    x1 = max(0, int(min_x) - padding_x)
-    y1 = max(0, int(min_y) - padding_y)
-    x2 = min(img_width, int(max_x) + padding_x)
-    y2 = min(img_height, int(max_y) + padding_y)
+    # Apply padding (in pixels) and ensure within image bounds
+    x1 = max(0, int(min_x) - padding)
+    y1 = max(0, int(min_y) - padding)
+    x2 = min(img_width, int(max_x) + padding)
+    y2 = min(img_height, int(max_y) + padding)
 
     # Crop the signature region
     cropped = image.crop((x1, y1, x2, y2))
@@ -1361,25 +1392,25 @@ def _validate_env_variables(
 
 def _validate_padding_parameter(
     padding_str: str, request_id: str
-) -> tuple[float, func.HttpResponse | None]:
+) -> tuple[int, func.HttpResponse | None]:
     """
     Validate and parse padding parameter.
 
     Args:
-        padding_str: String value of padding parameter
+        padding_str: String value of padding parameter (in pixels)
         request_id: Request ID for logging
 
     Returns:
         Tuple of (padding_value, error_response). If valid, error_response is None.
     """
     try:
-        padding = float(padding_str)
+        padding = int(padding_str)
     except ValueError:
-        return 0.0, func.HttpResponse(
+        return 0, func.HttpResponse(
             json.dumps(
                 {
                     "error": "Invalid parameters",
-                    "message": "padding must be a number",
+                    "message": "padding must be an integer",
                     "request_id": request_id,
                 }
             ),
@@ -1387,12 +1418,12 @@ def _validate_padding_parameter(
             status_code=400,
         )
 
-    if not (0 <= padding <= 50):
-        return 0.0, func.HttpResponse(
+    if not (0 <= padding <= 500):
+        return 0, func.HttpResponse(
             json.dumps(
                 {
                     "error": "Invalid parameters",
-                    "message": "padding must be between 0 and 50 percent",
+                    "message": "padding must be between 0 and 500 pixels",
                     "request_id": request_id,
                 }
             ),
@@ -2291,9 +2322,10 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
     Query Parameters:
         - model (optional): Azure OpenAI model name (default: from env AZURE_OPENAI_MODEL)
-        - padding (optional): Additional padding around signature in percent (default: 5.0)
+        - padding (optional): Additional padding around signature in pixels (default: 100)
         - opencv_upscale (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
+        - prompt_center (optional): Use centered bounding box prompt with balanced padding (default: false)
 
     Request Body:
         JSON with the following fields:
@@ -2323,9 +2355,10 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         # Get optional parameters
         model = req.params.get("model")
-        padding_str = req.params.get("padding", "5.0")
+        padding_str = req.params.get("padding", "100")
         opencv_upscale_str = req.params.get("opencv_upscale", "false").lower()
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
+        prompt_center_str = req.params.get("prompt_center", "false").lower()
 
         # Validate and parse padding
         padding, padding_error = _validate_padding_parameter(padding_str, request_id)
@@ -2334,6 +2367,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         opencv_upscale = opencv_upscale_str in ("true", "1", "yes")
         opencv_crop = opencv_crop_str in ("true", "1", "yes")
+        prompt_center = prompt_center_str in ("true", "1", "yes")
 
         # Parse and validate JSON body
         body, body_error = _parse_json_body(req, request_id)
@@ -2359,7 +2393,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         # Extract signatures using Azure OpenAI Vision API
         extraction_start = time.time()
-        extraction_result = await _extract_signature_with_openai(image_bytes, request_id, model)
+        extraction_result = await _extract_signature_with_openai(image_bytes, request_id, model, prompt_center)
         extraction_time = time.time() - extraction_start
 
         signatures_found = extraction_result.get("signatures_found", 0)
@@ -2422,7 +2456,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         crop_start = time.time()
         bounding_box = target_signature.get("bounding_box", {})
         try:
-            cropped_base64 = _crop_signature_from_image(
+            cropped_base64 = _crop_signature_from_gpt(
                 image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
             )
         except ValueError as e:
@@ -2479,6 +2513,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
             "signatures_found": signatures_found,
             "owner_signatures_found": len(owner_signatures),
             "model_used": model or AZURE_OPENAI_MODEL,
+            "prompt_centered": prompt_center,
             "opencv_upscaling": opencv_upscale,
             "opencv_processing": opencv_crop,
             "request_id": request_id,
@@ -2530,7 +2565,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
     Query Parameters:
         - model_id (optional): Azure Document Intelligence model ID (default: from env AZURE_DI_MODEL_ID)
-        - padding (optional): Additional padding around signature in percent (default: 5.0)
+        - padding (optional): Additional padding around signature in pixels (default: 4)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
 
     Request Body:
@@ -2559,7 +2594,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         # Get optional parameters
         model_id = req.params.get("model_id")
-        padding_str = req.params.get("padding", "5.0")
+        padding_str = req.params.get("padding", "4")
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
 
         # Validate and parse padding
@@ -2631,7 +2666,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         crop_start = time.time()
         bounding_box = target_signature.get("bounding_box", {})
         try:
-            cropped_base64 = _crop_signature_from_pixels(
+            cropped_base64 = _crop_signature_from_adi(
                 image_bytes, bounding_box, padding, opencv_crop, request_id
             )
         except ValueError as e:
@@ -3052,29 +3087,32 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        # Convert both images to RGBA to preserve transparency if any
-        image1 = image1.convert("RGBA")
-        image2 = image2.convert("RGBA")
+        # Convert both images to RGB (white background) to match _opencv_crop_signature behavior
+        image1 = image1.convert("RGB")
+        image2 = image2.convert("RGB")
 
-        # Calculate canvas size: width = max of both widths; height = sum of both heights
+        # Calculate canvas size: width = max of both widths; height = sum of both heights + padding
+        padding = 100
         out_width = max(image1.width, image2.width)
-        out_height = image1.height + image2.height
+        out_height = image1.height + image2.height + padding
 
         logger.info(
             f"[{request_id}] Combining signatures: "
             f"sig1={image1.width}x{image1.height}, "
             f"sig2={image2.width}x{image2.height}, "
-            f"canvas={out_width}x{out_height}"
+            f"canvas={out_width}x{out_height} (with {padding}px padding)"
         )
 
-        # Create a transparent canvas
-        combined_image = Image.new("RGBA", (out_width, out_height), (0, 0, 0, 0))
+        # Create a white canvas (RGB mode)
+        combined_image = Image.new("RGB", (out_width, out_height), (255, 255, 255))
 
-        # Paste top image at (0, 0)
-        combined_image.paste(image1, (0, 0))
+        # Paste first image centered horizontally at top
+        x_offset1 = (out_width - image1.width) // 2
+        combined_image.paste(image1, (x_offset1, 0))
 
-        # Paste bottom image under the top
-        combined_image.paste(image2, (0, image1.height))
+        # Paste second image centered horizontally below first image with padding
+        x_offset2 = (out_width - image2.width) // 2
+        combined_image.paste(image2, (x_offset2, image1.height + padding))
 
         logger.info(
             f"[{request_id}] Combined image size: {combined_image.width}x{combined_image.height}"
