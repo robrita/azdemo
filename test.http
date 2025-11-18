@@ -578,11 +578,98 @@ Content-Type: application/json
 {
   "filename": "valid_id1.png",
   "content": "iVBORw0KGgoAAAANS..."
-Content-Disposition: form-data; name="image"; filename="document.txt"
-Content-Type: text/plain
+}
 
-This is not an image file.
-------WebKitFormBoundary7MA4YWxkTrZu0gW--
+### ============================================
+### Azure Document Intelligence Signature Crop
+### ============================================
+
+### Azure DI Crop Signature - Basic Request
+POST {{baseUrl}}/adi_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - Custom Padding (10%)
+POST {{baseUrl}}/adi_crop?padding=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - Custom Model ID
+POST {{baseUrl}}/adi_crop?model_id=valid_id2
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - With OpenCV Post-Processing (Upscale 2x + Grayscale + Sharpen)
+POST {{baseUrl}}/adi_crop?opencv_process=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - OpenCV Processing + Custom Padding
+POST {{baseUrl}}/adi_crop?opencv_process=true&padding=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - All Parameters
+POST {{baseUrl}}/adi_crop?model_id=valid_id2&padding=8&opencv_process=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - Missing Content (Error Case)
+POST {{baseUrl}}/adi_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
+
+### Azure DI Crop Signature - Invalid Base64 Content (Error Case)
+POST {{baseUrl}}/adi_crop
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "not-valid-base64!!!"
+}
+
+### Azure DI Crop Signature - Invalid Padding Value (Error Case)
+POST {{baseUrl}}/adi_crop?padding=invalid
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
+
+### Azure DI Crop Signature - No Authentication (Error Case)
+POST {{baseUrl}}/adi_crop
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANS..."
+}
 
 ### ============================================
 ### Signature Compare Forward Endpoint

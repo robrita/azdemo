@@ -6,11 +6,15 @@ Azure Function App providing REST API access to Azure AI Search with hybrid vect
 
 - **AI Search Integration**: Hybrid queries with text and vector fields
 - **Signature Comparison**: Automated signature verification using OpenCV and OpenAI CLIP embeddings
-- **Signature Extraction & Enhancement**: AI-powered signature detection with optional OpenCV post-processing (grayscale, sharpen, 2x upscale)
+- **Signature Extraction & Enhancement**:
+  - **Azure OpenAI Vision API** (GPT-4.1): Natural language-based signature detection with owner/non-owner classification
+  - **Azure Document Intelligence**: AI-powered layout analysis with precise polygon bounding boxes
+  - **OpenCV Post-Processing**: Optional 2x upscaling (LapSRN), grayscale conversion, and sharpening
 - **Parallel Execution**: Batch operations execute concurrently using async/await
 - **Multi-Format Support**: Handles PNG, JPG, JPEG, and PDF files
 - **API Key Authentication**: Secure endpoints with X-API-Key header (query param fallback)
 - **Structured Logging**: Request ID tracking and performance metrics
+- **Serverless Compatible**: All operations in-memory, no file system writes required
 
 ## Endpoints
 
@@ -204,6 +208,87 @@ Extract and crop handwritten signature from an image using Azure OpenAI Vision A
   }
 }
 ```
+
+#### `POST /api/adi_crop`
+
+Extract and crop handwritten signature from an image using Azure Document Intelligence.
+
+**Use Case**: Automatically detect and extract signature regions from documents using AI-powered layout analysis. Returns the cropped signature as a base64-encoded PNG. More accurate than contour detection for complex documents with busy backgrounds.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Query Parameters** (all optional):
+
+- `model_id`: Azure Document Intelligence model ID (default: from `AZURE_DI_MODEL_ID` env var, typically `prebuilt-layout`)
+- `padding`: Additional padding around signature in percent (0-50, default: 5.0)
+- `opencv_process`: Enable OpenCV post-processing (`true` or `false`, default: `false`)
+  - When enabled, applies 2x upscaling using LapSRN, grayscale conversion, and sharpening (unsharp masking)
+  - Output image will be 2x larger, grayscale, and clearer (not blurred)
+  - Useful for improving low-quality or small signature images
+
+**Request Body** (application/json):
+
+```json
+{
+  "content": "iVBORw0KGgoAAAANS...base64_encoded_image_data..."
+}
+```
+
+- `content` (required): Base64-encoded image content (PNG, JPG, JPEG formats supported)
+
+**Response** (Success - 200):
+
+```json
+{
+  "cropped_signature": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_png_data...",
+  "signature_info": {
+    "id": 1,
+    "field_name": "signature_field",
+    "page_number": 1,
+    "bounding_box": {
+      "min_x": 150.5,
+      "min_y": 320.2,
+      "max_x": 380.8,
+      "max_y": 380.7,
+      "width": 230.3,
+      "height": 60.5
+    }
+  },
+  "signatures_found": 1,
+  "model_used": "prebuilt-layout",
+  "opencv_processing": false,
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 850.45,
+    "crop_ms": 8.34,
+    "total_ms": 858.79
+  }
+}
+```
+
+**Response** (No Signatures Found - 404):
+
+```json
+{
+  "error": "No signatures found",
+  "message": "No signature regions detected by Document Intelligence",
+  "request_id": "abc12345",
+  "performance": {
+    "extraction_ms": 800.12,
+    "total_ms": 800.12
+  }
+}
+```
+
+**Notes**:
+
+- Requires Azure Document Intelligence (Form Recognizer) resource configured
+- Uses polygon-based bounding boxes (more accurate than OpenAI Vision percentages)
+- Supports both custom trained models and prebuilt layout model
+- Custom models with explicit "Signature" fields provide best accuracy
+- Fallback to "figures" detection from layout model if no signature fields found
 
 **Response** (Specific Signature Not Found - 404):
 
@@ -548,6 +633,18 @@ curl -X POST "http://localhost:7071/api/gpt_crop?opencv_process=true&padding=10"
   -H "X-API-Key: your-key" \
   -H "Content-Type: application/json" \
   -d '{"filename": "valid_id.jpg", "content": "iVBORw0KGgoAAAANS..."}'
+
+# Crop signature using Azure Document Intelligence
+curl -X POST "http://localhost:7071/api/adi_crop?padding=5" \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "iVBORw0KGgoAAAANS..."}'
+
+# Azure DI with custom model and OpenCV post-processing
+curl -X POST "http://localhost:7071/api/adi_crop?model_id=valid_id2&opencv_process=true&padding=10" \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "iVBORw0KGgoAAAANS..."}'
 ```
 
 **Note**: For signature comparison testing, you'll need to prepare test images:

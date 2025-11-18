@@ -336,6 +336,80 @@ if isinstance(container, func.HttpResponse):
 4. Avoid copy-pasting code between different route handlers
 5. When two functions are always called together in sequence, consider merging them into one
 
+#### Common Validation Helper Functions
+
+The following helper functions are available for validating common API request patterns:
+
+**1. `_validate_env_variables(required_vars, request_id)`**
+
+- Validates that required environment variables are set
+- Returns `HttpResponse` with error or `None` if valid
+- Example:
+  ```python
+  env_error = _validate_env_variables(
+      {
+          "AZURE_OPENAI_API_KEY": AZURE_OPENAI_API_KEY,
+          "AZURE_OPENAI_ENDPOINT": AZURE_OPENAI_ENDPOINT,
+      },
+      request_id,
+  )
+  if env_error:
+      return env_error
+  ```
+
+**2. `_validate_padding_parameter(padding_str, request_id)`**
+
+- Validates and parses padding parameter (0-50 percent range)
+- Returns tuple of `(padding_value, error_response)`
+- Example:
+  ```python
+  padding, padding_error = _validate_padding_parameter(padding_str, request_id)
+  if padding_error:
+      return padding_error
+  ```
+
+**3. `_parse_json_body(req, request_id)`**
+
+- Parses and validates JSON request body
+- Returns tuple of `(body_dict, error_response)`
+- Example:
+  ```python
+  body, body_error = _parse_json_body(req, request_id)
+  if body_error:
+      return body_error
+  ```
+
+**4. `_validate_required_fields(body, required_fields, request_id)`**
+
+- Validates that required fields are present in request body
+- Returns `HttpResponse` with error or `None` if valid
+- Example:
+  ```python
+  fields_error = _validate_required_fields(body, ["filename", "content"], request_id)
+  if fields_error:
+      return fields_error
+  ```
+
+**5. `_decode_base64_content(base64_content, request_id)`**
+
+- Decodes base64-encoded content
+- Returns tuple of `(decoded_bytes, error_response)`
+- Example:
+  ```python
+  image_bytes, decode_error = _decode_base64_content(base64_content, request_id)
+  if decode_error:
+      return decode_error
+  ```
+
+**Usage Pattern**:
+These functions follow a consistent error-handling pattern where they return either:
+
+- A tuple with the result and `None` (success), or
+- A tuple with a default value and an `HttpResponse` error (failure), or
+- An `HttpResponse` error or `None` (for validation-only functions)
+
+Always check for errors immediately after calling these functions and return early if validation fails.
+
 ### Feature Removal and Cleanup
 
 **CRITICAL**: When removing features or dependencies:
