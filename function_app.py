@@ -413,7 +413,8 @@ def _opencv_crop_signature(
     """
     Crop the signature region from an image using OpenCV contour detection.
     Uses adaptive thresholding, morphological operations, and contour filtering
-    to isolate the handwritten signature.
+    to isolate the handwritten signature. Ensures the signature is centered
+    in the output with balanced padding on all sides.
 
     All processing is done in-memory (serverless-compatible).
 
@@ -422,7 +423,7 @@ def _opencv_crop_signature(
         request_id: Request ID for logging
 
     Returns:
-        Cropped PNG image bytes containing only the signature region
+        Cropped PNG image bytes containing only the signature region, centered
 
     Raises:
         ValueError: If image processing fails or no signature found
@@ -433,7 +434,8 @@ def _opencv_crop_signature(
     if image is None:
         raise ValueError("Failed to decode image bytes")
 
-    logger.info(f"[{request_id}] OpenCV signature cropping: input size {image.shape[1]}x{image.shape[0]}")
+    img_height, img_width = image.shape[:2]
+    logger.info(f"[{request_id}] OpenCV signature cropping: input size {img_width}x{img_height}")
 
     # Convert to grayscale
     gray: Any = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -457,7 +459,7 @@ def _opencv_crop_signature(
 
     # Filter contours by area and aspect ratio (typical signature characteristics)
     min_area = 500
-    signatures: list[dict[str, Any]] = []
+    valid_contours: list[dict[str, Any]] = []
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -468,51 +470,67 @@ def _opencv_crop_signature(
         aspect_ratio = w / float(h) if h > 0 else 0
 
         # Signatures typically have aspect ratio between 1.5 and 5.0
+        # Store individual contour bounding boxes
         if 1.5 <= aspect_ratio <= 5.0 and w > 50 and h > 20:
-            # Extra padding around signature region
-            padding = 10
-            x1 = max(0, x - padding)
-            y1 = max(0, y - padding)
-            x2 = min(image.shape[1], x + w + padding)
-            y2 = min(image.shape[0], y + h + padding)
-
-            cropped_img = image[y1:y2, x1:x2]
-
-            # Calculate file size (encoded PNG size as a proxy for content richness)
-            success_encode, encoded_temp = cv2.imencode(".png", cropped_img)
-            file_size = len(encoded_temp.tobytes()) if success_encode else 0
-
-            signatures.append({
-                "image": cropped_img,
-                "bbox": (x1, y1, x2, y2),
+            valid_contours.append({
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
                 "area": area,
                 "aspect_ratio": aspect_ratio,
-                "file_size": file_size,
             })
 
-    # Sort by area and file size (largest first) and keep the top signature
-    if not signatures:
+    # If no valid contours found, return original image
+    if not valid_contours:
         logger.warning(f"[{request_id}] No signature contours found, returning original image")
         return image_bytes
 
     logger.info(
-        f"[{request_id}] OpenCV contour detection identified {len(signatures)} signature candidate(s)"
+        f"[{request_id}] OpenCV contour detection identified {len(valid_contours)} signature contour(s)"
     )
 
-    # Sort by combined score: area (primary) and file size (secondary)
-    signatures.sort(key=lambda s: (s["area"], s["file_size"]), reverse=True)
-    top_signature = signatures[0]
+    # Calculate merged bounding box encompassing all valid contours
+    # This ensures we capture the complete signature including all disconnected strokes
+    min_x = min(c["x"] for c in valid_contours)
+    min_y = min(c["y"] for c in valid_contours)
+    max_x = max(c["x"] + c["w"] for c in valid_contours)
+    max_y = max(c["y"] + c["h"] for c in valid_contours)
+
+    # Calculate signature dimensions
+    sig_width = max_x - min_x
+    sig_height = max_y - min_y
+    total_area = sum(c["area"] for c in valid_contours)
 
     logger.info(
-        f"[{request_id}] Found signature: "
-        f"size={top_signature['image'].shape[1]}x{top_signature['image'].shape[0]}, "
-        f"area={top_signature['area']}, "
-        f"file_size={top_signature['file_size']} bytes, "
-        f"aspect_ratio={top_signature['aspect_ratio']:.2f}"
+        f"[{request_id}] Merged signature region: "
+        f"position=({min_x}, {min_y}), "
+        f"size={sig_width}x{sig_height}, "
+        f"total_area={total_area}"
+    )
+
+    # Add balanced padding around the signature (15% of signature dimensions)
+    padding_pct = 0.25
+    padding_x = max(int(sig_width * padding_pct), 20)  # At least 20px
+    padding_y = max(int(sig_height * padding_pct), 20)  # At least 20px
+
+    # Calculate crop coordinates with padding, ensuring they stay within image bounds
+    crop_x1 = max(0, min_x - padding_x)
+    crop_y1 = max(0, min_y - padding_y)
+    crop_x2 = min(img_width, max_x + padding_x)
+    crop_y2 = min(img_height, max_y + padding_y)
+
+    # Crop the signature region (now centered with balanced padding)
+    cropped_img = image[crop_y1:crop_y2, crop_x1:crop_x2]
+
+    logger.info(
+        f"[{request_id}] Cropped signature: "
+        f"output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}, "
+        f"padding=({padding_x}, {padding_y})"
     )
 
     # Encode cropped signature to PNG bytes
-    success, encoded = cv2.imencode(".png", top_signature["image"])
+    success, encoded = cv2.imencode(".png", cropped_img)
     if not success:
         raise ValueError("Failed to encode cropped signature to PNG")
 
