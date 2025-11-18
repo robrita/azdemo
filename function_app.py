@@ -2382,7 +2382,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 ),
                 mimetype="application/json",
-                status_code=404,
+                status_code=200,
             )
 
         # Filter signatures to only include owner signatures
@@ -2407,7 +2407,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 ),
                 mimetype="application/json",
-                status_code=404,
+                status_code=200,
             )
 
         logger.info(f"[{request_id}] Found {len(owner_signatures)} owner signature(s) out of {signatures_found} total")
@@ -2929,6 +2929,225 @@ async def sig_compare(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps(
                 {
                     "error": "Signature comparison forwarding failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="sig_dedup", methods=["POST"])
+@require_api_key
+async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Deduplicate handwritten signature images by combining and cropping.
+
+    Accepts JSON body with two base64-encoded signature images:
+    - signature1: First signature image (base64)
+    - signature2: Second signature image (base64)
+
+    If only one signature is provided (the other is empty/null), returns that signature immediately.
+    If both signatures are provided, combines them vertically and crops to a single signature region.
+
+    Returns the deduplicated signature as a base64-encoded PNG image.
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Signature deduplication request initiated")
+
+    try:
+        # Parse and validate JSON body
+        body, body_error = _parse_json_body(req, request_id)
+        if body_error:
+            return body_error
+
+        # Extract signature parameters
+        signature1_base64 = body.get("signature1", "")
+        signature2_base64 = body.get("signature2", "")
+
+        # Check if both signatures are empty
+        if not signature1_base64 and not signature2_base64:
+            logger.warning(f"[{request_id}] Both signature parameters are empty")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing signatures",
+                        "message": "At least one signature image must be provided (signature1 or signature2)",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # If only one signature provided, return it immediately
+        if not signature1_base64:
+            logger.info(f"[{request_id}] Only signature2 provided, returning immediately")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "signature_base64": signature2_base64,
+                        "request_id": request_id,
+                        "message": "Single signature returned (signature2 only)",
+                        "performance": {
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=200,
+            )
+
+        if not signature2_base64:
+            logger.info(f"[{request_id}] Only signature1 provided, returning immediately")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "signature_base64": signature1_base64,
+                        "request_id": request_id,
+                        "message": "Single signature returned (signature1 only)",
+                        "performance": {
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=200,
+            )
+
+        # Both signatures provided - decode them
+        logger.info(f"[{request_id}] Both signatures provided, proceeding with deduplication")
+
+        decode_start = time.time()
+        sig1_bytes, decode_error1 = _decode_base64_content(signature1_base64, request_id)
+        if decode_error1:
+            return decode_error1
+
+        sig2_bytes, decode_error2 = _decode_base64_content(signature2_base64, request_id)
+        if decode_error2:
+            return decode_error2
+
+        decode_time = time.time() - decode_start
+
+        # Open images using PIL for better handling of different widths
+        combine_start = time.time()
+        try:
+            image1 = Image.open(io.BytesIO(sig1_bytes))  # type: ignore[arg-type]
+            image2 = Image.open(io.BytesIO(sig2_bytes))  # type: ignore[arg-type]
+        except Exception as e:
+            logger.error(f"[{request_id}] Failed to open signature images: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid image",
+                        "message": f"Failed to decode signature images. Please provide valid image formats (PNG, JPEG): {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Convert both images to RGBA to preserve transparency if any
+        image1 = image1.convert("RGBA")
+        image2 = image2.convert("RGBA")
+
+        # Calculate canvas size: width = max of both widths; height = sum of both heights
+        out_width = max(image1.width, image2.width)
+        out_height = image1.height + image2.height
+
+        logger.info(
+            f"[{request_id}] Combining signatures: "
+            f"sig1={image1.width}x{image1.height}, "
+            f"sig2={image2.width}x{image2.height}, "
+            f"canvas={out_width}x{out_height}"
+        )
+
+        # Create a transparent canvas
+        combined_image = Image.new("RGBA", (out_width, out_height), (0, 0, 0, 0))
+
+        # Paste top image at (0, 0)
+        combined_image.paste(image1, (0, 0))
+
+        # Paste bottom image under the top
+        combined_image.paste(image2, (0, image1.height))
+
+        logger.info(
+            f"[{request_id}] Combined image size: {combined_image.width}x{combined_image.height}"
+        )
+
+        # Convert combined image to PNG bytes
+        combined_buffer = io.BytesIO()
+        combined_image.save(combined_buffer, format="PNG")
+        combined_bytes = combined_buffer.getvalue()
+        combine_time = time.time() - combine_start
+
+        # Apply OpenCV signature cropping
+        crop_start = time.time()
+        logger.info(f"[{request_id}] Applying OpenCV signature cropping to combined image")
+        try:
+            cropped_bytes = _opencv_crop_signature(combined_bytes, request_id)
+        except ValueError as e:
+            logger.error(f"[{request_id}] Signature cropping failed: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Signature extraction failed",
+                        "message": f"Failed to extract signature from combined image: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        crop_time = time.time() - crop_start
+
+        # Encode result to base64
+        encode_start = time.time()
+        result_base64 = base64.b64encode(cropped_bytes).decode("utf-8")
+        encode_time = time.time() - encode_start
+
+        total_time = time.time() - start_time
+
+        logger.info(
+            f"[{request_id}] Signature deduplication completed successfully in {total_time:.3f}s"
+        )
+
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "signature_base64": result_base64,
+                    "request_id": request_id,
+                    "message": "Signatures deduplicated successfully",
+                    "performance": {
+                        "decode_ms": round(decode_time * 1000, 2),
+                        "combine_ms": round(combine_time * 1000, 2),
+                        "crop_ms": round(crop_time * 1000, 2),
+                        "encode_ms": round(encode_time * 1000, 2),
+                        "total_ms": round(total_time * 1000, 2),
+                    },
+                }
+            ),
+            mimetype="application/json",
+            status_code=200,
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Signature deduplication failed after {total_time:.3f}s: "
+            f"{type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Signature deduplication failed",
                     "message": str(e),
                     "request_id": request_id,
                 }

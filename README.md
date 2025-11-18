@@ -395,6 +395,115 @@ The endpoint sends a JSON POST request to the `forward_endpoint` with the follow
 7. Uses `aiohttp` for async HTTP requests to the target endpoint
 8. Use the `request_id` to correlate requests with server logs for debugging
 
+#### `POST /api/deduplicate_signature`
+
+Deduplicate handwritten signature images by combining and cropping to a single signature region.
+
+**Use Case**: When you have two signature images that may contain duplicate or overlapping signatures, this endpoint combines them vertically and uses OpenCV contour detection to crop to a single unified signature region. Useful for cleaning up signature data before comparison or storage.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Request Body** (application/json):
+
+```json
+{
+  "signature1": "base64_encoded_image_string",
+  "signature2": "base64_encoded_image_string"
+}
+```
+
+**Parameters**:
+
+- `signature1` (string): First signature image as base64-encoded string (PNG, JPEG)
+- `signature2` (string): Second signature image as base64-encoded string (PNG, JPEG)
+
+**Behavior**:
+
+1. If both `signature1` and `signature2` are empty → Returns error (400)
+2. If only `signature1` is provided → Returns `signature1` immediately without processing
+3. If only `signature2` is provided → Returns `signature2` immediately without processing
+4. If both signatures are provided → Combines them vertically (signature2 below signature1) and applies OpenCV signature cropping
+
+**Response** (Success - 200):
+
+```json
+{
+  "signature_base64": "base64_encoded_cropped_signature",
+  "request_id": "abc12345",
+  "message": "Signatures deduplicated successfully",
+  "performance": {
+    "decode_ms": 5.12,
+    "combine_ms": 8.45,
+    "crop_ms": 120.34,
+    "encode_ms": 3.67,
+    "total_ms": 137.58
+  }
+}
+```
+
+**Response** (Single Signature - 200):
+
+```json
+{
+  "signature_base64": "base64_encoded_original_signature",
+  "request_id": "abc12345",
+  "message": "Single signature returned (signature1 only)",
+  "performance": {
+    "total_ms": 2.45
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request**: Both signatures empty, invalid base64 encoding, or invalid image format
+- **500 Internal Server Error**: Image processing failed or signature extraction failed
+
+**Processing Pipeline**:
+
+1. **Validation**: Check if at least one signature is provided
+2. **Early Return**: If only one signature exists, return it immediately
+3. **Decoding**: Decode both base64 strings to image bytes
+4. **Combining**: Stack images vertically (preserving original sizes)
+5. **Cropping**: Apply OpenCV contour detection to extract signature region
+   - Uses adaptive thresholding and morphological operations
+   - Filters contours by area and aspect ratio (1.5-5.0)
+   - Adds 25% padding around detected signature
+6. **Encoding**: Convert result to base64 PNG string
+
+**OpenCV Signature Cropping**:
+
+The endpoint uses the same OpenCV-based signature extraction as other endpoints:
+
+- Adaptive thresholding for robust text detection
+- Contour filtering by area (>500px²) and aspect ratio (1.5-5.0)
+- Merged bounding box encompassing all signature strokes
+- Balanced padding (25% of signature dimensions, minimum 20px)
+- Returns original image if no valid signature contours found
+
+**Important Notes**:
+
+1. All processing is **serverless-compatible** (in-memory only, no file system writes)
+2. Both signatures are combined at their **original sizes** (no resizing)
+3. Only **one cropped signature** is returned (the merged/deduplicated result)
+4. Uses **async operations** for scalability
+5. Performance metrics track each processing stage for monitoring
+6. If cropping fails to find a signature, returns an error instead of the original combined image
+
+**Example cURL Request**:
+
+```bash
+curl -X POST "http://localhost:7071/api/deduplicate_signature" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "signature1": "iVBORw0KGgoAAAANS...",
+    "signature2": "iVBORw0KGgoAAAANS..."
+  }'
+```
+
 **Bounding Box Format**:
 
 - `x`: Left edge position (percentage, 0-100)

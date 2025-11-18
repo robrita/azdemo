@@ -771,6 +771,72 @@ Content-Type: image/png
 < ./testdata/specimen/testing/specimen1.png
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
+### Deduplicate Signature - Both Signatures Provided (Happy Path)
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg=="
+}
+
+### Deduplicate Signature - Only Signature1 Provided
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "signature2": ""
+}
+
+### Deduplicate Signature - Only Signature2 Provided
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "",
+  "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg=="
+}
+
+### Deduplicate Signature - Both Empty (Error Case)
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "",
+  "signature2": ""
+}
+
+### Deduplicate Signature - Missing Parameters (Error Case)
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+}
+
+### Deduplicate Signature - Invalid Base64 (Error Case)
+POST {{baseUrl}}/deduplicate_signature
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "not-valid-base64!!!",
+  "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg=="
+}
+
+### Deduplicate Signature - Missing API Key (Error Case)
+POST {{baseUrl}}/deduplicate_signature
+Content-Type: application/json
+
+{
+  "signature1": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg=="
+}
 
 
 
