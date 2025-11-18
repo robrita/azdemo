@@ -2616,7 +2616,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 ),
                 mimetype="application/json",
-                status_code=404,
+                status_code=200,
             )
 
         logger.info(f"[{request_id}] Found {signatures_found} signature(s)")
