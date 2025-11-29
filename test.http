@@ -771,8 +771,8 @@ Content-Type: image/png
 < ./testdata/specimen/testing/specimen1.png
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
-### Deduplicate Signature - Both Signatures Provided (Happy Path)
-POST {{baseUrl}}/deduplicate_signature
+### Deduplicate Signature - Two Signatures Provided (Happy Path)
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -782,7 +782,7 @@ Content-Type: application/json
 }
 
 ### Deduplicate Signature - Only Signature1 Provided
-POST {{baseUrl}}/deduplicate_signature
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -792,7 +792,7 @@ Content-Type: application/json
 }
 
 ### Deduplicate Signature - Only Signature2 Provided
-POST {{baseUrl}}/deduplicate_signature
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -801,26 +801,49 @@ Content-Type: application/json
   "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg=="
 }
 
-### Deduplicate Signature - Both Empty (Error Case)
-POST {{baseUrl}}/deduplicate_signature
+### Deduplicate Signature - Only Signature3 Provided
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
 {
   "signature1": "",
-  "signature2": ""
+  "signature2": "",
+  "signature3": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8zwAEAAH+Av4N2g1lAAAAAElFTkSuQmCC"
+}
+
+### Deduplicate Signature - All Empty (Error Case)
+POST {{baseUrl}}/sig_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "",
+  "signature2": "",
+  "signature3": ""
 }
 
 ### Deduplicate Signature - Missing Parameters (Error Case)
-POST {{baseUrl}}/deduplicate_signature
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
 {
 }
 
+### Deduplicate Signature - Three Signatures (Combines all three)
+POST {{baseUrl}}/sig_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "signature1": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "signature2": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA4MNO9AAAAABJRU5ErkJggg==",
+  "signature3": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8zwAEAAH+Av4N2g1lAAAAAElFTkSuQmCC"
+}
+
 ### Deduplicate Signature - Invalid Base64 (Error Case)
-POST {{baseUrl}}/deduplicate_signature
+POST {{baseUrl}}/sig_dedup
 X-API-Key: {{apiKey}}
 Content-Type: application/json
 
@@ -830,7 +853,7 @@ Content-Type: application/json
 }
 
 ### Deduplicate Signature - Missing API Key (Error Case)
-POST {{baseUrl}}/deduplicate_signature
+POST {{baseUrl}}/sig_dedup
 Content-Type: application/json
 
 {

@@ -395,11 +395,11 @@ The endpoint sends a JSON POST request to the `forward_endpoint` with the follow
 7. Uses `aiohttp` for async HTTP requests to the target endpoint
 8. Use the `request_id` to correlate requests with server logs for debugging
 
-#### `POST /api/deduplicate_signature`
+#### `POST /api/sig_dedup`
 
 Deduplicate handwritten signature images by combining and cropping to a single signature region.
 
-**Use Case**: When you have two signature images that may contain duplicate or overlapping signatures, this endpoint combines them vertically and uses OpenCV contour detection to crop to a single unified signature region. Useful for cleaning up signature data before comparison or storage.
+**Use Case**: When you have multiple signature images (up to 3) that may contain duplicate or overlapping signatures, this endpoint combines them vertically and uses OpenCV contour detection to crop to a single unified signature region. Useful for cleaning up signature data before comparison or storage.
 
 **Headers**:
 
@@ -410,21 +410,22 @@ Deduplicate handwritten signature images by combining and cropping to a single s
 ```json
 {
   "signature1": "base64_encoded_image_string",
-  "signature2": "base64_encoded_image_string"
+  "signature2": "base64_encoded_image_string",
+  "signature3": "base64_encoded_image_string"
 }
 ```
 
 **Parameters**:
 
-- `signature1` (string): First signature image as base64-encoded string (PNG, JPEG)
-- `signature2` (string): Second signature image as base64-encoded string (PNG, JPEG)
+- `signature1` (string, optional): First signature image as base64-encoded string (PNG, JPEG)
+- `signature2` (string, optional): Second signature image as base64-encoded string (PNG, JPEG)
+- `signature3` (string, optional): Third signature image as base64-encoded string (PNG, JPEG)
 
 **Behavior**:
 
-1. If both `signature1` and `signature2` are empty → Returns error (400)
-2. If only `signature1` is provided → Returns `signature1` immediately without processing
-3. If only `signature2` is provided → Returns `signature2` immediately without processing
-4. If both signatures are provided → Combines them vertically (signature2 below signature1) and applies OpenCV signature cropping
+1. If all signatures are empty → Returns error (400)
+2. If only one signature is provided → Returns that signature immediately without processing
+3. If multiple signatures are provided → Combines them vertically (stacked in order with padding) and applies OpenCV signature cropping
 
 **Response** (Success - 200):
 
@@ -495,12 +496,23 @@ The endpoint uses the same OpenCV-based signature extraction as other endpoints:
 **Example cURL Request**:
 
 ```bash
-curl -X POST "http://localhost:7071/api/deduplicate_signature" \
+# Two signatures
+curl -X POST "http://localhost:7071/api/sig_dedup" \
   -H "X-API-Key: your-api-key-here" \
   -H "Content-Type: application/json" \
   -d '{
     "signature1": "iVBORw0KGgoAAAANS...",
     "signature2": "iVBORw0KGgoAAAANS..."
+  }'
+
+# Three signatures
+curl -X POST "http://localhost:7071/api/sig_dedup" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "signature1": "iVBORw0KGgoAAAANS...",
+    "signature2": "iVBORw0KGgoAAAANS...",
+    "signature3": "iVBORw0KGgoAAAANS..."
   }'
 ```
 

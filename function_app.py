@@ -581,9 +581,9 @@ def _opencv_postprocess_image(
 ) -> bytes:
     """
     Apply OpenCV post-processing to enhance signature image:
-    1. Upscale 2x using LapSRN model (requires BGR input)
-    2. Convert to grayscale
-    3. Sharpen using unsharp masking
+    1. Convert to grayscale
+    2. Sharpen using unsharp masking
+    3. Upscale 2x using LapSRN model
 
     All processing is done in-memory (serverless-compatible).
 
@@ -592,13 +592,13 @@ def _opencv_postprocess_image(
         request_id: Request ID for logging
 
     Returns:
-        Processed PNG image bytes (upscaled 2x, grayscale, sharpened)
+        Processed PNG image bytes (grayscale, sharpened, upscaled 2x)
 
     Raises:
         FileNotFoundError: If LapSRN model file not found
         ValueError: If image processing fails
     """
-    # Load image from bytes (BGR format for super resolution)
+    # Load image from bytes
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
@@ -606,20 +606,11 @@ def _opencv_postprocess_image(
 
     logger.info(f"[{request_id}] OpenCV post-processing: input size {img.shape[1]}x{img.shape[0]}")
 
-    # Load and apply LapSRN model
-    sr_obj: Any = cv2.dnn_superres.DnnSuperResImpl_create()  # type: ignore[attr-defined]
-    sr = cast(Any, sr_obj)
-    sr.readModel(LAPSRN_MODEL_PATH)
-    sr.setModel("lapsrn", 2)  # 2x upscaling
-
-    upscaled = sr.upsample(img)
-    logger.info(f"[{request_id}] Upscaled 2x using LapSRN: output size {upscaled.shape[1]}x{upscaled.shape[0]}")
-
-    # 2. Convert to grayscale
-    gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+    # 1. Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     logger.info(f"[{request_id}] Converted to grayscale")
 
-    # 3. Sharpen using unsharp masking
+    # 2. Sharpen using unsharp masking
     # Parameters tuned for signature clarity
     gaussian_radius = 1.5
     amount = 1.5
@@ -630,8 +621,23 @@ def _opencv_postprocess_image(
     sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
     logger.info(f"[{request_id}] Applied unsharp masking (radius={gaussian_radius}, amount={amount})")
 
+    # 3. Convert back to BGR for LapSRN (requires 3-channel input)
+    sharpened_bgr = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
+
+    # 4. Load and apply LapSRN model for 2x upscaling
+    sr_obj: Any = cv2.dnn_superres.DnnSuperResImpl_create()  # type: ignore[attr-defined]
+    sr = cast(Any, sr_obj)
+    sr.readModel(LAPSRN_MODEL_PATH)
+    sr.setModel("lapsrn", 2)  # 2x upscaling
+
+    upscaled = sr.upsample(sharpened_bgr)
+    logger.info(f"[{request_id}] Upscaled 2x using LapSRN: output size {upscaled.shape[1]}x{upscaled.shape[0]}")
+
+    # Convert back to grayscale for final output
+    final_gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+
     # Encode to PNG bytes
-    success, encoded = cv2.imencode(".png", sharpened)
+    success, encoded = cv2.imencode(".png", final_gray)
     if not success:
         raise ValueError("Failed to encode processed image to PNG")
 
@@ -865,8 +871,9 @@ def _crop_signature_from_gpt(
 
 def _crop_signature_from_adi(
     image_bytes: bytes,
-    bbox: dict[str, float],
+    bbox: dict[str, float] | None,
     padding: int = 4,
+    opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
 ) -> str:
@@ -877,50 +884,64 @@ def _crop_signature_from_adi(
 
     Args:
         image_bytes: Image file bytes
-        bbox: Dict with keys 'min_x', 'min_y', 'max_x', 'max_y' (in pixels)
+        bbox: Dict with keys 'min_x', 'min_y', 'max_x', 'max_y' (in pixels), or None to process entire image
         padding: Additional padding to add around bounding box in pixels (default: 4)
+        opencv_upscale: If True, apply OpenCV post-processing (grayscale, sharpen, upscale 2x)
         opencv_crop: If True, apply OpenCV signature cropping using contour detection to isolate handwritten signature
-        request_id: Request ID for logging (required if opencv_crop=True)
+        request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
 
     Returns:
         Base64-encoded PNG image string of the cropped signature
 
     Raises:
-        ValueError: If bounding box is invalid
+        ValueError: If bounding box is provided but invalid
     """
     # Load image from bytes (serverless pattern)
     image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     img_width, img_height = image.size
 
-    # Extract bounding box pixel coordinates
-    min_x = bbox.get("min_x", 0)
-    min_y = bbox.get("min_y", 0)
-    max_x = bbox.get("max_x", 0)
-    max_y = bbox.get("max_y", 0)
+    # If no bounding box provided, use the entire image
+    if bbox is None:
+        # Process entire image (no cropping, just apply OpenCV processing)
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        png_bytes = img_byte_arr.getvalue()
+    else:
+        # Extract bounding box pixel coordinates
+        min_x = bbox.get("min_x", 0)
+        min_y = bbox.get("min_y", 0)
+        max_x = bbox.get("max_x", 0)
+        max_y = bbox.get("max_y", 0)
 
-    # Validate bounding box
-    if not (0 <= min_x < img_width and 0 <= min_y < img_height):
-        raise ValueError(f"Invalid bounding box position: min_x={min_x}, min_y={min_y}")
-    if not (min_x < max_x <= img_width and min_y < max_y <= img_height):
-        raise ValueError(
-            f"Invalid bounding box dimensions: max_x={max_x}, max_y={max_y}"
-        )
+        # Validate bounding box
+        if not (0 <= min_x < img_width and 0 <= min_y < img_height):
+            raise ValueError(f"Invalid bounding box position: min_x={min_x}, min_y={min_y}")
+        if not (min_x < max_x <= img_width and min_y < max_y <= img_height):
+            raise ValueError(
+                f"Invalid bounding box dimensions: max_x={max_x}, max_y={max_y}"
+            )
 
-    # Apply padding (in pixels) and ensure within image bounds
-    x1 = max(0, int(min_x) - padding)
-    y1 = max(0, int(min_y) - padding)
-    x2 = min(img_width, int(max_x) + padding)
-    y2 = min(img_height, int(max_y) + padding)
+        # Apply padding (in pixels) and ensure within image bounds
+        x1 = max(0, int(min_x) - padding)
+        y1 = max(0, int(min_y) - padding)
+        x2 = min(img_width, int(max_x) + padding)
+        y2 = min(img_height, int(max_y) + padding)
 
-    # Crop the signature region
-    cropped = image.crop((x1, y1, x2, y2))
+        # Crop the signature region
+        cropped = image.crop((x1, y1, x2, y2))
 
-    # Convert to PNG bytes
-    img_byte_arr = io.BytesIO()
-    cropped.save(img_byte_arr, format="PNG")
-    png_bytes = img_byte_arr.getvalue()
+        # Convert to PNG bytes
+        img_byte_arr = io.BytesIO()
+        cropped.save(img_byte_arr, format="PNG")
+        png_bytes = img_byte_arr.getvalue()
 
     # Apply OpenCV post-processing if requested
+    if opencv_upscale:
+        if request_id is None:
+            raise ValueError("request_id is required when opencv_upscale=True")
+        png_bytes = _opencv_postprocess_image(png_bytes, request_id)
+
+    # Apply OpenCV signature cropping if requested
     if opencv_crop:
         if request_id is None:
             raise ValueError("request_id is required when opencv_crop=True")
@@ -2566,6 +2587,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
     Query Parameters:
         - model_id (optional): Azure Document Intelligence model ID (default: from env AZURE_DI_MODEL_ID)
         - padding (optional): Additional padding around signature in pixels (default: 4)
+        - opencv_upscale (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
 
     Request Body:
@@ -2574,6 +2596,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
     Returns:
         JSON response with cropped signature in base64 format (first detected signature)
+        If opencv_upscale=true, the output will be grayscale, sharpened, and upscaled 2x
         If opencv_crop=true, applies contour detection to isolate the handwritten signature region
     """
     request_id = _generate_request_id()
@@ -2595,6 +2618,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         # Get optional parameters
         model_id = req.params.get("model_id")
         padding_str = req.params.get("padding", "4")
+        opencv_upscale_str = req.params.get("opencv_upscale", "false").lower()
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
 
         # Validate and parse padding
@@ -2602,6 +2626,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         if padding_error:
             return padding_error
 
+        opencv_upscale = opencv_upscale_str in ("true", "1", "yes")
         opencv_crop = opencv_crop_str in ("true", "1", "yes")
 
         # Parse and validate JSON body
@@ -2633,7 +2658,8 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         signatures_found = extraction_result.get("signatures_found", 0)
         signatures = extraction_result.get("signatures", [])
 
-        if signatures_found == 0:
+        # If no signatures found and both opencv_upscale, opencv_crop are false, return early
+        if signatures_found == 0 and not opencv_upscale and not opencv_crop:
             logger.warning(f"[{request_id}] No signatures found in image")
             total_time = time.time() - start_time
             return func.HttpResponse(
@@ -2656,18 +2682,28 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         logger.info(f"[{request_id}] Found {signatures_found} signature(s)")
 
-        # Use the first detected signature
-        target_signature = signatures[0]
-        logger.info(
-            f"[{request_id}] Using first signature (ID: {target_signature.get('id')}, field: {target_signature.get('field_name')})"
-        )
-
-        # Crop signature from image using pixel coordinates
+        # Determine target signature and bounding box
         crop_start = time.time()
-        bounding_box = target_signature.get("bounding_box", {})
+        target_signature: dict[str, Any] | None = None
+        bounding_box: dict[str, float] | None = None
+
+        if signatures:
+            # Use the first detected signature
+            target_signature = signatures[0]
+            bounding_box = target_signature.get("bounding_box")
+            logger.info(
+                f"[{request_id}] Using first signature (ID: {target_signature.get('id')}, field: {target_signature.get('field_name')})"
+            )
+        else:
+            # No signatures found, but opencv_upscale or opencv_crop is enabled
+            # Process entire image with OpenCV
+            logger.info(
+                f"[{request_id}] No signatures detected, processing entire image with OpenCV "
+                f"(upscale={opencv_upscale}, crop={opencv_crop})"
+            )
         try:
             cropped_base64 = _crop_signature_from_adi(
-                image_bytes, bounding_box, padding, opencv_crop, request_id
+                image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
             )
         except ValueError as e:
             logger.error(f"[{request_id}] Failed to crop signature: {str(e)}")
@@ -2710,16 +2746,11 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         total_time = time.time() - start_time
 
         # Build response
-        result = {
+        result: dict[str, Any] = {
             "cropped_signature": cropped_base64,
-            "signature_info": {
-                "id": target_signature.get("id"),
-                "field_name": target_signature.get("field_name"),
-                "page_number": target_signature.get("page_number"),
-                "bounding_box": bounding_box,
-            },
             "signatures_found": signatures_found,
             "model_used": model_id or AZURE_DI_MODEL_ID,
+            "opencv_upscaling": opencv_upscale,
             "opencv_processing": opencv_crop,
             "request_id": request_id,
             "performance": {
@@ -2729,13 +2760,29 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
             },
         }
 
-        logger.info(
-            f"[{request_id}] Azure DI signature cropping completed: "
-            f"total_signatures={signatures_found}, "
-            f"used_id={target_signature.get('id')}, "
-            f"field={target_signature.get('field_name')}, "
-            f"total_time={total_time:.3f}s"
-        )
+        # Add signature info only if a signature was detected
+        if target_signature:
+            result["signature_info"] = {
+                "id": target_signature.get("id"),
+                "field_name": target_signature.get("field_name"),
+                "page_number": target_signature.get("page_number"),
+                "bounding_box": bounding_box,
+            }
+            logger.info(
+                f"[{request_id}] Azure DI signature cropping completed: "
+                f"total_signatures={signatures_found}, "
+                f"used_id={target_signature.get('id')}, "
+                f"field={target_signature.get('field_name')}, "
+                f"total_time={total_time:.3f}s"
+            )
+        else:
+            result["signature_info"] = None
+            result["message"] = "No signatures detected by Azure DI. OpenCV processing applied to entire image."
+            logger.info(
+                f"[{request_id}] Azure DI signature cropping completed (no signatures detected): "
+                f"opencv_processing applied to entire image, "
+                f"total_time={total_time:.3f}s"
+            )
 
         return func.HttpResponse(
             json.dumps(result), mimetype="application/json", status_code=200
@@ -2979,12 +3026,16 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
     """
     Deduplicate handwritten signature images by combining and cropping.
 
-    Accepts JSON body with two base64-encoded signature images:
+    Query Parameters:
+        - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
+
+    Accepts JSON body with up to three base64-encoded signature images:
     - signature1: First signature image (base64)
     - signature2: Second signature image (base64)
+    - signature3: Third signature image (base64)
 
-    If only one signature is provided (the other is empty/null), returns that signature immediately.
-    If both signatures are provided, combines them vertically and crops to a single signature region.
+    If only one signature is provided, returns that signature immediately.
+    If multiple signatures are provided, combines them vertically and optionally crops to a single signature region.
 
     Returns the deduplicated signature as a base64-encoded PNG image.
     """
@@ -2993,6 +3044,10 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
     logger.info(f"[{request_id}] Signature deduplication request initiated")
 
     try:
+        # Get optional parameters
+        opencv_crop_str = req.params.get("opencv_crop", "false").lower()
+        opencv_crop = opencv_crop_str in ("true", "1", "yes")
+
         # Parse and validate JSON body
         body, body_error = _parse_json_body(req, request_id)
         if body_error:
@@ -3001,15 +3056,25 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
         # Extract signature parameters
         signature1_base64 = body.get("signature1", "")
         signature2_base64 = body.get("signature2", "")
+        signature3_base64 = body.get("signature3", "")
 
-        # Check if both signatures are empty
-        if not signature1_base64 and not signature2_base64:
-            logger.warning(f"[{request_id}] Both signature parameters are empty")
+        # Collect non-empty signatures
+        signatures = []
+        if signature1_base64:
+            signatures.append(("signature1", signature1_base64))
+        if signature2_base64:
+            signatures.append(("signature2", signature2_base64))
+        if signature3_base64:
+            signatures.append(("signature3", signature3_base64))
+
+        # Check if all signatures are empty
+        if not signatures:
+            logger.warning(f"[{request_id}] All signature parameters are empty")
             return func.HttpResponse(
                 json.dumps(
                     {
                         "error": "Missing signatures",
-                        "message": "At least one signature image must be provided (signature1 or signature2)",
+                        "message": "At least one signature image must be provided (signature1, signature2, or signature3)",
                         "request_id": request_id,
                     }
                 ),
@@ -3018,15 +3083,16 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # If only one signature provided, return it immediately
-        if not signature1_base64:
-            logger.info(f"[{request_id}] Only signature2 provided, returning immediately")
+        if len(signatures) == 1:
+            sig_name, sig_base64 = signatures[0]
+            logger.info(f"[{request_id}] Only {sig_name} provided, returning immediately")
             total_time = time.time() - start_time
             return func.HttpResponse(
                 json.dumps(
                     {
-                        "signature_base64": signature2_base64,
+                        "signature_base64": sig_base64,
                         "request_id": request_id,
-                        "message": "Single signature returned (signature2 only)",
+                        "message": f"Single signature returned ({sig_name} only)",
                         "performance": {
                             "total_ms": round(total_time * 1000, 2),
                         },
@@ -3036,43 +3102,29 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200,
             )
 
-        if not signature2_base64:
-            logger.info(f"[{request_id}] Only signature1 provided, returning immediately")
-            total_time = time.time() - start_time
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "signature_base64": signature1_base64,
-                        "request_id": request_id,
-                        "message": "Single signature returned (signature1 only)",
-                        "performance": {
-                            "total_ms": round(total_time * 1000, 2),
-                        },
-                    }
-                ),
-                mimetype="application/json",
-                status_code=200,
-            )
-
-        # Both signatures provided - decode them
-        logger.info(f"[{request_id}] Both signatures provided, proceeding with deduplication")
+        # Multiple signatures provided - decode them
+        logger.info(f"[{request_id}] {len(signatures)} signatures provided, proceeding with deduplication")
 
         decode_start = time.time()
-        sig1_bytes, decode_error1 = _decode_base64_content(signature1_base64, request_id)
-        if decode_error1:
-            return decode_error1
+        decoded_images = []
 
-        sig2_bytes, decode_error2 = _decode_base64_content(signature2_base64, request_id)
-        if decode_error2:
-            return decode_error2
+        for sig_name, sig_base64 in signatures:
+            sig_bytes, decode_error = _decode_base64_content(sig_base64, request_id)
+            if decode_error:
+                return decode_error
+            decoded_images.append((sig_name, sig_bytes))
 
         decode_time = time.time() - decode_start
 
         # Open images using PIL for better handling of different widths
         combine_start = time.time()
+        images = []
         try:
-            image1 = Image.open(io.BytesIO(sig1_bytes))  # type: ignore[arg-type]
-            image2 = Image.open(io.BytesIO(sig2_bytes))  # type: ignore[arg-type]
+            for sig_name, sig_bytes in decoded_images:
+                image = Image.open(io.BytesIO(sig_bytes))  # type: ignore[arg-type]
+                image = image.convert("RGB")  # Convert to RGB (white background)
+                images.append((sig_name, image))
+                logger.info(f"[{request_id}] {sig_name}: {image.width}x{image.height}")
         except Exception as e:
             logger.error(f"[{request_id}] Failed to open signature images: {str(e)}")
             return func.HttpResponse(
@@ -3087,32 +3139,26 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        # Convert both images to RGB (white background) to match _opencv_crop_signature behavior
-        image1 = image1.convert("RGB")
-        image2 = image2.convert("RGB")
-
-        # Calculate canvas size: width = max of both widths; height = sum of both heights + padding
+        # Calculate canvas size: width = max of all widths; height = sum of all heights + padding between images
         padding = 100
-        out_width = max(image1.width, image2.width)
-        out_height = image1.height + image2.height + padding
+        out_width = max(img.width for _, img in images)
+        out_height = sum(img.height for _, img in images) + padding * (len(images) - 1)
 
         logger.info(
-            f"[{request_id}] Combining signatures: "
-            f"sig1={image1.width}x{image1.height}, "
-            f"sig2={image2.width}x{image2.height}, "
-            f"canvas={out_width}x{out_height} (with {padding}px padding)"
+            f"[{request_id}] Combining {len(images)} signatures: "
+            f"canvas={out_width}x{out_height} (with {padding}px padding between images)"
         )
 
         # Create a white canvas (RGB mode)
         combined_image = Image.new("RGB", (out_width, out_height), (255, 255, 255))
 
-        # Paste first image centered horizontally at top
-        x_offset1 = (out_width - image1.width) // 2
-        combined_image.paste(image1, (x_offset1, 0))
-
-        # Paste second image centered horizontally below first image with padding
-        x_offset2 = (out_width - image2.width) // 2
-        combined_image.paste(image2, (x_offset2, image1.height + padding))
+        # Paste images centered horizontally, stacked vertically with padding
+        y_offset = 0
+        for sig_name, image in images:
+            x_offset = (out_width - image.width) // 2
+            combined_image.paste(image, (x_offset, y_offset))
+            logger.info(f"[{request_id}] Pasted {sig_name} at position ({x_offset}, {y_offset})")
+            y_offset += image.height + padding
 
         logger.info(
             f"[{request_id}] Combined image size: {combined_image.width}x{combined_image.height}"
@@ -3124,26 +3170,30 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
         combined_bytes = combined_buffer.getvalue()
         combine_time = time.time() - combine_start
 
-        # Apply OpenCV signature cropping
-        crop_start = time.time()
-        logger.info(f"[{request_id}] Applying OpenCV signature cropping to combined image")
-        try:
-            cropped_bytes = _opencv_crop_signature(combined_bytes, request_id)
-        except ValueError as e:
-            logger.error(f"[{request_id}] Signature cropping failed: {str(e)}")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Signature extraction failed",
-                        "message": f"Failed to extract signature from combined image: {str(e)}",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=500,
-            )
-
-        crop_time = time.time() - crop_start
+        # Conditionally apply OpenCV signature cropping
+        crop_time = 0.0
+        if opencv_crop:
+            crop_start = time.time()
+            logger.info(f"[{request_id}] Applying OpenCV signature cropping to combined image")
+            try:
+                cropped_bytes = _opencv_crop_signature(combined_bytes, request_id)
+            except ValueError as e:
+                logger.error(f"[{request_id}] Signature cropping failed: {str(e)}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Signature extraction failed",
+                            "message": f"Failed to extract signature from combined image: {str(e)}",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=500,
+                )
+            crop_time = time.time() - crop_start
+        else:
+            logger.info(f"[{request_id}] Skipping OpenCV cropping (opencv_crop=false)")
+            cropped_bytes = combined_bytes
 
         # Encode result to base64
         encode_start = time.time()
@@ -3161,6 +3211,7 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
                 {
                     "signature_base64": result_base64,
                     "request_id": request_id,
+                    "opencv_processing": opencv_crop,
                     "message": "Signatures deduplicated successfully",
                     "performance": {
                         "decode_ms": round(decode_time * 1000, 2),
