@@ -10,6 +10,9 @@ Azure Function App providing REST API access to Azure AI Search with hybrid vect
   - **Azure OpenAI Vision API** (GPT-4.1): Natural language-based signature detection with owner/non-owner classification
   - **Azure Document Intelligence**: AI-powered layout analysis with precise polygon bounding boxes
   - **OpenCV Post-Processing**: Optional 2x upscaling (LapSRN), grayscale conversion, and sharpening
+- **ID Masking**: Privacy protection for identity documents
+  - **Face Masking**: Azure Face API for detecting and masking faces
+  - **ID Detail Masking**: Azure Document Intelligence to mask personal information while preserving signatures
 - **Parallel Execution**: Batch operations execute concurrently using async/await
 - **Multi-Format Support**: Handles PNG, JPG, JPEG, and PDF files
 - **API Key Authentication**: Secure endpoints with X-API-Key header (query param fallback)
@@ -206,6 +209,93 @@ Extract and crop handwritten signature from an image using Azure OpenAI Vision A
     "extraction_ms": 2150.34,
     "total_ms": 2150.34
   }
+}
+```
+
+#### `POST /api/gpt_dedup`
+
+Deduplicate signature crops by selecting the cleanest one using Azure OpenAI Vision API.
+
+**Use Case**: When multiple signature candidates are detected (e.g., from OpenCV contour detection), use GPT to intelligently select the cleanest crop that fully captures the complete handwritten signature with no extra surrounding elements. Returns the selected signature as a base64-encoded PNG.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Query Parameters** (all optional):
+
+- `model`: Azure OpenAI model deployment name (default: from `AZURE_OPENAI_MODEL` env var, typically `gpt-4.1`)
+
+**Request Body** (application/json):
+
+```json
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS...base64_encoded_signature_1..."
+    },
+    {
+      "content": "iVBORw0KGgoAAAANS...base64_encoded_signature_2..."
+    }
+  ]
+}
+```
+
+- `opencv_signatures` (required): Array of signature objects, each with:
+  - `content` (required): Base64-encoded PNG image of a signature candidate
+
+**How It Works**:
+
+1. The endpoint combines all provided signature images vertically with index labels (similar to OpenCV contour detection output)
+2. Sends the combined image to Azure OpenAI Vision API for analysis
+3. GPT selects the index of the cleanest signature
+4. Returns the original signature image from the selected index
+
+**Response** (Success - 200):
+
+```json
+{
+  "cropped_signature": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_png_data...",
+  "selected_index": 0,
+  "reason": "Crop 0 fully captures the complete handwritten signature with clean edges and no surrounding elements",
+  "total_signatures": 2,
+  "model_used": "gpt-4.1",
+  "request_id": "abc12345",
+  "performance": {
+    "combine_ms": 45.23,
+    "selection_ms": 1850.45,
+    "total_ms": 1895.68
+  }
+}
+```
+
+**Response** (Single Signature - 200):
+
+When only one signature is provided, it's returned directly without GPT analysis:
+
+```json
+{
+  "cropped_signature": "iVBORw0KGgoAAAANSUhEUgAA...base64_encoded_png_data...",
+  "selected_index": 0,
+  "reason": "Only one signature provided, no deduplication needed",
+  "total_signatures": 1,
+  "model_used": "gpt-4.1",
+  "request_id": "abc12345",
+  "performance": {
+    "combine_ms": 0,
+    "selection_ms": 0,
+    "total_ms": 12.34
+  }
+}
+```
+
+**Response** (Invalid opencv_signatures - 400):
+
+```json
+{
+  "error": "Invalid opencv_signatures",
+  "message": "opencv_signatures must be a non-empty array of signature objects",
+  "request_id": "abc12345"
 }
 ```
 
@@ -524,6 +614,143 @@ curl -X POST "http://localhost:7071/api/sig_dedup" \
 - `height`: Box height (percentage, 0-100)
 - Additional padding is applied based on the `padding` parameter
 
+#### `POST /api/id_masking`
+
+Mask faces and ID details from an image while preserving signatures.
+
+**Use Case**: Privacy protection for identity documents. This endpoint performs two-stage masking:
+
+1. **Face Masking**: Detects and masks all faces using Azure Face API (with expanded padding to cover hair/forehead)
+2. **ID Detail Masking**: Masks all document fields (name, address, ID numbers, dates, etc.) EXCEPT signature fields using Azure Document Intelligence
+
+The result is an image with faces and personal information hidden, but signatures preserved for verification purposes.
+
+**Headers**:
+
+- `X-API-Key`: API key for authentication (required)
+
+**Query Parameters**:
+
+- `model_id` (optional): Azure Document Intelligence model ID (default: from env `AZURE_DI_MODEL_ID`)
+- `padding` (optional): Additional padding around masked regions in pixels (default: 4, range: 0-50)
+- `skip_face_masking` (optional): Skip face detection/masking step (default: false)
+- `skip_id_masking` (optional): Skip ID details masking step (default: false)
+
+**Request Body** (application/json):
+
+```json
+{
+  "filename": "valid_id.png",
+  "content": "base64_encoded_image_string"
+}
+```
+
+**Parameters**:
+
+- `filename` (string, required): Name of the image file
+- `content` (string, required): Base64-encoded image content (PNG, JPG, JPEG)
+
+**Response** (Success - 200):
+
+```json
+{
+  "masked_image": "base64_encoded_masked_image",
+  "faces_masked": 1,
+  "fields_masked": 8,
+  "signature_fields_preserved": ["signature", "owner_signature"],
+  "masked_fields": [
+    {
+      "index": 1,
+      "field_name": "full_name",
+      "page_number": 1,
+      "bbox": { "min_x": 100, "min_y": 50, "max_x": 400, "max_y": 80 }
+    },
+    {
+      "index": 2,
+      "field_name": "address",
+      "page_number": 1,
+      "bbox": { "min_x": 100, "min_y": 90, "max_x": 500, "max_y": 130 }
+    }
+  ],
+  "model_used": "valid_id2",
+  "request_id": "abc12345",
+  "performance": {
+    "face_masking_ms": 450.23,
+    "id_masking_ms": 1200.45,
+    "encode_ms": 15.67,
+    "total_ms": 1666.35
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request**: Invalid parameters, missing required fields, or both masking operations skipped
+- **401 Unauthorized**: Missing API key
+- **403 Forbidden**: Invalid API key
+- **500 Internal Server Error**: Processing failed
+
+**Processing Pipeline**:
+
+1. **Input Validation**: Validate parameters and decode base64 image
+2. **Face Detection**: Call Azure Face API to detect face locations
+3. **Face Masking**: Draw white rectangles over detected faces (with 20% width/height padding, 40% top padding for hair)
+4. **Document Analysis**: Call Azure Document Intelligence to detect document fields
+5. **Field Filtering**: Identify signature fields vs non-signature fields
+6. **ID Masking**: Draw white rectangles over non-signature fields (preserving signatures)
+7. **Output Encoding**: Encode final masked image to base64 PNG
+
+**Partial Results**:
+
+- If Face API is not configured but DI is configured → Only ID details are masked
+- If Face API succeeds but DI fails → Returns face-masked image only
+- If both fail → Returns appropriate error
+
+**Important Notes**:
+
+1. **Signature Preservation**: Any field containing "signature" in its name is preserved (not masked)
+2. **Face Padding**: Faces are masked with expanded rectangles to cover hair, forehead, and ears
+3. **Serverless Compatible**: All processing is in-memory (no file system writes)
+4. **Async Operations**: Uses `aiohttp` for Face API and `asyncio.to_thread` for Document Intelligence
+5. **Custom Models**: Use a custom-trained Document Intelligence model for best field detection accuracy
+
+**Example cURL Request**:
+
+```bash
+# Full masking (faces + ID details)
+curl -X POST "http://localhost:7071/api/id_masking" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "driver_license.png",
+    "content": "iVBORw0KGgoAAAANS..."
+  }'
+
+# Face masking only
+curl -X POST "http://localhost:7071/api/id_masking?skip_id_masking=true" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "selfie.png",
+    "content": "iVBORw0KGgoAAAANS..."
+  }'
+
+# ID details masking only (no face masking)
+curl -X POST "http://localhost:7071/api/id_masking?skip_face_masking=true&model_id=valid_id2" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "id_card.png",
+    "content": "iVBORw0KGgoAAAANS..."
+  }'
+```
+
+**Configuration Requirements**:
+
+- **Azure Face API**: Set `AZURE_FACE_API_KEY` and `AZURE_FACE_ENDPOINT` environment variables
+- **Azure Document Intelligence**: Set `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, and optionally `AZURE_DI_MODEL_ID`
+- For best results, use a custom-trained Document Intelligence model with explicit field definitions
+
 **Configuration Requirements**:
 
 - Requires Azure OpenAI with vision-capable model (e.g., GPT-4.1, GPT-4o)
@@ -633,6 +860,12 @@ API_KEY=your-api-key-here
 # Performance Tuning
 MAX_REQUEST_SIZE_MB=10                 # Default: 10
 AISEARCH_TIMEOUT_SECONDS=60            # Default: 60
+FACE_API_TIMEOUT_SECONDS=60            # Default: 60
+
+# Azure Face API (Required for /id_masking face detection)
+# Used to detect and mask faces in ID documents
+AZURE_FACE_API_KEY=your-face-api-key
+AZURE_FACE_ENDPOINT=https://your-face-instance.cognitiveservices.azure.com/
 
 # Azure Document Intelligence (Optional)
 # If provided, signature extraction will use AI-powered detection

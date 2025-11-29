@@ -61,39 +61,14 @@ AZURE_OPENAI_MODEL = os.getenv("AZURE_OPENAI_MODEL", "gpt-4.1")
 # OpenCV post-processing configuration
 LAPSRN_MODEL_PATH = os.getenv("LAPSRN_MODEL_PATH", "./LapSRN_x2.pb")
 
-# Signature extraction prompt for Azure OpenAI Vision API - No Center
-SIGNATURE_EXTRACTION_PROMPT_NOCENTER = """
-You are an expert computer vision assistant specializing in document analysis and signature detection. Your task is to identify and locate handwritten signatures within images.
+# Azure Face API configuration (for face detection and masking)
+AZURE_FACE_API_KEY = os.getenv("AZURE_FACE_API_KEY")
+AZURE_FACE_ENDPOINT = os.getenv("AZURE_FACE_ENDPOINT")
+FACE_API_TIMEOUT_SECONDS = int(os.getenv("FACE_API_TIMEOUT_SECONDS", "60"))
 
-## Task
-Analyze the provided image and identify all handwritten signatures present. A signature is a person's name written in a distinctive, personalized handwriting style, typically used for authentication or authorization purposes.
-
-## Instructions
-
-1. **Carefully examine the entire image** for handwritten signatures
-2. **Distinguish signatures from other handwritten text** - signatures typically have:
-   - A more stylized, flowing, or cursive appearance
-   - Personal flourishes or unique characteristics
-   - Different ink color or pen pressure than printed text
-   - Placement in typical signature locations (bottom of documents, signature lines, etc.)
-
-3. **For each signature found**, provide:
-   - **Location**: Describe where in the image the signature appears (e.g., "bottom right corner", "below the printed text", "on the signature line")
-   - **Bounding box coordinates**: Estimated x, y, width, height as percentages of image dimensions
-   - **Confidence level**: High, Medium, or Low
-   - **Characteristics**: Brief description of the signature's appearance (e.g., "cursive script in blue ink", "printed signature in black")
-   - **Legibility**: Whether the signature is legible enough to read the name
-   - **Is owner signature**: Boolean indicating if this signature is by the owner/cardholder of the document
-     - Set to `true` if the signature appears to be from the document owner, cardholder, Licensee, or primary subject
-     - Set to `false` ONLY if there is clear evidence the signature is from an authorized representative, chairman, witness, guarantor, or other third party
-     - Look for explicit labels ("Chairman", "Witness", "Authorized Signatory", "Guardian", etc.)
-     - **Default to `true` when ownership is ambiguous or unclear**
-
-4. **Exclude the following**:
-   - Printed signatures or typed names
-   - Initials alone (unless clearly part of a signature)
-   - Random handwritten notes that are not signatures
-   - Stamps or seal impressions (unless they contain a handwritten component)
+# Signature extraction prompt for Azure OpenAI Vision API
+SIGNATURE_EXTRACTION_PROMPT = """
+Look for the owner handwritten signature from this image. It may look like unreadable cursive black ink strokes close to the ID owner headshot. Tell me the exact location.
 
 ## Output Format
 
@@ -107,10 +82,10 @@ Provide your response in the following JSON structure:
       "id": 1,
       "location_description": "<descriptive location>",
       "bounding_box": {
-        "x": <percentage>,
-        "y": <percentage>,
-        "width": <percentage>,
-        "height": <percentage>
+        "x": <percentage from left>,
+        "y": <percentage from top>,
+        "width": <percentage of image width>,
+        "height": <percentage of image height>
       },
       "confidence": "<High|Medium|Low>",
       "characteristics": "<description>",
@@ -119,160 +94,9 @@ Provide your response in the following JSON structure:
       "is_owner_signature": <true|false>
     }
   ],
-  "analysis_notes": "<any additional observations or challenges>"
+  "analysis_notes": "<any additional observations>"
 }
 ```
-
-## Examples of What to Look For
-
-**Typical Signature Characteristics:**
-- Flowing, connected cursive writing
-- Underlines or flourishes beneath the name
-- Rapid, confident strokes
-- May be partially illegible due to speed of writing
-- Often appears on designated signature lines
-- May include date nearby
-
-**Common Locations:**
-- Bottom of contracts or forms
-- Next to "Signature:" or "Signed by:" labels
-- On signature lines (indicated by "___________")
-- In signature blocks with printed name underneath
-- On checks, receipts, or official documents
-
-**Owner vs Non-Owner Signatures:**
-- **Owner signatures** typically appear on:
-  - Primary signature line of ID cards or documents
-  - "Cardholder signature" or "Owner signature" sections
-  - Main applicant or account holder fields
-  - Licensee signature fields (holder of a license)
-  - Any signature without explicit third-party labels
-- **Non-owner signatures** (set to `false` only with clear evidence) typically appear on:
-  - Witness signature lines with "Witness" label
-  - "Chairman", "Director", or "Authorized Officer" sections with explicit titles
-  - Guardian, parent, or representative signature fields with clear labels
-  - Co-signer or guarantor sections with "Guarantor" or "Co-signer" labels
-
-## Edge Cases
-
-- **Multiple signatures**: If there are multiple signatures (e.g., witness signatures, co-signers), identify each separately and determine which is the owner's signature
-- **Digital signatures**: If you see a digital signature (typed name in script font), note it but mark it as "digital/printed" rather than handwritten
-- **Unclear marks**: If you're uncertain whether a mark is a signature, note it with Low confidence
-- **Partially visible signatures**: If a signature is cut off or partially obscured, describe what is visible
-- **Ambiguous ownership**: If it's unclear whether a signature is from the owner or another party, **default to `true` (owner signature)** unless there is explicit evidence otherwise
-
-## Analysis Approach
-
-1. First, scan for common signature locations
-2. Look for handwriting that differs from printed text
-3. Identify flowing or stylized writing patterns
-4. Check for signature lines or labels
-5. Assess each potential signature against the characteristics listed above
-6. **Determine signature ownership** by examining:
-   - Labels or titles near the signature (e.g., "Owner", "Cardholder", "Witness", "Chairman")
-   - Position on the document (primary vs secondary signature locations)
-   - Document type and context
-   - **When in doubt, default to owner signature (`true`)**
-7. Provide clear, actionable results with confidence levels
-
-Remember: Be thorough but conservative. It's better to report Low confidence than to misidentify non-signature elements as signatures.
-"""
-
-
-# Signature extraction prompt for Azure OpenAI Vision API - Center
-SIGNATURE_EXTRACTION_PROMPT_CENTER = """
-You are an expert computer vision assistant specializing in document analysis and signature detection. Your task is to identify and locate handwritten signatures within images.
-
-## Task
-Analyze the provided image and identify all handwritten signatures present. A signature is a person's name written in a distinctive, personalized handwriting style, typically used for authentication or authorization purposes.
-
-## Instructions
-
-1. **Carefully examine the entire image** for handwritten signatures
-2. **Distinguish signatures from other handwritten text** - signatures typically have:
-   - A more stylized, flowing, or cursive appearance
-   - Personal flourishes or unique characteristics
-   - Different ink color or pen pressure than printed text
-   - Placement in typical signature locations (bottom of documents, signature lines, etc.)
-
-3. **For each signature found**, provide:
-   - **Location**: Describe where in the image the signature appears (e.g., "bottom right corner", "below the printed text", "on the signature line")
-   - **Bounding box coordinates**: Estimated x, y, width, height as percentages of image dimensions
-     - **IMPORTANT**: Ensure the bounding box is **centered on the signature** with **balanced padding on all sides**
-     - Include approximately **10-15% padding** around the actual signature strokes (not too tight, not too loose)
-     - The signature should be **visually centered** within the bounding box
-     - Adjust the bounding box to maintain symmetry - equal space on left/right and top/bottom where possible
-   - **Confidence level**: High, Medium, or Low
-   - **Characteristics**: Brief description of the signature's appearance (e.g., "cursive script in blue ink", "printed signature in black")
-   - **Legibility**: Whether the signature is legible enough to read the name
-   - **Is owner signature**: Boolean indicating if this signature is by the owner/cardholder of the document
-     - Set to `true` if the signature appears to be from the document owner, cardholder, Licensee, or primary subject
-     - Set to `false` ONLY if there is clear evidence the signature is from an authorized representative, chairman, witness, guarantor, or other third party
-     - Look for explicit labels ("Chairman", "Witness", "Authorized Signatory", "Guardian", etc.)
-     - **Default to `true` when ownership is ambiguous or unclear**
-
-4. **Exclude the following**:
-   - Printed signatures or typed names
-   - Initials alone (unless clearly part of a signature)
-   - Random handwritten notes that are not signatures
-   - Stamps or seal impressions (unless they contain a handwritten component)
-
-## Output Format
-
-Provide your response in the following JSON structure:
-
-```json
-{
-  "signatures_found": <number>,
-  "signatures": [
-    {
-      "id": 1,
-      "location_description": "<descriptive location>",
-      "bounding_box": {
-        "x": <percentage>,
-        "y": <percentage>,
-        "width": <percentage>,
-        "height": <percentage>
-      },
-      "confidence": "<High|Medium|Low>",
-      "characteristics": "<description>",
-      "legible": <true|false>,
-      "estimated_name": "<name if legible, otherwise null>",
-      "is_owner_signature": <true|false>
-    }
-  ],
-  "analysis_notes": "<any additional observations or challenges>"
-}
-```
-
-## Analysis Approach
-
-1. First, scan for common signature locations
-2. Look for handwriting that differs from printed text
-3. Identify flowing or stylized writing patterns
-4. Check for signature lines or labels
-5. Assess each potential signature against the characteristics listed above
-6. **Determine signature ownership** by examining:
-   - Labels or titles near the signature (e.g., "Owner", "Cardholder", "Witness", "Chairman")
-   - Position on the document (primary vs secondary signature locations)
-   - Document type and context
-   - **When in doubt, default to owner signature (`true`)**
-7. **Calculate precise bounding boxes**:
-   - Identify the exact extent of the signature strokes (leftmost, rightmost, topmost, bottommost points)
-   - Add equal padding on all sides (approximately 10-15% of the signature dimensions)
-   - Ensure the signature is centered horizontally and vertically within the bounding box
-   - Verify the bounding box doesn't include unnecessary whitespace or adjacent elements
-8. Provide clear, actionable results with confidence levels
-
-Remember: Be thorough but conservative. It's better to report Low confidence than to misidentify non-signature elements as signatures.
-
-**Bounding Box Quality Checklist:**
-- ✓ Signature is centered within the box (not pushed to one edge)
-- ✓ Equal padding on left and right sides
-- ✓ Equal padding on top and bottom sides
-- ✓ Box captures the complete signature including all flourishes
-- ✓ Minimal excess whitespace beyond the padding
-- ✓ No adjacent text or elements included unless part of the signature
 """
 
 # Client singleton cache
@@ -314,7 +138,7 @@ def _get_openai_client() -> AzureOpenAI:
 
 
 async def _extract_signature_with_openai(
-    image_bytes: bytes, request_id: str, model: str | None = None, prompt_center: bool = False
+    image_bytes: bytes, request_id: str, model: str | None = None, prompt: str | None = None
 ) -> dict[str, Any]:
     """
     Extract handwritten signatures from an image using Azure OpenAI Vision API.
@@ -324,8 +148,7 @@ async def _extract_signature_with_openai(
         image_bytes: Image file bytes (PNG, JPG, etc.)
         request_id: Request ID for logging
         model: Azure OpenAI model deployment name (defaults to AZURE_OPENAI_MODEL)
-        prompt_center: If True, uses SIGNATURE_EXTRACTION_PROMPT_CENTER (centered bounding boxes with balanced padding).
-                      If False, uses SIGNATURE_EXTRACTION_PROMPT_NOCENTER (default)
+        prompt: Custom prompt for signature extraction (defaults to SIGNATURE_EXTRACTION_PROMPT)
 
     Returns:
         Dictionary containing signature extraction results with structure:
@@ -348,8 +171,8 @@ async def _extract_signature_with_openai(
     # Encode image to base64
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-    # Choose prompt based on prompt_center parameter
-    selected_prompt = SIGNATURE_EXTRACTION_PROMPT_CENTER if prompt_center else SIGNATURE_EXTRACTION_PROMPT_NOCENTER
+    # Use custom prompt if provided, otherwise use default
+    selected_prompt = prompt if prompt else SIGNATURE_EXTRACTION_PROMPT
 
     # Wrap synchronous OpenAI call in asyncio.to_thread for non-blocking execution
     def _call_openai() -> dict[str, Any]:
@@ -414,7 +237,7 @@ async def _extract_signature_with_openai(
 
 def _opencv_crop_signature(
     image_bytes: bytes, request_id: str
-) -> bytes:
+) -> tuple[bytes, list[dict[str, Any]]]:
     """
     Crop the signature region from an image using OpenCV contour detection.
     Uses adaptive thresholding, morphological operations, and contour filtering
@@ -423,7 +246,7 @@ def _opencv_crop_signature(
     Implementation follows crop_signatures_opencv() from signature_extraction_opencv.ipynb:
     - Extracts individual signature regions with padding
     - Sorts by area and keeps top 3 candidates
-    - Returns largest signature by area
+    - Returns largest signature by area (or combined image for multiple signatures)
 
     All processing is done in-memory (serverless-compatible).
 
@@ -432,7 +255,10 @@ def _opencv_crop_signature(
         request_id: Request ID for logging
 
     Returns:
-        Cropped PNG image bytes containing the largest signature region
+        Tuple of:
+        - Cropped PNG image bytes containing the signature region(s)
+        - List of OpenCV-extracted signatures with structure:
+          [{"content": str}, ...] where content is base64-encoded PNG image
 
     Raises:
         ValueError: If image processing fails or no signature found
@@ -468,6 +294,7 @@ def _opencv_crop_signature(
 
     # Filter contours by area and aspect ratio (typical signature characteristics)
     min_area = 500
+    original_image_area = img_width * img_height
     signatures: list[dict[str, Any]] = []
 
     for contour in contours:
@@ -487,20 +314,53 @@ def _opencv_crop_signature(
             x2 = min(img_width, x + w + padding)
             y2 = min(img_height, y + h + padding)
 
+            # Calculate cropped area (with padding) for size filtering
+            cropped_width = x2 - x1
+            cropped_height = y2 - y1
+            cropped_area = cropped_width * cropped_height
+
             signature_img = image[y1:y2, x1:x2]
             signatures.append({
                 "image": signature_img,
                 "bbox": (x1, y1, x2, y2),
                 "area": area,
+                "cropped_area": cropped_area,
                 "aspect_ratio": aspect_ratio,
             })
 
-    # If no valid contours found, return original image
+    # If no valid contours found, return original image with empty bounding boxes
     if not signatures:
         logger.warning(f"[{request_id}] No signature contours found, returning original image")
-        return image_bytes
+        return image_bytes, []
 
     logger.info(f"[{request_id}] Detected {len(signatures)} signature candidate(s)")
+
+    # When multiple signatures are detected, filter out those that are too small or too large
+    # relative to the original image size (< 25% or > 80%)
+    if len(signatures) > 1:
+        min_size_ratio = 0.25
+        max_size_ratio = 0.80
+
+        filtered_signatures = [
+            sig for sig in signatures
+            if min_size_ratio <= (sig["cropped_area"] / original_image_area) <= max_size_ratio
+        ]
+
+        excluded_count = len(signatures) - len(filtered_signatures)
+        if excluded_count > 0:
+            logger.info(
+                f"[{request_id}] Excluded {excluded_count} signature(s) outside size range "
+                f"({min_size_ratio * 100:.0f}%-{max_size_ratio * 100:.0f}% of original image)"
+            )
+
+        # Only use filtered list if we still have at least one signature
+        if filtered_signatures:
+            signatures = filtered_signatures
+        else:
+            logger.warning(
+                f"[{request_id}] All signatures were filtered out by size constraint, "
+                f"keeping original {len(signatures)} signature(s)"
+            )
 
     # Sort by area (largest first) and keep top 3
     signatures.sort(key=lambda s: s["area"], reverse=True)
@@ -510,9 +370,9 @@ def _opencv_crop_signature(
         f"[{request_id}] Keeping top {len(top_signatures)} signature(s) by area"
     )
 
-    # If there are 2 or more signatures, combine them vertically
+    # If there are 2 or more signatures, combine them vertically with index labels
     if len(signatures) >= 2:
-        logger.info(f"[{request_id}] Multiple signatures detected, combining vertically with 50px padding")
+        logger.info(f"[{request_id}] Multiple signatures detected, combining vertically with 100px padding")
 
         # Convert OpenCV images to PIL for easier combining
         pil_images = []
@@ -523,30 +383,69 @@ def _opencv_crop_signature(
             pil_images.append(pil_img)
 
         # Calculate canvas dimensions
-        max_width = max(img.width for img in pil_images)
+        # Reserve space on the left for index numbers (120px margin for 48pt font)
+        index_margin = 120
+        max_img_width = max(img.width for img in pil_images)
         padding = 100
         total_height = sum(img.height for img in pil_images) + padding * (len(pil_images) - 1)
+        canvas_width = index_margin + max_img_width
 
         logger.info(
-            f"[{request_id}] Canvas size: {max_width}x{total_height} "
-            f"({len(pil_images)} signatures with {padding}px padding)"
+            f"[{request_id}] Canvas size: {canvas_width}x{total_height} "
+            f"({len(pil_images)} signatures with {padding}px padding, {index_margin}px index margin)"
         )
 
         # Create white canvas (RGB mode)
-        combined_canvas = Image.new("RGB", (max_width, total_height), (255, 255, 255))
+        combined_canvas = Image.new("RGB", (canvas_width, total_height), (255, 255, 255))
 
-        # Paste each signature centered horizontally
+        # Import ImageDraw and ImageFont for drawing index numbers
+        from PIL import ImageDraw, ImageFont
+
+        draw = ImageDraw.Draw(combined_canvas)
+
+        # Use Pillow's bundled font (Aileron Regular) - works in serverless environments
+        # Pillow 10.1+ bundles this font and supports the size parameter
+        font_size = 48
+        font = ImageFont.load_default(size=font_size)
+        logger.info(f"[{request_id}] Using Pillow bundled font (Aileron) at size {font_size}")
+
+        # Paste each signature right-aligned with index number on the left
         current_y = 0
         for idx, pil_img in enumerate(pil_images):
-            # Center horizontally
-            x_offset = (max_width - pil_img.width) // 2
+            # Right-align: place image at the rightmost position
+            x_offset = canvas_width - pil_img.width
             combined_canvas.paste(pil_img, (x_offset, current_y))
-            current_y += pil_img.height + padding
+
+            # Draw index number on the left side, vertically centered with the signature
+            index_text = str(idx)
+            # Get text bounding box for centering
+            text_bbox = draw.textbbox((0, 0), index_text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+
+            # Center the index number vertically with the signature image
+            # and place it in the left margin area
+            text_x = (index_margin - text_width) // 2
+            text_y = current_y + (pil_img.height - text_height) // 2
+
+            # Draw the index number in RED with stroke to simulate bold effect
+            # stroke_width adds thickness to the text, making it appear bold
+            draw.text(
+                (text_x, text_y),
+                index_text,
+                fill=(255, 0, 0),
+                font=font,
+                stroke_width=3,
+                stroke_fill=(255, 0, 0),
+            )
 
             logger.info(
-                f"[{request_id}] Pasted signature {idx + 1}/{len(pil_images)}: "
-                f"size={pil_img.width}x{pil_img.height}, position=({x_offset}, {current_y - pil_img.height - padding})"
+                f"[{request_id}] Pasted signature {idx}/{len(pil_images) - 1}: "
+                f"size={pil_img.width}x{pil_img.height}, position=({x_offset}, {current_y}), "
+                f"index at ({text_x}, {text_y})"
             )
+
+            current_y += pil_img.height + padding
 
         # Convert back to OpenCV format
         cropped_img = cv2.cvtColor(np.array(combined_canvas), cv2.COLOR_RGB2BGR)
@@ -554,6 +453,17 @@ def _opencv_crop_signature(
         logger.info(
             f"[{request_id}] Combined signature: output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}"
         )
+
+        # Build opencv_signatures list with base64 content for each signature
+        opencv_signatures = []
+        for idx, sig in enumerate(signatures):
+            # Encode individual signature image to base64
+            sig_success, sig_encoded = cv2.imencode(".png", sig["image"])
+            sig_base64 = base64.b64encode(sig_encoded.tobytes()).decode("utf-8") if sig_success else ""
+            opencv_signatures.append({
+                "content": sig_base64,
+            })
+            logger.debug(f"[{request_id}] Added signature {idx} to opencv_signatures")
     else:
         # Single signature - return the largest one
         largest_signature = top_signatures[0]
@@ -568,12 +478,20 @@ def _opencv_crop_signature(
             f"aspect_ratio={largest_signature['aspect_ratio']:.2f}"
         )
 
+        # Build opencv_signatures list with base64 content for single signature
+        # Encode individual signature image to base64
+        sig_success, sig_encoded = cv2.imencode(".png", cropped_img)
+        sig_base64 = base64.b64encode(sig_encoded.tobytes()).decode("utf-8") if sig_success else ""
+        opencv_signatures = [{
+            "content": sig_base64,
+        }]
+
     # Encode cropped signature to PNG bytes
     success, encoded = cv2.imencode(".png", cropped_img)
     if not success:
         raise ValueError("Failed to encode cropped signature to PNG")
 
-    return encoded.tobytes()
+    return encoded.tobytes(), opencv_signatures
 
 
 def _opencv_postprocess_image(
@@ -644,6 +562,399 @@ def _opencv_postprocess_image(
     return encoded.tobytes()
 
 
+async def _detect_faces_with_azure_face_api(
+    image_bytes: bytes, request_id: str
+) -> dict[str, Any]:
+    """
+    Detect faces in an image using Azure Face API.
+
+    SERVERLESS COMPATIBLE: All processing is done in-memory using aiohttp.
+
+    Args:
+        image_bytes: Image file bytes (JPEG, PNG, GIF, or BMP)
+        request_id: Request ID for logging
+
+    Returns:
+        Dictionary containing:
+        - faces_found: Number of faces detected
+        - faces: List of face detection results with bounding boxes
+        - message: Status message
+        - error: Error message if detection failed
+    """
+    if not AZURE_FACE_API_KEY:
+        logger.warning(f"[{request_id}] Azure Face API key not configured")
+        return {
+            "faces_found": 0,
+            "faces": [],
+            "error": "Azure Face API key not configured",
+            "message": "Set AZURE_FACE_API_KEY environment variable",
+        }
+
+    if not AZURE_FACE_ENDPOINT:
+        logger.warning(f"[{request_id}] Azure Face API endpoint not configured")
+        return {
+            "faces_found": 0,
+            "faces": [],
+            "error": "Azure Face API endpoint not configured",
+            "message": "Set AZURE_FACE_ENDPOINT environment variable",
+        }
+
+    logger.info(
+        f"[{request_id}] Detecting faces using Azure Face API ({len(image_bytes):,} bytes)"
+    )
+
+    # Construct API endpoint
+    endpoint_url = f"{AZURE_FACE_ENDPOINT.rstrip('/')}/face/v1.0/detect"
+
+    # Construct query parameters
+    params = {
+        "returnFaceId": "false",
+        "returnFaceLandmarks": "false",
+        "returnFaceAttributes": "glasses,headpose,blur,exposure,noise,qualityforrecognition",
+        "detectionModel": "detection_01",
+        "recognitionModel": "recognition_04",
+    }
+
+    # Prepare headers
+    headers = {
+        "Ocp-Apim-Subscription-Key": AZURE_FACE_API_KEY,
+        "Content-Type": "application/octet-stream",
+    }
+
+    try:
+        # Make async HTTP request using aiohttp
+        timeout = aiohttp.ClientTimeout(total=FACE_API_TIMEOUT_SECONDS)
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                endpoint_url,
+                params=params,
+                headers=headers,
+                data=image_bytes,
+                timeout=timeout,
+            ) as response,
+        ):
+            response_text = await response.text()
+
+            if response.status != 200:
+                # Handle error response
+                logger.error(
+                    f"[{request_id}] Face API error: HTTP {response.status} - {response.reason}"
+                )
+
+                try:
+                    error_body = json.loads(response_text)
+                    error_details = error_body.get("error", {})
+                    error_message = f"Face API error: {error_details.get('code', response.status)} - {error_details.get('message', response.reason)}"
+                except json.JSONDecodeError:
+                    error_message = f"Face API error: {response.status} {response.reason}"
+
+                return {
+                    "faces_found": 0,
+                    "faces": [],
+                    "error": error_message,
+                    "message": "Face detection failed",
+                }
+
+            # Success - parse face data
+            faces = json.loads(response_text)
+
+            logger.info(f"[{request_id}] Face API detected {len(faces)} face(s)")
+
+            return {
+                "faces_found": len(faces),
+                "faces": faces,
+                "message": f"Successfully detected {len(faces)} face(s)",
+            }
+
+    except asyncio.TimeoutError:
+        logger.error(
+            f"[{request_id}] Face API request timed out after {FACE_API_TIMEOUT_SECONDS} seconds"
+        )
+        return {
+            "faces_found": 0,
+            "faces": [],
+            "error": f"Request timed out after {FACE_API_TIMEOUT_SECONDS} seconds",
+            "message": "Face detection failed",
+        }
+
+    except Exception as e:
+        logger.error(f"[{request_id}] Face API unexpected error: {type(e).__name__}: {str(e)}")
+        return {
+            "faces_found": 0,
+            "faces": [],
+            "error": f"Unexpected error: {str(e)}",
+            "message": "Face detection failed",
+        }
+
+
+def _erase_faces_from_image(
+    image_bytes: bytes, face_detection_result: dict[str, Any], request_id: str
+) -> bytes:
+    """
+    Erase detected faces from an image by replacing bounding box regions with white color.
+
+    SERVERLESS COMPATIBLE: All processing is done in-memory using PIL.
+
+    Args:
+        image_bytes: Original image bytes
+        face_detection_result: Face detection result dictionary containing 'faces' list
+        request_id: Request ID for logging
+
+    Returns:
+        Modified image bytes with faces erased (white rectangles)
+    """
+    from PIL import ImageDraw
+
+    # Load image from bytes
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    draw = ImageDraw.Draw(image)
+
+    faces = face_detection_result.get("faces", [])
+
+    if not faces:
+        logger.info(f"[{request_id}] No faces to erase")
+        # Return original image bytes as PNG
+        output = io.BytesIO()
+        image.save(output, format="PNG")
+        return output.getvalue()
+
+    logger.info(f"[{request_id}] Erasing {len(faces)} face(s) from image")
+
+    # Erase each face by drawing white rectangle
+    for idx, face in enumerate(faces, start=1):
+        rect = face.get("faceRectangle", {})
+        if not rect:
+            continue
+
+        left = rect.get("left", 0)
+        top = rect.get("top", 0)
+        width = rect.get("width", 0)
+        height = rect.get("height", 0)
+
+        # Expand bounding box to cover the whole head (add 20% padding to width/height, 40% to top)
+        padding_width = int(width * 0.2)
+        padding_height = int(height * 0.2)
+        padding_top = int(height * 0.4)  # Extra padding at top for hair/forehead
+
+        # Calculate expanded rectangle coordinates
+        x1 = max(0, left - padding_width)
+        y1 = max(0, top - padding_top)
+        x2 = left + width + padding_width
+        y2 = top + height + padding_height
+
+        # Draw white rectangle to erase face
+        draw.rectangle([x1, y1, x2, y2], fill="white", outline=None)
+
+        logger.debug(
+            f"[{request_id}] Erased face #{idx} at ({x1}, {y1}, {x2-x1}x{y2-y1}) "
+            f"[expanded from ({left}, {top}, {width}x{height})]"
+        )
+
+    # Convert back to bytes
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+
+    logger.info(f"[{request_id}] Face erasure complete")
+
+    return output.getvalue()
+
+
+def _mask_regions_with_white(
+    image_bytes: bytes,
+    regions: list[tuple[str, int, list[float]]],
+    padding: int,
+    request_id: str,
+) -> bytes:
+    """
+    Mask specified regions in an image with white color.
+
+    SERVERLESS COMPATIBLE: All processing is done in-memory using PIL.
+
+    Args:
+        image_bytes: Original image bytes
+        regions: List of tuples (field_name, page_number, polygon)
+        padding: Extra padding around each region in pixels
+        request_id: Request ID for logging
+
+    Returns:
+        Modified image bytes with regions masked (white rectangles)
+    """
+    from PIL import ImageDraw
+
+    # Load image from bytes
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    draw = ImageDraw.Draw(image)
+
+    if not regions:
+        logger.info(f"[{request_id}] No regions to mask")
+        output = io.BytesIO()
+        image.save(output, format="PNG")
+        return output.getvalue()
+
+    logger.info(f"[{request_id}] Masking {len(regions)} region(s) from image")
+
+    # Mask each region by drawing white rectangle
+    for field_name, _page_no, polygon in regions:
+        if not polygon:
+            continue
+
+        # Convert polygon to bounding box
+        min_x, min_y, max_x, max_y = _polygon_to_bbox(polygon)
+
+        # Apply padding
+        x1 = max(0, int(min_x) - padding)
+        y1 = max(0, int(min_y) - padding)
+        x2 = min(int(max_x) + padding, image.width)
+        y2 = min(int(max_y) + padding, image.height)
+
+        # Draw white rectangle to mask field
+        draw.rectangle([x1, y1, x2, y2], fill="white", outline=None)
+
+        logger.debug(f"[{request_id}] Masked field '{field_name}' at ({x1}, {y1}) - ({x2}, {y2})")
+
+    # Convert back to bytes
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+
+    logger.info(f"[{request_id}] Field masking complete")
+
+    return output.getvalue()
+
+
+async def _mask_id_details_with_doc_intelligence(
+    image_bytes: bytes, request_id: str, model_id: str | None = None, padding: int = 4
+) -> dict[str, Any]:
+    """
+    Mask all detected fields EXCEPT signature fields with white color using Azure Document Intelligence.
+
+    This function analyzes a document, finds all fields from the custom model,
+    and masks every field that does NOT contain 'signature' in its name.
+
+    SERVERLESS COMPATIBLE: All processing is done in-memory.
+    Uses asyncio.to_thread to wrap the synchronous Azure DI SDK call.
+
+    Args:
+        image_bytes: Image file bytes (PNG, JPG, etc.)
+        request_id: Request ID for logging
+        model_id: Document Intelligence model ID (should be a custom model with field definitions)
+        padding: Extra padding around each masked region in pixels (default: 4)
+
+    Returns:
+        Dictionary containing masking results with masked image bytes
+    """
+    if not AZURE_DI_ENDPOINT or not AZURE_DI_KEY:
+        raise ValueError(
+            "Azure Document Intelligence is not configured. Please set AZURE_DI_ENDPOINT and AZURE_DI_KEY environment variables."
+        )
+
+    if model_id is None:
+        model_id = AZURE_DI_MODEL_ID
+
+    logger.info(
+        f"[{request_id}] Masking ID details with Azure Document Intelligence (model: {model_id})"
+    )
+
+    # Wrap synchronous Azure DI call in asyncio.to_thread for non-blocking execution
+    def _analyze_and_mask() -> dict[str, Any]:
+        # Initialize Document Intelligence client
+        client = DocumentIntelligenceClient(
+            AZURE_DI_ENDPOINT, AzureKeyCredential(AZURE_DI_KEY)
+        )
+
+        # Analyze document
+        image_stream = io.BytesIO(image_bytes)
+        poller = client.begin_analyze_document(
+            model_id, body=image_stream, content_type="application/octet-stream"
+        )
+        result: Any = poller.result()
+
+        # Collect NON-SIGNATURE field regions to mask
+        regions_to_mask: list[tuple[str, int, list[float]]] = []
+        signature_fields_found: list[str] = []
+
+        # Look for fields in custom model documents
+        documents_attr: Any = getattr(result, "documents", None)
+        if documents_attr:
+            for doc in documents_attr:
+                fields_attr: Any = getattr(doc, "fields", None)
+                if fields_attr:
+                    for field_name, field_value in fields_attr.items():
+                        fname_str: str = str(field_name)
+
+                        # Skip signature fields - we want to preserve them
+                        if "signature" in fname_str.lower():
+                            signature_fields_found.append(fname_str)
+                            logger.debug(f"[{request_id}] Preserving signature field: {fname_str}")
+                            continue
+
+                        # Get bounding regions for non-signature fields
+                        regions_attr: Any = getattr(field_value, "bounding_regions", None)
+                        if regions_attr:
+                            for region in regions_attr:
+                                page_number: int = int(getattr(region, "page_number", 1))
+                                polygon_raw: Any = getattr(region, "polygon", [])
+                                polygon: list[float] = list(polygon_raw) if polygon_raw else []
+                                if polygon:
+                                    regions_to_mask.append((fname_str, page_number, polygon))
+                                    logger.debug(f"[{request_id}] Will mask field: {fname_str}")
+
+        return {
+            "regions_to_mask": regions_to_mask,
+            "signature_fields_found": signature_fields_found,
+        }
+
+    # Execute Document Intelligence analysis in thread pool
+    analysis_result = await asyncio.to_thread(_analyze_and_mask)
+
+    regions_to_mask: list[tuple[str, int, list[float]]] = analysis_result["regions_to_mask"]
+    signature_fields_found: list[str] = analysis_result["signature_fields_found"]
+
+    if not regions_to_mask:
+        logger.info(
+            f"[{request_id}] No fields to mask (all are signature fields or no fields found)"
+        )
+        return {
+            "fields_masked": 0,
+            "masked_fields": [],
+            "signature_fields_preserved": signature_fields_found,
+            "masked_image_bytes": image_bytes,  # Return original if nothing to mask
+            "message": "No non-signature fields detected to mask",
+        }
+
+    # Mask non-signature regions with white color
+    logger.info(f"[{request_id}] Masking {len(regions_to_mask)} non-signature field(s)")
+    masked_image_bytes = _mask_regions_with_white(
+        image_bytes, regions_to_mask, padding, request_id
+    )
+
+    # Build list of masked field details
+    masked_fields: list[dict[str, Any]] = []
+    for i, (name, page_no, poly) in enumerate(regions_to_mask, start=1):
+        min_x, min_y, max_x, max_y = _polygon_to_bbox(poly)
+        masked_fields.append(
+            {
+                "index": i,
+                "field_name": name,
+                "page_number": page_no,
+                "bbox": {"min_x": min_x, "min_y": min_y, "max_x": max_x, "max_y": max_y},
+            }
+        )
+
+    logger.info(
+        f"[{request_id}] Masked {len(regions_to_mask)} field(s), "
+        f"preserved {len(signature_fields_found)} signature field(s)"
+    )
+
+    return {
+        "fields_masked": len(regions_to_mask),
+        "masked_fields": masked_fields,
+        "signature_fields_preserved": signature_fields_found,
+        "masked_image_bytes": masked_image_bytes,
+        "message": f"Successfully masked {len(regions_to_mask)} field(s)",
+    }
+
+
 async def _extract_signature_with_doc_intelligence(
     image_bytes: bytes, request_id: str, model_id: str | None = None
 ) -> dict[str, Any]:
@@ -703,6 +1014,18 @@ async def _extract_signature_with_doc_intelligence(
                         # Match signature fields by name
                         fname_str: str = str(field_name)
                         if "signature" in fname_str.lower():
+                            # Extract content and confidence to validate signature
+                            content: str = str(getattr(field_value, "content", "") or "")
+                            confidence: float = float(getattr(field_value, "confidence", 0) or 0)
+
+                            # Skip invalid signatures: 1 character content with confidence < 8%
+                            if len(content) == 1 and confidence < 0.08:
+                                logger.info(
+                                    f"[{request_id}] Skipping invalid signature '{fname_str}': "
+                                    f"content='{content}' (1 char), confidence={confidence:.2%}"
+                                )
+                                continue
+
                             regions_attr: Any = getattr(field_value, "bounding_regions", None)
                             if regions_attr:
                                 for region in regions_attr:
@@ -713,23 +1036,6 @@ async def _extract_signature_with_doc_intelligence(
                                     )
                                     if polygon:
                                         regions.append((fname_str, page_number, polygon))
-
-        # Strategy 2: Fallback to figures (Layout model)
-        figures_attr: Any = getattr(result, "figures", None)
-        if not regions and figures_attr:
-            for idx, fig in enumerate(figures_attr):
-                regions_attr_fig: Any = getattr(fig, "bounding_regions", None)
-                if regions_attr_fig:
-                    for region in regions_attr_fig:
-                        page_number_fig: int = int(getattr(region, "page_number", 1))
-                        polygon_raw_fig: Any = getattr(region, "polygon", [])
-                        polygon_fig: list[float] = (
-                            list(polygon_raw_fig) if polygon_raw_fig else []
-                        )
-                        if polygon_fig:
-                            regions.append(
-                                (f"figure_{idx+1}", page_number_fig, polygon_fig)
-                            )
 
         if not regions:
             return {
@@ -796,7 +1102,7 @@ def _crop_signature_from_gpt(
     opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
-) -> str:
+) -> tuple[str, list[dict[str, Any]]]:
     """
     Crop signature region from image based on bounding box and return as base64 string.
     All processing is done in-memory (serverless-compatible).
@@ -810,7 +1116,9 @@ def _crop_signature_from_gpt(
         request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
 
     Returns:
-        Base64-encoded PNG image string of the cropped signature
+        Tuple of:
+        - Base64-encoded PNG image string of the cropped signature
+        - List of OpenCV-extracted signatures [{"content": str}, ...] (empty if opencv_crop=False)
 
     Raises:
         ValueError: If bounding box is invalid
@@ -858,15 +1166,16 @@ def _crop_signature_from_gpt(
         png_bytes = _opencv_postprocess_image(png_bytes, request_id)
 
     # Apply OpenCV signature cropping if requested
+    opencv_signatures: list[dict[str, Any]] = []
     if opencv_crop:
         if request_id is None:
             raise ValueError("request_id is required when opencv_crop=True")
-        png_bytes = _opencv_crop_signature(png_bytes, request_id)
+        png_bytes, opencv_signatures = _opencv_crop_signature(png_bytes, request_id)
 
     # Encode to base64 string
     base64_string = base64.b64encode(png_bytes).decode("utf-8")
 
-    return base64_string
+    return base64_string, opencv_signatures
 
 
 def _crop_signature_from_adi(
@@ -876,7 +1185,7 @@ def _crop_signature_from_adi(
     opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
-) -> str:
+) -> tuple[str, list[dict[str, Any]]]:
     """
     Crop signature region from image using pixel coordinates and return as base64 string.
     Used for Azure Document Intelligence results which return pixel coordinates.
@@ -891,7 +1200,9 @@ def _crop_signature_from_adi(
         request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
 
     Returns:
-        Base64-encoded PNG image string of the cropped signature
+        Tuple of:
+        - Base64-encoded PNG image string of the cropped signature
+        - List of OpenCV-extracted signatures [{"content": str}, ...] (empty if opencv_crop=False)
 
     Raises:
         ValueError: If bounding box is provided but invalid
@@ -942,15 +1253,16 @@ def _crop_signature_from_adi(
         png_bytes = _opencv_postprocess_image(png_bytes, request_id)
 
     # Apply OpenCV signature cropping if requested
+    opencv_signatures: list[dict[str, Any]] = []
     if opencv_crop:
         if request_id is None:
             raise ValueError("request_id is required when opencv_crop=True")
-        png_bytes = _opencv_crop_signature(png_bytes, request_id)
+        png_bytes, opencv_signatures = _opencv_crop_signature(png_bytes, request_id)
 
     # Encode to base64 string
     base64_string = base64.b64encode(png_bytes).decode("utf-8")
 
-    return base64_string
+    return base64_string, opencv_signatures
 
 
 def _convert_pdf_to_image_bytes(file_bytes: bytes, filename: str, dpi: int = 200) -> bytes:
@@ -2346,7 +2658,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         - padding (optional): Additional padding around signature in pixels (default: 100)
         - opencv_upscale (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
-        - prompt_center (optional): Use centered bounding box prompt with balanced padding (default: false)
+        - prompt (optional): Custom prompt for signature extraction (defaults to built-in SIGNATURE_EXTRACTION_PROMPT)
 
     Request Body:
         JSON with the following fields:
@@ -2379,7 +2691,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         padding_str = req.params.get("padding", "100")
         opencv_upscale_str = req.params.get("opencv_upscale", "false").lower()
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
-        prompt_center_str = req.params.get("prompt_center", "false").lower()
+        custom_prompt = req.params.get("prompt")
 
         # Validate and parse padding
         padding, padding_error = _validate_padding_parameter(padding_str, request_id)
@@ -2388,7 +2700,6 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         opencv_upscale = opencv_upscale_str in ("true", "1", "yes")
         opencv_crop = opencv_crop_str in ("true", "1", "yes")
-        prompt_center = prompt_center_str in ("true", "1", "yes")
 
         # Parse and validate JSON body
         body, body_error = _parse_json_body(req, request_id)
@@ -2414,7 +2725,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         # Extract signatures using Azure OpenAI Vision API
         extraction_start = time.time()
-        extraction_result = await _extract_signature_with_openai(image_bytes, request_id, model, prompt_center)
+        extraction_result = await _extract_signature_with_openai(image_bytes, request_id, model, custom_prompt)
         extraction_time = time.time() - extraction_start
 
         signatures_found = extraction_result.get("signatures_found", 0)
@@ -2477,7 +2788,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         crop_start = time.time()
         bounding_box = target_signature.get("bounding_box", {})
         try:
-            cropped_base64 = _crop_signature_from_gpt(
+            cropped_base64, opencv_signatures = _crop_signature_from_gpt(
                 image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
             )
         except ValueError as e:
@@ -2521,7 +2832,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         total_time = time.time() - start_time
 
         # Build response
-        result = {
+        result: dict[str, Any] = {
             "cropped_signature": cropped_base64,
             "signature_info": {
                 "id": target_signature.get("id"),
@@ -2534,7 +2845,7 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
             "signatures_found": signatures_found,
             "owner_signatures_found": len(owner_signatures),
             "model_used": model or AZURE_OPENAI_MODEL,
-            "prompt_centered": prompt_center,
+            "custom_prompt_used": custom_prompt is not None,
             "opencv_upscaling": opencv_upscale,
             "opencv_processing": opencv_crop,
             "request_id": request_id,
@@ -2544,6 +2855,10 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
                 "total_ms": round(total_time * 1000, 2),
             },
         }
+
+        # Add OpenCV signatures if available
+        if opencv_signatures:
+            result["opencv_signatures"] = opencv_signatures
 
         logger.info(
             f"[{request_id}] Signature cropping completed: "
@@ -2568,6 +2883,489 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps(
                 {
                     "error": "Signature cropping failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+# GPT deduplication prompt for selecting cleanest signature
+GPT_DEDUP_PROMPT = """
+The attached image shows numbered signature crops on the left with corresponding handwritten signature images on the right. Identify which crop is the cleanest, it must fully capture the complete handwritten signature with no extra surrounding elements. Return only the number of the cleanest crop.
+
+Return your response in the following JSON format:
+{
+  "selected_index": <number>,
+  "reason": "<brief explanation of why this crop was selected>"
+}
+"""
+
+
+async def _select_cleanest_signature_with_openai(
+    image_bytes: bytes, request_id: str, model: str | None = None
+) -> dict[str, Any]:
+    """
+    Select the cleanest signature from an image showing numbered signature crops
+    using Azure OpenAI Vision API.
+
+    Args:
+        image_bytes: Image file bytes showing numbered signature options
+        request_id: Request ID for logging
+        model: Azure OpenAI model deployment name (defaults to AZURE_OPENAI_MODEL)
+
+    Returns:
+        Dictionary containing selection result with structure:
+        {
+            "selected_index": int,
+            "reason": str
+        }
+
+    Raises:
+        ValueError: If OpenAI is not configured or response parsing fails
+        Exception: If API call fails
+    """
+    if model is None:
+        model = AZURE_OPENAI_MODEL
+
+    # Get OpenAI client (singleton pattern)
+    client = _get_openai_client()
+
+    # Encode image to base64
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    # Wrap synchronous OpenAI call in asyncio.to_thread for non-blocking execution
+    def _call_openai() -> dict[str, Any]:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert at analyzing signature images and selecting the cleanest, most complete signature crop. Always respond with valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": GPT_DEDUP_PROMPT},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}",
+                                "detail": "high",
+                            },
+                        },
+                    ],
+                },
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+
+        # Extract and parse response
+        content = response.choices[0].message.content
+
+        # Handle None content
+        if content is None:
+            raise ValueError("No content returned from OpenAI API")
+
+        # Try to extract JSON from response (in case it's wrapped in markdown)
+        if "```json" in content:
+            json_start = content.find("```json") + 7
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+        elif "```" in content:
+            json_start = content.find("```") + 3
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+
+        result: dict[str, Any] = json.loads(content)
+        return result
+
+    logger.info(f"[{request_id}] Calling Azure OpenAI Vision API for signature deduplication")
+    result = await asyncio.to_thread(_call_openai)
+    logger.info(
+        f"[{request_id}] Azure OpenAI selected signature index: {result.get('selected_index')}"
+    )
+
+    return result
+
+
+def _combine_signatures_vertically(
+    opencv_signatures: list[dict[str, Any]], request_id: str
+) -> tuple[bytes, list[dict[str, Any]]]:
+    """
+    Combine multiple signature images vertically with index labels for GPT deduplication.
+    Similar to the stacking logic in _opencv_crop_signature().
+
+    Args:
+        opencv_signatures: List of signature objects with 'content' field (base64-encoded PNG)
+        request_id: Request ID for logging
+
+    Returns:
+        Tuple of:
+        - Combined PNG image bytes with signatures stacked vertically
+        - List of bounding box info for each signature in the combined image
+
+    Raises:
+        ValueError: If image decoding fails or no valid signatures provided
+    """
+    from PIL import ImageDraw, ImageFont
+
+    if not opencv_signatures:
+        raise ValueError("No signatures provided")
+
+    # Decode all base64 images to PIL Images
+    pil_images: list[Image.Image] = []
+    for idx, sig in enumerate(opencv_signatures):
+        base64_content = sig.get("content", "")
+        if not base64_content:
+            logger.warning(f"[{request_id}] Signature {idx} has no content, skipping")
+            continue
+
+        try:
+            image_bytes = base64.b64decode(base64_content)
+            pil_img = Image.open(io.BytesIO(image_bytes))
+            # Convert to RGB if needed
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
+            pil_images.append(pil_img)
+        except Exception as e:
+            logger.warning(f"[{request_id}] Failed to decode signature {idx}: {str(e)}")
+            continue
+
+    if not pil_images:
+        raise ValueError("No valid signature images could be decoded")
+
+    logger.info(f"[{request_id}] Combining {len(pil_images)} signatures vertically")
+
+    # Calculate canvas dimensions
+    # Reserve space on the left for index numbers (120px margin for 48pt font)
+    index_margin = 120
+    max_img_width = max(img.width for img in pil_images)
+    padding = 100
+    total_height = sum(img.height for img in pil_images) + padding * (len(pil_images) - 1)
+    canvas_width = index_margin + max_img_width
+
+    logger.info(
+        f"[{request_id}] Canvas size: {canvas_width}x{total_height} "
+        f"({len(pil_images)} signatures with {padding}px padding, {index_margin}px index margin)"
+    )
+
+    # Create white canvas (RGB mode)
+    combined_canvas = Image.new("RGB", (canvas_width, total_height), (255, 255, 255))
+    draw = ImageDraw.Draw(combined_canvas)
+
+    # Use Pillow's bundled font (Aileron Regular) - works in serverless environments
+    font_size = 48
+    font = ImageFont.load_default(size=font_size)
+    logger.info(f"[{request_id}] Using Pillow bundled font at size {font_size}")
+
+    # Track bounding boxes for each signature in the combined image
+    bounding_boxes: list[dict[str, Any]] = []
+
+    # Paste each signature right-aligned with index number on the left
+    current_y = 0
+    for idx, pil_img in enumerate(pil_images):
+        # Right-align: place image at the rightmost position
+        x_offset = canvas_width - pil_img.width
+        combined_canvas.paste(pil_img, (x_offset, current_y))
+
+        # Store bounding box for this signature (position in combined image)
+        bounding_boxes.append({
+            "index": idx,
+            "x": x_offset,
+            "y": current_y,
+            "width": pil_img.width,
+            "height": pil_img.height,
+        })
+
+        # Draw index number on the left side, vertically centered with the signature
+        index_text = str(idx)
+        # Get text bounding box for centering
+        text_bbox = draw.textbbox((0, 0), index_text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+
+        # Center the index number vertically with the signature image
+        # and place it in the left margin area
+        text_x = (index_margin - text_width) // 2
+        text_y = current_y + (pil_img.height - text_height) // 2
+
+        # Draw the index number in RED with stroke to simulate bold effect
+        draw.text(
+            (text_x, text_y),
+            index_text,
+            fill=(255, 0, 0),
+            font=font,
+            stroke_width=3,
+            stroke_fill=(255, 0, 0),
+        )
+
+        logger.info(
+            f"[{request_id}] Pasted signature {idx}/{len(pil_images) - 1}: "
+            f"size={pil_img.width}x{pil_img.height}, position=({x_offset}, {current_y}), "
+            f"index at ({text_x}, {text_y})"
+        )
+
+        current_y += pil_img.height + padding
+
+    # Convert combined canvas to PNG bytes
+    output_buffer = io.BytesIO()
+    combined_canvas.save(output_buffer, format="PNG")
+    combined_bytes = output_buffer.getvalue()
+
+    logger.info(
+        f"[{request_id}] Combined signature image: {canvas_width}x{total_height}, "
+        f"{len(combined_bytes)} bytes"
+    )
+
+    return combined_bytes, bounding_boxes
+
+
+@app.route(route="gpt_dedup", methods=["POST"])
+@require_api_key
+async def gpt_dedup(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Deduplicate signature crops by selecting the cleanest one using Azure OpenAI Vision API.
+    Returns the cropped signature as a base64-encoded PNG string.
+
+    This endpoint accepts an array of signature images, combines them vertically with index
+    labels, and uses GPT to identify which signature is the cleanest (fully captures the
+    complete handwritten signature with no extra surrounding elements).
+
+    Query Parameters:
+        - model (optional): Azure OpenAI model name (default: from env AZURE_OPENAI_MODEL)
+
+    Request Body:
+        JSON with the following fields:
+        - opencv_signatures (required): Array of signature objects with structure:
+            [{"content": "base64-encoded-png-image"}, ...]
+
+    Returns:
+        JSON response with:
+        - cropped_signature: Base64-encoded PNG of the selected cleanest signature
+        - selected_index: The index of the selected signature
+        - reason: GPT's explanation for the selection
+        - total_signatures: Total number of input signatures
+        - performance: Timing metrics
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] GPT signature deduplication request initiated")
+
+    try:
+        # Validate environment variables
+        env_error = _validate_env_variables(
+            {
+                "AZURE_OPENAI_API_KEY": AZURE_OPENAI_API_KEY,
+                "AZURE_OPENAI_ENDPOINT": AZURE_OPENAI_ENDPOINT,
+            },
+            request_id,
+        )
+        if env_error:
+            return env_error
+
+        # Get optional parameters
+        model = req.params.get("model")
+
+        # Parse and validate JSON body
+        body, body_error = _parse_json_body(req, request_id)
+        if body_error:
+            return body_error
+
+        # Validate required fields
+        fields_error = _validate_required_fields(body, ["opencv_signatures"], request_id)
+        if fields_error:
+            return fields_error
+
+        opencv_signatures: list[dict[str, Any]] = body.get("opencv_signatures", [])
+
+        # Validate opencv_signatures is a non-empty list
+        if not isinstance(opencv_signatures, list) or len(opencv_signatures) == 0:
+            logger.warning(f"[{request_id}] Invalid opencv_signatures: must be a non-empty array")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid opencv_signatures",
+                        "message": "opencv_signatures must be a non-empty array of signature objects",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Validate each signature has 'content' field
+        for idx, sig in enumerate(opencv_signatures):
+            if not isinstance(sig, dict) or not sig.get("content"):
+                logger.warning(f"[{request_id}] Signature {idx} missing 'content' field")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid signature format",
+                            "message": f"Signature at index {idx} must have a 'content' field with base64-encoded image",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+        logger.info(f"[{request_id}] Processing {len(opencv_signatures)} signature candidates")
+
+        # If only one signature, return it directly without GPT call
+        if len(opencv_signatures) == 1:
+            logger.info(f"[{request_id}] Only one signature provided, returning directly")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "cropped_signature": opencv_signatures[0]["content"],
+                        "selected_index": 0,
+                        "reason": "Only one signature provided, no deduplication needed",
+                        "total_signatures": 1,
+                        "model_used": model or AZURE_OPENAI_MODEL,
+                        "request_id": request_id,
+                        "performance": {
+                            "combine_ms": 0,
+                            "selection_ms": 0,
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=200,
+            )
+
+        # Combine signatures vertically with index labels
+        combine_start = time.time()
+        try:
+            combined_image_bytes, bounding_boxes = _combine_signatures_vertically(
+                opencv_signatures, request_id
+            )
+        except ValueError as e:
+            logger.error(f"[{request_id}] Failed to combine signatures: {str(e)}")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Failed to combine signatures",
+                        "message": str(e),
+                        "request_id": request_id,
+                        "performance": {
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+        combine_time = time.time() - combine_start
+
+        # Call Azure OpenAI to select the cleanest signature
+        selection_start = time.time()
+        selection_result = await _select_cleanest_signature_with_openai(
+            combined_image_bytes, request_id, model
+        )
+        selection_time = time.time() - selection_start
+
+        selected_index = selection_result.get("selected_index")
+        selection_reason = selection_result.get("reason", "")
+
+        # Validate selected_index
+        if selected_index is None:
+            logger.error(f"[{request_id}] OpenAI did not return a selected_index")
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Selection failed",
+                        "message": "OpenAI did not return a valid signature selection",
+                        "request_id": request_id,
+                        "performance": {
+                            "combine_ms": round(combine_time * 1000, 2),
+                            "selection_ms": round(selection_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=500,
+            )
+
+        # Validate selected_index is within range
+        selected_index_int = int(selected_index)
+        if selected_index_int < 0 or selected_index_int >= len(opencv_signatures):
+            logger.error(
+                f"[{request_id}] Selected index {selected_index_int} out of range. "
+                f"Valid range: 0-{len(opencv_signatures) - 1}"
+            )
+            total_time = time.time() - start_time
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid selection",
+                        "message": f"Selected index {selected_index_int} is out of range. "
+                        f"Valid range: 0-{len(opencv_signatures) - 1}",
+                        "request_id": request_id,
+                        "performance": {
+                            "combine_ms": round(combine_time * 1000, 2),
+                            "selection_ms": round(selection_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        logger.info(
+            f"[{request_id}] GPT selected signature index {selected_index_int}: {selection_reason}"
+        )
+
+        # Return the selected signature directly from the input
+        cropped_signature = opencv_signatures[selected_index_int]["content"]
+        total_time = time.time() - start_time
+
+        # Build response
+        result: dict[str, Any] = {
+            "cropped_signature": cropped_signature,
+            "selected_index": selected_index_int,
+            "reason": selection_reason,
+            "total_signatures": len(opencv_signatures),
+            "model_used": model or AZURE_OPENAI_MODEL,
+            "request_id": request_id,
+            "performance": {
+                "combine_ms": round(combine_time * 1000, 2),
+                "selection_ms": round(selection_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        logger.info(
+            f"[{request_id}] GPT deduplication completed: "
+            f"selected_index={selected_index_int}, "
+            f"total_candidates={len(opencv_signatures)}, "
+            f"total_time={total_time:.3f}s"
+        )
+
+        return func.HttpResponse(
+            json.dumps(result), mimetype="application/json", status_code=200
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] GPT deduplication failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "GPT deduplication failed",
                     "message": str(e),
                     "request_id": request_id,
                 }
@@ -2702,7 +3500,7 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
                 f"(upscale={opencv_upscale}, crop={opencv_crop})"
             )
         try:
-            cropped_base64 = _crop_signature_from_adi(
+            cropped_base64, opencv_signatures = _crop_signature_from_adi(
                 image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
             )
         except ValueError as e:
@@ -2759,6 +3557,10 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
                 "total_ms": round(total_time * 1000, 2),
             },
         }
+
+        # Add OpenCV signatures if available
+        if opencv_signatures:
+            result["opencv_signatures"] = opencv_signatures
 
         # Add signature info only if a signature was detected
         if target_signature:
@@ -3172,11 +3974,12 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
 
         # Conditionally apply OpenCV signature cropping
         crop_time = 0.0
+        opencv_signatures: list[dict[str, Any]] = []
         if opencv_crop:
             crop_start = time.time()
             logger.info(f"[{request_id}] Applying OpenCV signature cropping to combined image")
             try:
-                cropped_bytes = _opencv_crop_signature(combined_bytes, request_id)
+                cropped_bytes, opencv_signatures = _opencv_crop_signature(combined_bytes, request_id)
             except ValueError as e:
                 logger.error(f"[{request_id}] Signature cropping failed: {str(e)}")
                 return func.HttpResponse(
@@ -3206,22 +4009,27 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
             f"[{request_id}] Signature deduplication completed successfully in {total_time:.3f}s"
         )
 
+        # Build response
+        response_data: dict[str, Any] = {
+            "signature_base64": result_base64,
+            "request_id": request_id,
+            "opencv_processing": opencv_crop,
+            "message": "Signatures deduplicated successfully",
+            "performance": {
+                "decode_ms": round(decode_time * 1000, 2),
+                "combine_ms": round(combine_time * 1000, 2),
+                "crop_ms": round(crop_time * 1000, 2),
+                "encode_ms": round(encode_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        # Add OpenCV signatures if available
+        if opencv_signatures:
+            response_data["opencv_signatures"] = opencv_signatures
+
         return func.HttpResponse(
-            json.dumps(
-                {
-                    "signature_base64": result_base64,
-                    "request_id": request_id,
-                    "opencv_processing": opencv_crop,
-                    "message": "Signatures deduplicated successfully",
-                    "performance": {
-                        "decode_ms": round(decode_time * 1000, 2),
-                        "combine_ms": round(combine_time * 1000, 2),
-                        "crop_ms": round(crop_time * 1000, 2),
-                        "encode_ms": round(encode_time * 1000, 2),
-                        "total_ms": round(total_time * 1000, 2),
-                    },
-                }
-            ),
+            json.dumps(response_data),
             mimetype="application/json",
             status_code=200,
         )
@@ -3237,6 +4045,238 @@ async def sig_dedup(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps(
                 {
                     "error": "Signature deduplication failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="id_masking", methods=["POST"])
+@require_api_key
+async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Mask faces and ID details from an image while preserving signatures.
+
+    This endpoint performs two-stage masking:
+    1. Face masking: Detects and masks all faces using Azure Face API
+    2. ID detail masking: Masks all document fields (name, address, ID numbers, etc.)
+       EXCEPT signature fields using Azure Document Intelligence
+
+    Query Parameters:
+        - model_id (optional): Azure Document Intelligence model ID (default: from env AZURE_DI_MODEL_ID)
+        - padding (optional): Additional padding around masked regions in pixels (default: 4)
+        - skip_face_masking (optional): Skip face detection/masking step (default: false)
+        - skip_id_masking (optional): Skip ID details masking step (default: false)
+
+    Request Body:
+        JSON with the following fields:
+        - filename (required): Name of the image file
+        - content (required): Base64-encoded image content
+
+    Returns:
+        JSON response with:
+        - masked_image: Base64-encoded masked image (PNG format)
+        - faces_masked: Number of faces masked
+        - fields_masked: Number of ID fields masked
+        - signature_fields_preserved: List of signature field names preserved
+        - performance: Timing metrics for each processing step
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] ID masking request initiated")
+
+    try:
+        # Get optional parameters
+        model_id = req.params.get("model_id")
+        padding_str = req.params.get("padding", "4")
+        skip_face_masking_str = req.params.get("skip_face_masking", "false").lower()
+        skip_id_masking_str = req.params.get("skip_id_masking", "false").lower()
+
+        # Validate and parse padding
+        padding, padding_error = _validate_padding_parameter(padding_str, request_id)
+        if padding_error:
+            return padding_error
+
+        skip_face_masking = skip_face_masking_str in ("true", "1", "yes")
+        skip_id_masking = skip_id_masking_str in ("true", "1", "yes")
+
+        # At least one masking operation must be enabled
+        if skip_face_masking and skip_id_masking:
+            logger.warning(f"[{request_id}] Both masking operations skipped")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameters",
+                        "message": "At least one masking operation must be enabled. Both skip_face_masking and skip_id_masking cannot be true.",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse and validate JSON body
+        body, body_error = _parse_json_body(req, request_id)
+        if body_error:
+            return body_error
+
+        # Validate required fields
+        fields_error = _validate_required_fields(body, ["filename", "content"], request_id)
+        if fields_error:
+            return fields_error
+
+        filename = body.get("filename")
+        base64_content = body.get("content")
+
+        # Decode base64 content
+        image_bytes, decode_error = _decode_base64_content(base64_content, request_id)
+        if decode_error:
+            return decode_error
+
+        logger.info(
+            f"[{request_id}] Processing file: {filename} ({len(image_bytes)} bytes), "
+            f"face_masking={not skip_face_masking}, id_masking={not skip_id_masking}"
+        )
+
+        # Initialize result tracking
+        current_image_bytes = image_bytes
+        faces_masked = 0
+        fields_masked = 0
+        signature_fields_preserved: list[str] = []
+        masked_fields: list[dict[str, Any]] = []
+        face_time = 0.0
+        id_time = 0.0
+
+        # Step 1: Face masking using Azure Face API
+        if not skip_face_masking:
+            # Validate Face API configuration
+            if not AZURE_FACE_API_KEY or not AZURE_FACE_ENDPOINT:
+                logger.warning(f"[{request_id}] Azure Face API not configured, skipping face masking")
+            else:
+                face_start = time.time()
+
+                # Detect faces
+                face_result = await _detect_faces_with_azure_face_api(
+                    current_image_bytes, request_id
+                )
+
+                if face_result.get("error"):
+                    logger.warning(
+                        f"[{request_id}] Face detection failed: {face_result['error']}, "
+                        f"continuing with ID masking"
+                    )
+                else:
+                    faces_masked = face_result.get("faces_found", 0)
+
+                    if faces_masked > 0:
+                        # Erase faces from image
+                        current_image_bytes = _erase_faces_from_image(
+                            current_image_bytes, face_result, request_id
+                        )
+                        logger.info(f"[{request_id}] Erased {faces_masked} face(s) from image")
+
+                face_time = time.time() - face_start
+
+        # Step 2: ID details masking using Azure Document Intelligence
+        if not skip_id_masking:
+            # Validate Document Intelligence configuration
+            env_error = _validate_env_variables(
+                {
+                    "AZURE_DI_ENDPOINT": AZURE_DI_ENDPOINT,
+                    "AZURE_DI_KEY": AZURE_DI_KEY,
+                },
+                request_id,
+            )
+            if env_error:
+                # If DI is not configured but face masking was done, return partial result
+                if faces_masked > 0:
+                    logger.warning(
+                        f"[{request_id}] Azure DI not configured, returning face-masked image only"
+                    )
+                else:
+                    return env_error
+            else:
+                id_start = time.time()
+
+                try:
+                    # Mask ID details (preserving signatures)
+                    mask_result = await _mask_id_details_with_doc_intelligence(
+                        current_image_bytes, request_id, model_id, padding
+                    )
+
+                    fields_masked = mask_result.get("fields_masked", 0)
+                    signature_fields_preserved = mask_result.get("signature_fields_preserved", [])
+                    masked_fields = mask_result.get("masked_fields", [])
+                    current_image_bytes = mask_result.get("masked_image_bytes", current_image_bytes)
+
+                    logger.info(
+                        f"[{request_id}] Masked {fields_masked} ID field(s), "
+                        f"preserved {len(signature_fields_preserved)} signature field(s)"
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        f"[{request_id}] ID masking failed: {type(e).__name__}: {str(e)}"
+                    )
+                    # If face masking was done, return partial result
+                    if faces_masked > 0:
+                        logger.warning(
+                            f"[{request_id}] Returning face-masked image only due to ID masking error"
+                        )
+                    else:
+                        raise
+
+                id_time = time.time() - id_start
+
+        # Encode final masked image to base64
+        encode_start = time.time()
+        masked_base64 = base64.b64encode(current_image_bytes).decode("utf-8")
+        encode_time = time.time() - encode_start
+
+        total_time = time.time() - start_time
+
+        # Build response
+        result: dict[str, Any] = {
+            "masked_image": masked_base64,
+            "faces_masked": faces_masked,
+            "fields_masked": fields_masked,
+            "signature_fields_preserved": signature_fields_preserved,
+            "masked_fields": masked_fields,
+            "model_used": model_id or AZURE_DI_MODEL_ID,
+            "request_id": request_id,
+            "performance": {
+                "face_masking_ms": round(face_time * 1000, 2),
+                "id_masking_ms": round(id_time * 1000, 2),
+                "encode_ms": round(encode_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+            },
+        }
+
+        logger.info(
+            f"[{request_id}] ID masking completed: "
+            f"faces_masked={faces_masked}, "
+            f"fields_masked={fields_masked}, "
+            f"signatures_preserved={len(signature_fields_preserved)}, "
+            f"total_time={total_time:.3f}s"
+        )
+
+        return func.HttpResponse(
+            json.dumps(result), mimetype="application/json", status_code=200
+        )
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] ID masking failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "ID masking failed",
                     "message": str(e),
                     "request_id": request_id,
                 }

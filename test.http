@@ -581,6 +581,133 @@ Content-Type: application/json
 }
 
 ### ============================================
+### GPT Signature Deduplication
+### ============================================
+
+### GPT Dedup - Basic Request (Select cleanest signature from opencv_signatures)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    },
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    }
+  ]
+}
+
+### GPT Dedup - Single Signature (No GPT call needed)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    }
+  ]
+}
+
+### GPT Dedup - Multiple Signatures (3 candidates)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    },
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    },
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    }
+  ]
+}
+
+### GPT Dedup - Custom Model
+POST {{baseUrl}}/gpt_dedup?model=gpt-4o
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    },
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    }
+  ]
+}
+
+### GPT Dedup - Missing opencv_signatures (Error Case)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "old_field.png"
+}
+
+### GPT Dedup - Empty opencv_signatures Array (Error Case)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": []
+}
+
+### GPT Dedup - Missing Content Field (Error Case)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "other_field": "value"
+    }
+  ]
+}
+
+### GPT Dedup - Invalid Base64 Content (Error Case)
+POST {{baseUrl}}/gpt_dedup
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "not-valid-base64!!!"
+    },
+    {
+      "content": "another-invalid!!!"
+    }
+  ]
+}
+
+### GPT Dedup - No Authentication (Error Case)
+POST {{baseUrl}}/gpt_dedup
+Content-Type: application/json
+
+{
+  "opencv_signatures": [
+    {
+      "content": "iVBORw0KGgoAAAANS..."
+    }
+  ]
+}
+
+### ============================================
 ### Azure Document Intelligence Signature Crop
 ### ============================================
 
@@ -862,4 +989,146 @@ Content-Type: application/json
 }
 
 
+###############################################################################
+# ID Masking Routes
+###############################################################################
+
+### ID Masking - Basic Request (Both Face and ID Masking)
+# Masks faces using Azure Face API and ID details using Azure Document Intelligence
+# Preserves signature fields while masking other ID fields (name, address, ID numbers, etc.)
+POST {{baseUrl}}/id_masking
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Custom Model ID
+# Use a specific Document Intelligence custom model for field detection
+POST {{baseUrl}}/id_masking?model_id=valid_id2
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "driver_license.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Custom Padding
+# Apply 10 pixels padding around masked regions
+POST {{baseUrl}}/id_masking?padding=10
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "passport.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Skip Face Masking (ID Details Only)
+# Only mask ID details, skip face detection/masking
+POST {{baseUrl}}/id_masking?skip_face_masking=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "valid_id.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Skip ID Masking (Face Only)
+# Only mask faces, skip ID detail masking
+POST {{baseUrl}}/id_masking?skip_id_masking=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "selfie_with_id.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - All Parameters Combined
+# Custom model, padding, and face-only masking
+POST {{baseUrl}}/id_masking?model_id=valid_id2&padding=8&skip_face_masking=false&skip_id_masking=false
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "id_card.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Both Masking Operations Skipped (Error Case)
+# Should return 400 error - at least one masking operation must be enabled
+POST {{baseUrl}}/id_masking?skip_face_masking=true&skip_id_masking=true
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "test.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Invalid Padding (Error Case)
+# Should return 400 error for invalid padding value
+POST {{baseUrl}}/id_masking?padding=invalid
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "test.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Missing Filename (Error Case)
+# Should return 400 error - filename is required
+POST {{baseUrl}}/id_masking
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Missing Content (Error Case)
+# Should return 400 error - content is required
+POST {{baseUrl}}/id_masking
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "test.png"
+}
+
+### ID Masking - Invalid Base64 Content (Error Case)
+# Should return 400 error for invalid base64 encoding
+POST {{baseUrl}}/id_masking
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "filename": "test.png",
+  "content": "not-valid-base64!!!"
+}
+
+### ID Masking - Missing API Key (Error Case)
+# Should return 401 error - API key is required
+POST {{baseUrl}}/id_masking
+Content-Type: application/json
+
+{
+  "filename": "test.png",
+  "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+}
+
+### ID Masking - Empty Request Body (Error Case)
+# Should return 400 error - request body is required
+POST {{baseUrl}}/id_masking
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+}
 
