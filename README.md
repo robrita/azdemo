@@ -1,10 +1,9 @@
-# Azure Functions App - AI Search & Signature Comparison
+# Azure Functions App - Signature Comparison
 
-Azure Function App providing REST API access to Azure AI Search with hybrid vector search capabilities and signature verification using computer vision and AI embeddings.
+Azure Function App providing REST API access for signature verification using computer vision and AI embeddings.
 
 ## Features
 
-- **AI Search Integration**: Hybrid queries with text and vector fields
 - **Signature Comparison**: Automated signature verification using OpenCV and OpenAI CLIP embeddings
 - **Signature Extraction & Enhancement**:
   - **Azure OpenAI Vision API** (GPT-4.1): Natural language-based signature detection with owner/non-owner classification
@@ -485,135 +484,6 @@ The endpoint sends a JSON POST request to the `forward_endpoint` with the follow
 7. Uses `aiohttp` for async HTTP requests to the target endpoint
 8. Use the `request_id` to correlate requests with server logs for debugging
 
-#### `POST /api/sig_dedup`
-
-Deduplicate handwritten signature images by combining and cropping to a single signature region.
-
-**Use Case**: When you have multiple signature images (up to 3) that may contain duplicate or overlapping signatures, this endpoint combines them vertically and uses OpenCV contour detection to crop to a single unified signature region. Useful for cleaning up signature data before comparison or storage.
-
-**Headers**:
-
-- `X-API-Key`: API key for authentication (required)
-
-**Request Body** (application/json):
-
-```json
-{
-  "signature1": "base64_encoded_image_string",
-  "signature2": "base64_encoded_image_string",
-  "signature3": "base64_encoded_image_string"
-}
-```
-
-**Parameters**:
-
-- `signature1` (string, optional): First signature image as base64-encoded string (PNG, JPEG)
-- `signature2` (string, optional): Second signature image as base64-encoded string (PNG, JPEG)
-- `signature3` (string, optional): Third signature image as base64-encoded string (PNG, JPEG)
-
-**Behavior**:
-
-1. If all signatures are empty → Returns error (400)
-2. If only one signature is provided → Returns that signature immediately without processing
-3. If multiple signatures are provided → Combines them vertically (stacked in order with padding) and applies OpenCV signature cropping
-
-**Response** (Success - 200):
-
-```json
-{
-  "signature_base64": "base64_encoded_cropped_signature",
-  "request_id": "abc12345",
-  "message": "Signatures deduplicated successfully",
-  "performance": {
-    "decode_ms": 5.12,
-    "combine_ms": 8.45,
-    "crop_ms": 120.34,
-    "encode_ms": 3.67,
-    "total_ms": 137.58
-  }
-}
-```
-
-**Response** (Single Signature - 200):
-
-```json
-{
-  "signature_base64": "base64_encoded_original_signature",
-  "request_id": "abc12345",
-  "message": "Single signature returned (signature1 only)",
-  "performance": {
-    "total_ms": 2.45
-  }
-}
-```
-
-**Error Responses**:
-
-- **400 Bad Request**: Both signatures empty, invalid base64 encoding, or invalid image format
-- **500 Internal Server Error**: Image processing failed or signature extraction failed
-
-**Processing Pipeline**:
-
-1. **Validation**: Check if at least one signature is provided
-2. **Early Return**: If only one signature exists, return it immediately
-3. **Decoding**: Decode both base64 strings to image bytes
-4. **Combining**: Stack images vertically (preserving original sizes)
-5. **Cropping**: Apply OpenCV contour detection to extract signature region
-   - Uses adaptive thresholding and morphological operations
-   - Filters contours by area and aspect ratio (1.5-5.0)
-   - Adds 25% padding around detected signature
-6. **Encoding**: Convert result to base64 PNG string
-
-**OpenCV Signature Cropping**:
-
-The endpoint uses the same OpenCV-based signature extraction as other endpoints:
-
-- Adaptive thresholding for robust text detection
-- Contour filtering by area (>500px²) and aspect ratio (1.5-5.0)
-- Merged bounding box encompassing all signature strokes
-- Balanced padding (25% of signature dimensions, minimum 20px)
-- Returns original image if no valid signature contours found
-
-**Important Notes**:
-
-1. All processing is **serverless-compatible** (in-memory only, no file system writes)
-2. Both signatures are combined at their **original sizes** (no resizing)
-3. Only **one cropped signature** is returned (the merged/deduplicated result)
-4. Uses **async operations** for scalability
-5. Performance metrics track each processing stage for monitoring
-6. If cropping fails to find a signature, returns an error instead of the original combined image
-
-**Example cURL Request**:
-
-```bash
-# Two signatures
-curl -X POST "http://localhost:7071/api/sig_dedup" \
-  -H "X-API-Key: your-api-key-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "signature1": "iVBORw0KGgoAAAANS...",
-    "signature2": "iVBORw0KGgoAAAANS..."
-  }'
-
-# Three signatures
-curl -X POST "http://localhost:7071/api/sig_dedup" \
-  -H "X-API-Key: your-api-key-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "signature1": "iVBORw0KGgoAAAANS...",
-    "signature2": "iVBORw0KGgoAAAANS...",
-    "signature3": "iVBORw0KGgoAAAANS..."
-  }'
-```
-
-**Bounding Box Format**:
-
-- `x`: Left edge position (percentage, 0-100)
-- `y`: Top edge position (percentage, 0-100)
-- `width`: Box width (percentage, 0-100)
-- `height`: Box height (percentage, 0-100)
-- Additional padding is applied based on the `padding` parameter
-
 #### `POST /api/id_masking`
 
 Mask faces and ID details from an image while preserving signatures.
@@ -767,61 +637,6 @@ curl -X POST "http://localhost:7071/api/id_masking?skip_face_masking=true&model_
 6. Automatically identifies owner vs non-owner signatures based on labels and document context
 7. Padding parameter adds extra space around the detected signature (useful for downstream processing)
 
-### AI Search Operations
-
-#### `POST /api/query_aisearch`
-
-Hybrid text + vector search using Azure AI Search.
-
-**Query Parameters**:
-
-- `search_endpoint`: Azure AI Search endpoint URL (required)
-- `top`: Number of results to return (default: 10)
-- `vector_fields`: Comma-separated list of vector field names (required)
-
-**Headers**:
-
-- `X-API-Key`: API key for authentication (required)
-- `X-Search-Key`: Azure AI Search API key (or use `search_api_key` query param)
-
-**Request Body**:
-
-```json
-{
-  "search": ["query1", "query2"]
-}
-```
-
-**Response**:
-
-```json
-{
-  "search_queries": ["query1", "query2"],
-  "vector_fields": ["vector1", "vector2"],
-  "top": 10,
-  "results": [...],
-  "total_results": 25,
-  "unique_results": 20,
-  "duplicates_removed": 5,
-  "request_id": "abc12345",
-  "query_details": [
-    {
-      "query": "query1",
-      "result_count": 12,
-      "query_ms": 150.23
-    }
-  ],
-  "failed_queries": [],
-  "queries_failed": 0,
-  "performance": {
-    "total_query_ms": 300.45,
-    "total_ms": 320.67,
-    "queries_executed": 2,
-    "queries_succeeded": 2
-  }
-}
-```
-
 ### Health Check
 
 #### `GET /api/health`
@@ -859,7 +674,6 @@ API_KEY=your-api-key-here
 ```bash
 # Performance Tuning
 MAX_REQUEST_SIZE_MB=10                 # Default: 10
-AISEARCH_TIMEOUT_SECONDS=60            # Default: 60
 FACE_API_TIMEOUT_SECONDS=60            # Default: 60
 
 # Azure Face API (Required for /id_masking face detection)
@@ -968,13 +782,6 @@ curl -X POST "http://localhost:7071/api/compare_signatures" \
   -F "valid_id=@./testdata/valid_id.jpg" \
   -F "specimen_signatures=@./testdata/specimen_signatures.jpg" \
   -F "selfie_with_id=@./testdata/selfie_with_id.jpg"
-
-# Query AI Search
-curl -X POST "http://localhost:7071/api/query_aisearch?search_endpoint=https://your-search.search.windows.net/indexes/your-index/docs/search?api-version=2025-08-01-preview&top=10&vector_fields=vector1,vector2" \
-  -H "X-API-Key: your-key" \
-  -H "X-Search-Key: your-search-key" \
-  -H "Content-Type: application/json" \
-  -d '{"search": ["azure functions best practices"]}'
 
 # Crop signature from image (Azure OpenAI Vision-based extraction)
 curl -X POST "http://localhost:7071/api/gpt_crop?padding=5" \
