@@ -58,7 +58,8 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-pre
 AZURE_OPENAI_MODEL = os.getenv("AZURE_OPENAI_MODEL", "gpt-4.1")
 
 # OpenCV post-processing configuration
-LAPSRN_MODEL_PATH = os.getenv("LAPSRN_MODEL_PATH", "./LapSRN_x2.pb")
+LAPSRN_X2_MODEL_PATH = os.getenv("LAPSRN_X2_MODEL_PATH", "./LapSRN_x2.pb")
+LAPSRN_X4_MODEL_PATH = os.getenv("LAPSRN_X4_MODEL_PATH", "./LapSRN_x4.pb")
 
 # Azure Face API configuration (for face detection and masking)
 AZURE_FACE_API_KEY = os.getenv("AZURE_FACE_API_KEY")
@@ -235,8 +236,11 @@ async def _extract_signature_with_openai(
 
 
 def _opencv_crop_signature(
-    image_bytes: bytes, request_id: str
-) -> tuple[bytes, list[dict[str, Any]]]:
+    image_bytes: bytes,
+    request_id: str,
+    min_size_ratio: float = 0.25,
+    max_size_ratio: float = 0.80,
+) -> list[dict[str, Any]]:
     """
     Crop the signature region from an image using OpenCV contour detection.
     Uses adaptive thresholding, morphological operations, and contour filtering
@@ -245,19 +249,18 @@ def _opencv_crop_signature(
     Implementation follows crop_signatures_opencv() from signature_extraction_opencv.ipynb:
     - Extracts individual signature regions with padding
     - Sorts by area and keeps top 3 candidates
-    - Returns largest signature by area (or combined image for multiple signatures)
 
     All processing is done in-memory (serverless-compatible).
 
     Args:
         image_bytes: PNG image bytes
         request_id: Request ID for logging
+        min_size_ratio: Minimum cropped area ratio (0.0-1.0) relative to original image (default: 0.25)
+        max_size_ratio: Maximum cropped area ratio (0.0-1.0) relative to original image (default: 0.80)
 
     Returns:
-        Tuple of:
-        - Cropped PNG image bytes containing the signature region(s)
-        - List of OpenCV-extracted signatures with structure:
-          [{"content": str}, ...] where content is base64-encoded PNG image
+        List of OpenCV-extracted signatures with structure:
+        [{"content": str}, ...] where content is base64-encoded PNG image
 
     Raises:
         ValueError: If image processing fails or no signature found
@@ -327,19 +330,16 @@ def _opencv_crop_signature(
                 "aspect_ratio": aspect_ratio,
             })
 
-    # If no valid contours found, return original image with empty bounding boxes
+    # If no valid contours found, return empty list
     if not signatures:
-        logger.warning(f"[{request_id}] No signature contours found, returning original image")
-        return image_bytes, []
+        logger.warning(f"[{request_id}] No signature contours found")
+        return []
 
     logger.info(f"[{request_id}] Detected {len(signatures)} signature candidate(s)")
 
     # When multiple signatures are detected, filter out those that are too small or too large
-    # relative to the original image size (< 25% or > 80%)
+    # relative to the original image size based on min_size_ratio and max_size_ratio parameters
     if len(signatures) > 1:
-        min_size_ratio = 0.25
-        max_size_ratio = 0.80
-
         filtered_signatures = [
             sig for sig in signatures
             if min_size_ratio <= (sig["cropped_area"] / original_image_area) <= max_size_ratio
@@ -369,128 +369,25 @@ def _opencv_crop_signature(
         f"[{request_id}] Keeping top {len(top_signatures)} signature(s) by area"
     )
 
-    # If there are 2 or more signatures, combine them vertically with index labels
-    if len(signatures) >= 2:
-        logger.info(f"[{request_id}] Multiple signatures detected, combining vertically with 100px padding")
-
-        # Convert OpenCV images to PIL for easier combining
-        pil_images = []
-        for sig in signatures:
-            # Convert BGR to RGB for PIL
-            rgb_img = cv2.cvtColor(sig["image"], cv2.COLOR_BGR2RGB)
-            pil_img = Image.fromarray(rgb_img)
-            pil_images.append(pil_img)
-
-        # Calculate canvas dimensions
-        # Reserve space on the left for index numbers (120px margin for 48pt font)
-        index_margin = 120
-        max_img_width = max(img.width for img in pil_images)
-        padding = 100
-        total_height = sum(img.height for img in pil_images) + padding * (len(pil_images) - 1)
-        canvas_width = index_margin + max_img_width
-
-        logger.info(
-            f"[{request_id}] Canvas size: {canvas_width}x{total_height} "
-            f"({len(pil_images)} signatures with {padding}px padding, {index_margin}px index margin)"
-        )
-
-        # Create white canvas (RGB mode)
-        combined_canvas = Image.new("RGB", (canvas_width, total_height), (255, 255, 255))
-
-        # Import ImageDraw and ImageFont for drawing index numbers
-        from PIL import ImageDraw, ImageFont
-
-        draw = ImageDraw.Draw(combined_canvas)
-
-        # Use Pillow's bundled font (Aileron Regular) - works in serverless environments
-        # Pillow 10.1+ bundles this font and supports the size parameter
-        font_size = 48
-        font = ImageFont.load_default(size=font_size)
-        logger.info(f"[{request_id}] Using Pillow bundled font (Aileron) at size {font_size}")
-
-        # Paste each signature right-aligned with index number on the left
-        current_y = 0
-        for idx, pil_img in enumerate(pil_images):
-            # Right-align: place image at the rightmost position
-            x_offset = canvas_width - pil_img.width
-            combined_canvas.paste(pil_img, (x_offset, current_y))
-
-            # Draw index number on the left side, vertically centered with the signature
-            index_text = str(idx)
-            # Get text bounding box for centering
-            text_bbox = draw.textbbox((0, 0), index_text, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-
-            # Center the index number vertically with the signature image
-            # and place it in the left margin area
-            text_x = (index_margin - text_width) // 2
-            text_y = current_y + (pil_img.height - text_height) // 2
-
-            # Draw the index number in RED with stroke to simulate bold effect
-            # stroke_width adds thickness to the text, making it appear bold
-            draw.text(
-                (text_x, text_y),
-                index_text,
-                fill=(255, 0, 0),
-                font=font,
-                stroke_width=3,
-                stroke_fill=(255, 0, 0),
-            )
-
-            logger.info(
-                f"[{request_id}] Pasted signature {idx}/{len(pil_images) - 1}: "
-                f"size={pil_img.width}x{pil_img.height}, position=({x_offset}, {current_y}), "
-                f"index at ({text_x}, {text_y})"
-            )
-
-            current_y += pil_img.height + padding
-
-        # Convert back to OpenCV format
-        cropped_img = cv2.cvtColor(np.array(combined_canvas), cv2.COLOR_RGB2BGR)
-
-        logger.info(
-            f"[{request_id}] Combined signature: output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}"
-        )
-
-        # Build opencv_signatures list with base64 content for each signature
-        opencv_signatures = []
-        for idx, sig in enumerate(signatures):
-            # Encode individual signature image to base64
-            sig_success, sig_encoded = cv2.imencode(".png", sig["image"])
-            sig_base64 = base64.b64encode(sig_encoded.tobytes()).decode("utf-8") if sig_success else ""
-            opencv_signatures.append({
-                "content": sig_base64,
-            })
-            logger.debug(f"[{request_id}] Added signature {idx} to opencv_signatures")
-    else:
-        # Single signature - return the largest one
-        largest_signature = top_signatures[0]
-        cropped_img = largest_signature["image"]
-        x1, y1, x2, y2 = largest_signature["bbox"]
-
-        logger.info(
-            f"[{request_id}] Single signature: "
-            f"position=({x1}, {y1}), "
-            f"output_size={cropped_img.shape[1]}x{cropped_img.shape[0]}, "
-            f"area={largest_signature['area']:.0f}, "
-            f"aspect_ratio={largest_signature['aspect_ratio']:.2f}"
-        )
-
-        # Build opencv_signatures list with base64 content for single signature
+    # Build opencv_signatures list with base64 content for each signature
+    opencv_signatures: list[dict[str, Any]] = []
+    for idx, sig in enumerate(top_signatures):
         # Encode individual signature image to base64
-        sig_success, sig_encoded = cv2.imencode(".png", cropped_img)
+        sig_success, sig_encoded = cv2.imencode(".png", sig["image"])
         sig_base64 = base64.b64encode(sig_encoded.tobytes()).decode("utf-8") if sig_success else ""
-        opencv_signatures = [{
+        x1, y1, x2, y2 = sig["bbox"]
+        opencv_signatures.append({
             "content": sig_base64,
-        }]
+        })
+        logger.info(
+            f"[{request_id}] Signature {idx}: "
+            f"position=({x1}, {y1}), "
+            f"size={sig['image'].shape[1]}x{sig['image'].shape[0]}, "
+            f"area={sig['area']:.0f}, "
+            f"aspect_ratio={sig['aspect_ratio']:.2f}"
+        )
 
-    # Encode cropped signature to PNG bytes
-    success, encoded = cv2.imencode(".png", cropped_img)
-    if not success:
-        raise ValueError("Failed to encode cropped signature to PNG")
-
-    return encoded.tobytes(), opencv_signatures
+    return opencv_signatures
 
 
 def _opencv_postprocess_image(
@@ -544,7 +441,7 @@ def _opencv_postprocess_image(
     # 4. Load and apply LapSRN model for 2x upscaling
     sr_obj: Any = cv2.dnn_superres.DnnSuperResImpl_create()  # type: ignore[attr-defined]
     sr = cast(Any, sr_obj)
-    sr.readModel(LAPSRN_MODEL_PATH)
+    sr.readModel(LAPSRN_X2_MODEL_PATH)
     sr.setModel("lapsrn", 2)  # 2x upscaling
 
     upscaled = sr.upsample(sharpened_bgr)
@@ -871,6 +768,8 @@ async def _mask_id_details_with_doc_intelligence(
         # Collect NON-SIGNATURE field regions to mask
         regions_to_mask: list[tuple[str, int, list[float]]] = []
         signature_fields_found: list[str] = []
+        # Also collect signature field regions for cropping
+        signature_field_regions: list[tuple[str, int, list[float]]] = []
 
         # Look for fields in custom model documents
         documents_attr: Any = getattr(result, "documents", None)
@@ -881,13 +780,7 @@ async def _mask_id_details_with_doc_intelligence(
                     for field_name, field_value in fields_attr.items():
                         fname_str: str = str(field_name)
 
-                        # Skip signature fields - we want to preserve them
-                        if "signature" in fname_str.lower():
-                            signature_fields_found.append(fname_str)
-                            logger.debug(f"[{request_id}] Preserving signature field: {fname_str}")
-                            continue
-
-                        # Get bounding regions for non-signature fields
+                        # Get bounding regions
                         regions_attr: Any = getattr(field_value, "bounding_regions", None)
                         if regions_attr:
                             for region in regions_attr:
@@ -895,12 +788,19 @@ async def _mask_id_details_with_doc_intelligence(
                                 polygon_raw: Any = getattr(region, "polygon", [])
                                 polygon: list[float] = list(polygon_raw) if polygon_raw else []
                                 if polygon:
-                                    regions_to_mask.append((fname_str, page_number, polygon))
-                                    logger.debug(f"[{request_id}] Will mask field: {fname_str}")
+                                    # Check if this is a signature field
+                                    if "signature" in fname_str.lower():
+                                        signature_fields_found.append(fname_str)
+                                        signature_field_regions.append((fname_str, page_number, polygon))
+                                        logger.debug(f"[{request_id}] Preserving signature field: {fname_str}")
+                                    else:
+                                        regions_to_mask.append((fname_str, page_number, polygon))
+                                        logger.debug(f"[{request_id}] Will mask field: {fname_str}")
 
         return {
             "regions_to_mask": regions_to_mask,
             "signature_fields_found": signature_fields_found,
+            "signature_field_regions": signature_field_regions,
         }
 
     # Execute Document Intelligence analysis in thread pool
@@ -908,6 +808,9 @@ async def _mask_id_details_with_doc_intelligence(
 
     regions_to_mask: list[tuple[str, int, list[float]]] = analysis_result["regions_to_mask"]
     signature_fields_found: list[str] = analysis_result["signature_fields_found"]
+    signature_field_regions: list[tuple[str, int, list[float]]] = analysis_result[
+        "signature_field_regions"
+    ]
 
     if not regions_to_mask:
         logger.info(
@@ -917,6 +820,7 @@ async def _mask_id_details_with_doc_intelligence(
             "fields_masked": 0,
             "masked_fields": [],
             "signature_fields_preserved": signature_fields_found,
+            "signature_field_regions": signature_field_regions,
             "masked_image_bytes": image_bytes,  # Return original if nothing to mask
             "message": "No non-signature fields detected to mask",
         }
@@ -949,6 +853,7 @@ async def _mask_id_details_with_doc_intelligence(
         "fields_masked": len(regions_to_mask),
         "masked_fields": masked_fields,
         "signature_fields_preserved": signature_fields_found,
+        "signature_field_regions": signature_field_regions,
         "masked_image_bytes": masked_image_bytes,
         "message": f"Successfully masked {len(regions_to_mask)} field(s)",
     }
@@ -1101,6 +1006,8 @@ def _crop_signature_from_gpt(
     opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
+    min_size_ratio: float = 0.25,
+    max_size_ratio: float = 0.80,
 ) -> tuple[str, list[dict[str, Any]]]:
     """
     Crop signature region from image based on bounding box and return as base64 string.
@@ -1113,6 +1020,8 @@ def _crop_signature_from_gpt(
         opencv_upscale: If True, apply OpenCV post-processing (grayscale, sharpen, upscale 2x)
         opencv_crop: If True, apply OpenCV signature cropping using contour detection to isolate handwritten signature
         request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
+        min_size_ratio: Minimum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.25)
+        max_size_ratio: Maximum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.80)
 
     Returns:
         Tuple of:
@@ -1169,9 +1078,11 @@ def _crop_signature_from_gpt(
     if opencv_crop:
         if request_id is None:
             raise ValueError("request_id is required when opencv_crop=True")
-        png_bytes, opencv_signatures = _opencv_crop_signature(png_bytes, request_id)
+        opencv_signatures = _opencv_crop_signature(
+            png_bytes, request_id, min_size_ratio, max_size_ratio
+        )
 
-    # Encode to base64 string
+    # Encode to base64 string (used when opencv_crop is False)
     base64_string = base64.b64encode(png_bytes).decode("utf-8")
 
     return base64_string, opencv_signatures
@@ -1179,29 +1090,35 @@ def _crop_signature_from_gpt(
 
 def _crop_signature_from_adi(
     image_bytes: bytes,
-    bbox: dict[str, float] | None,
+    signatures: list[dict[str, Any]],
     padding: int = 4,
     opencv_upscale: bool = False,
     opencv_crop: bool = False,
     request_id: str | None = None,
-) -> tuple[str, list[dict[str, Any]]]:
+    min_size_ratio: float = 0.25,
+    max_size_ratio: float = 0.80,
+) -> list[dict[str, Any]]:
     """
-    Crop signature region from image using pixel coordinates and return as base64 string.
-    Used for Azure Document Intelligence results which return pixel coordinates.
+    Crop all signature regions from image using pixel coordinates from Azure Document Intelligence.
     All processing is done in-memory (serverless-compatible).
 
     Args:
         image_bytes: Image file bytes
-        bbox: Dict with keys 'min_x', 'min_y', 'max_x', 'max_y' (in pixels), or None to process entire image
+        signatures: List of signature dicts from Azure DI, each with 'bounding_box' containing
+                   'min_x', 'min_y', 'max_x', 'max_y' (in pixels), and 'field_name'
         padding: Additional padding to add around bounding box in pixels (default: 4)
-        opencv_upscale: If True, apply OpenCV post-processing (grayscale, sharpen, upscale 2x)
-        opencv_crop: If True, apply OpenCV signature cropping using contour detection to isolate handwritten signature
+        opencv_upscale: If True, apply OpenCV post-processing to original image (grayscale, sharpen, upscale 2x)
+                       and append resulting signatures to output
+        opencv_crop: If True, apply OpenCV signature cropping to original image using contour detection
+                    and append resulting signatures to output
         request_id: Request ID for logging (required if opencv_upscale=True or opencv_crop=True)
+        min_size_ratio: Minimum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.25)
+        max_size_ratio: Maximum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.80)
 
     Returns:
-        Tuple of:
-        - Base64-encoded PNG image string of the cropped signature
-        - List of OpenCV-extracted signatures [{"content": str}, ...] (empty if opencv_crop=False)
+        List of signature images with structure:
+        [{"content": str, "field_name": str, "bounding_box": dict}, ...]
+        where content is base64-encoded PNG image
 
     Raises:
         ValueError: If bounding box is provided but invalid
@@ -1210,13 +1127,18 @@ def _crop_signature_from_adi(
     image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     img_width, img_height = image.size
 
-    # If no bounding box provided, use the entire image
-    if bbox is None:
-        # Process entire image (no cropping, just apply OpenCV processing)
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format="PNG")
-        png_bytes = img_byte_arr.getvalue()
-    else:
+    signature_images: list[dict[str, Any]] = []
+
+    # Process each signature from Azure Document Intelligence
+    for sig_info in signatures:
+        bbox = sig_info.get("bounding_box")
+        field_name = sig_info.get("field_name", f"signature_{sig_info.get('id', 'unknown')}")
+
+        if not bbox:
+            if request_id:
+                logger.warning(f"[{request_id}] Signature '{field_name}' has no bounding box, skipping")
+            continue
+
         # Extract bounding box pixel coordinates
         min_x = bbox.get("min_x", 0)
         min_y = bbox.get("min_y", 0)
@@ -1225,11 +1147,19 @@ def _crop_signature_from_adi(
 
         # Validate bounding box
         if not (0 <= min_x < img_width and 0 <= min_y < img_height):
-            raise ValueError(f"Invalid bounding box position: min_x={min_x}, min_y={min_y}")
+            if request_id:
+                logger.warning(
+                    f"[{request_id}] Invalid bounding box position for '{field_name}': "
+                    f"min_x={min_x}, min_y={min_y}, skipping"
+                )
+            continue
         if not (min_x < max_x <= img_width and min_y < max_y <= img_height):
-            raise ValueError(
-                f"Invalid bounding box dimensions: max_x={max_x}, max_y={max_y}"
-            )
+            if request_id:
+                logger.warning(
+                    f"[{request_id}] Invalid bounding box dimensions for '{field_name}': "
+                    f"max_x={max_x}, max_y={max_y}, skipping"
+                )
+            continue
 
         # Apply padding (in pixels) and ensure within image bounds
         x1 = max(0, int(min_x) - padding)
@@ -1245,23 +1175,67 @@ def _crop_signature_from_adi(
         cropped.save(img_byte_arr, format="PNG")
         png_bytes = img_byte_arr.getvalue()
 
-    # Apply OpenCV post-processing if requested
-    if opencv_upscale:
+        # Encode to base64 string
+        base64_string = base64.b64encode(png_bytes).decode("utf-8")
+        signature_images.append({
+            "content": base64_string,
+            "field_name": field_name,
+            "bounding_box": bbox,
+        })
+
+        if request_id:
+            logger.info(
+                f"[{request_id}] Extracted signature '{field_name}': "
+                f"bbox=({min_x:.0f}, {min_y:.0f}, {max_x:.0f}, {max_y:.0f})"
+            )
+
+    # Optional post-processing: apply OpenCV processing to original image_bytes
+    # and append resulting signatures to signature_images
+    if opencv_upscale or opencv_crop:
         if request_id is None:
-            raise ValueError("request_id is required when opencv_upscale=True")
-        png_bytes = _opencv_postprocess_image(png_bytes, request_id)
+            raise ValueError("request_id is required when opencv_upscale=True or opencv_crop=True")
 
-    # Apply OpenCV signature cropping if requested
-    opencv_signatures: list[dict[str, Any]] = []
-    if opencv_crop:
-        if request_id is None:
-            raise ValueError("request_id is required when opencv_crop=True")
-        png_bytes, opencv_signatures = _opencv_crop_signature(png_bytes, request_id)
+        if request_id:
+            logger.info(
+                f"[{request_id}] Applying OpenCV post-processing to original image "
+                f"(upscale={opencv_upscale}, crop={opencv_crop})"
+            )
 
-    # Encode to base64 string
-    base64_string = base64.b64encode(png_bytes).decode("utf-8")
+        # Convert original image to PNG bytes for OpenCV processing
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        processing_bytes = img_byte_arr.getvalue()
 
-    return base64_string, opencv_signatures
+        # Apply OpenCV upscaling if requested
+        if opencv_upscale:
+            processing_bytes = _opencv_postprocess_image(processing_bytes, request_id)
+
+        # Apply OpenCV signature cropping if requested
+        if opencv_crop:
+            opencv_results = _opencv_crop_signature(
+                processing_bytes, request_id, min_size_ratio, max_size_ratio
+            )
+            # Add field_name and bounding_box to each opencv result and append to signature_images
+            for idx, opencv_sig in enumerate(opencv_results):
+                opencv_sig["field_name"] = f"opencv_signature_{idx}"
+                opencv_sig["bounding_box"] = None
+            signature_images.extend(opencv_results)
+            if request_id:
+                logger.info(
+                    f"[{request_id}] OpenCV cropping added {len(opencv_results)} signature(s)"
+                )
+        else:
+            # opencv_upscale only - return the upscaled full image as a signature
+            base64_string = base64.b64encode(processing_bytes).decode("utf-8")
+            signature_images.append({
+                "content": base64_string,
+                "field_name": "opencv_upscaled_full_image",
+                "bounding_box": None,
+            })
+            if request_id:
+                logger.info(f"[{request_id}] Added OpenCV upscaled full image")
+
+    return signature_images
 
 
 def _convert_pdf_to_image_bytes(file_bytes: bytes, filename: str, dpi: int = 200) -> bytes:
@@ -1302,7 +1276,7 @@ def _polygon_to_bbox(points: list[float]) -> tuple[float, float, float, float]:
 
 
 def _save_crop_from_image(
-    image_bytes: bytes, bbox_px: tuple[float, float, float, float], out_path: str, padding: int = 0
+    image_bytes: bytes, bbox_px: tuple[float, float, float, float], padding: int = 0
 ) -> bytes:
     """
     Crop region from image bytes (serverless-compatible, in-memory only).
@@ -1310,7 +1284,6 @@ def _save_crop_from_image(
     Args:
         image_bytes: Image file bytes
         bbox_px: Bounding box in pixels (min_x, min_y, max_x, max_y)
-        out_path: Output path for local debugging
         padding: Padding in pixels
 
     Returns:
@@ -1326,11 +1299,6 @@ def _save_crop_from_image(
         min(int(max_y) + padding, im.height),
     )
     crop = im.crop(box)
-
-    # Save crops to tmp/ folder if enabled
-    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
-    if save_crops:
-        crop.save(out_path, "PNG")
 
     # Return cropped image as PNG bytes
     img_byte_arr = io.BytesIO()
@@ -1405,22 +1373,14 @@ def _extract_signatures_with_doc_intelligence(
 
         # Extract and crop signatures (coordinates are in pixels for images)
         signatures: list[Any] = []
-        save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
-        timestamp = str(int(time.time() * 1000))
 
-        for i, (name, page_no, poly) in enumerate(regions, start=1):
+        for _name, _page_no, poly in regions:
             min_x, min_y, max_x, max_y = _polygon_to_bbox(poly)
 
-            # Crop from image bytes (in-memory)
-            out_path = f"./tmp/{debug_prefix}_di_{name}_p{page_no}_{i}_{timestamp}.png"
-            if save_crops:
-                os.makedirs("./tmp", exist_ok=True)
-
-            # Get cropped image bytes
+            # Get cropped image bytes (in-memory)
             cropped_bytes = _save_crop_from_image(
                 image_bytes,
                 (min_x, min_y, max_x, max_y),
-                out_path,
                 padding=PADDING_PIXELS,
             )
 
@@ -1429,7 +1389,6 @@ def _extract_signatures_with_doc_intelligence(
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if img is not None:
                 signatures.append(img)
-                logger.debug(f"Extracted signature: {out_path}")
 
         logger.info(
             f"Document Intelligence extracted {len(signatures)} signature(s) using {AZURE_DI_MODEL_ID} "
@@ -1537,66 +1496,151 @@ def _extract_signatures(file_bytes: bytes, filename: str, debug_prefix: str = ""
         f"returning top {len(top_signatures)} (debug_prefix: {debug_prefix})"
     )
 
-    # Save extracted signatures for debugging (save crops to tmp/ if enabled)
-    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
-    if debug_prefix and save_crops:
-        try:
-            tmp_dir = "./tmp"
-            os.makedirs(tmp_dir, exist_ok=True)
-            timestamp = str(int(time.time() * 1000))
-            for idx, sig_img in enumerate(top_signatures):
-                filename = f"{tmp_dir}/{debug_prefix}_sig_{idx + 1}_{timestamp}.png"
-                cv2.imwrite(filename, sig_img)  # type: ignore[arg-type]
-                logger.debug(f"Saved debug signature: {filename}")
-        except Exception as e:
-            # Don't fail the request if debug saving fails
-            logger.warning(f"Failed to save debug signature: {str(e)}")
-
     return top_signatures
 
 
-def _normalize_signature(signature: Any, debug_prefix: str = "", index: int = 0) -> Any:
+def _normalize_signature(signature: Any) -> Any:
     """
     Normalize a signature image for consistent comparison.
 
+    Processing steps:
+    1. Upscale 4x using LapSRN super-resolution model for enhanced detail
+    2. Sharpen using unsharp masking for clearer strokes
+    3. Apply histogram equalization for consistent contrast
+    4. Resize to fixed dimensions while preserving aspect ratio (with padding)
+
     Args:
-        signature: Input signature image as numpy array
-        debug_prefix: Optional prefix for saved debug images (e.g., "valid_id", "specimen")
-        index: Index of the signature for unique naming
+        signature: Input signature image as numpy array (BGR or grayscale format)
 
     Returns:
-        Normalized signature image
+        Normalized signature image as numpy array (grayscale format, fixed dimensions)
     """
-    # Resize to standard dimensions
-    normalized: Any = cv2.resize(  # type: ignore[assignment]
-        signature, (SIGNATURE_NORMALIZED_WIDTH, SIGNATURE_NORMALIZED_HEIGHT)
+    # 1. Upscale 4x using LapSRN super-resolution model
+    # LapSRN requires 3-channel BGR input
+    if len(signature.shape) == 2:  # type: ignore[arg-type]
+        # Convert grayscale to BGR for LapSRN
+        signature = cv2.cvtColor(signature, cv2.COLOR_GRAY2BGR)  # type: ignore[arg-type,assignment]
+
+    sr_obj: Any = cv2.dnn_superres.DnnSuperResImpl_create()  # type: ignore[attr-defined]
+    sr = cast(Any, sr_obj)
+    sr.readModel(LAPSRN_X4_MODEL_PATH)
+    sr.setModel("lapsrn", 4)  # 4x upscaling
+
+    upscaled: Any = sr.upsample(signature)
+
+    # 2. Convert to grayscale and sharpen using unsharp masking
+    gray: Any = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)  # type: ignore[arg-type,assignment]
+
+    # Apply unsharp masking for clearer strokes
+    gaussian_radius = 1.5
+    amount = 1.5
+
+    blur: Any = cv2.GaussianBlur(gray, ksize=(0, 0), sigmaX=gaussian_radius)
+    mask: Any = cv2.subtract(gray, blur)
+    sharpened: Any = cv2.add(gray, cv2.multiply(mask, amount))
+    sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+
+    # 3. Apply histogram equalization for consistent contrast
+    equalized: Any = cv2.equalizeHist(sharpened)  # type: ignore[arg-type,assignment]
+
+    # 4. Resize to fixed dimensions while preserving aspect ratio (pad with white)
+    # This ensures consistent dimensions for visualization and feature extraction
+    normalized = _resize_with_aspect_ratio(
+        equalized, SIGNATURE_NORMALIZED_WIDTH, SIGNATURE_NORMALIZED_HEIGHT
     )
 
-    # Convert to grayscale if needed
-    if len(normalized.shape) == 3:  # type: ignore[arg-type]  # type: ignore[arg-type]
-        normalized = cv2.cvtColor(normalized, cv2.COLOR_BGR2GRAY)  # type: ignore[arg-type,assignment]
-
-    # Apply histogram equalization for consistent contrast
-    normalized = cv2.equalizeHist(normalized)  # type: ignore[arg-type,assignment]
-
-    # Convert back to BGR for CLIP model (expects 3 channels)
-    normalized = cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)  # type: ignore[arg-type,assignment]
-
-    # Save normalized signature for debugging (save crops to tmp/ if enabled)
-    save_crops = os.getenv("SAVE_CROPS", "false").lower() == "true"
-    if debug_prefix and save_crops:
-        try:
-            tmp_dir = "./tmp"
-            os.makedirs(tmp_dir, exist_ok=True)
-            timestamp = str(int(time.time() * 1000))
-            filename = f"{tmp_dir}/{debug_prefix}_normalized_{index}_{timestamp}.png"
-            cv2.imwrite(filename, normalized)  # type: ignore[arg-type]
-            logger.debug(f"Saved normalized signature: {filename}")
-        except Exception as e:
-            # Don't fail the request if debug saving fails
-            logger.warning(f"Failed to save normalized signature: {str(e)}")
-
     return normalized  # type: ignore[return-value]
+
+
+def _stack_images_vertically(
+    images: list[Any], padding: int = 50, bg_color: int = 255
+) -> str:
+    """
+    Stack multiple grayscale images vertically with padding, center-aligned.
+    Returns the result as a base64-encoded PNG string.
+
+    Args:
+        images: List of grayscale numpy arrays to stack
+        padding: Vertical padding between images in pixels (default: 100)
+        bg_color: Background color for padding (0=black, 255=white)
+
+    Returns:
+        Base64-encoded PNG string of the stacked image
+    """
+    if not images:
+        return ""
+
+    # Convert grayscale images to PIL Images
+    pil_images: list[Image.Image] = []
+    for img in images:
+        # Ensure image is 2D grayscale
+        if len(img.shape) == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        pil_img = Image.fromarray(img, mode="L")
+        pil_images.append(pil_img)
+
+    # Calculate total dimensions
+    max_width = max(img.width for img in pil_images)
+    total_height = sum(img.height for img in pil_images) + padding * (len(pil_images) - 1)
+
+    # Create canvas with background color
+    canvas = Image.new("L", (max_width, total_height), color=bg_color)
+
+    # Paste each image centered horizontally
+    y_offset = 0
+    for img in pil_images:
+        x_offset = (max_width - img.width) // 2
+        canvas.paste(img, (x_offset, y_offset))
+        y_offset += img.height + padding
+
+    # Convert to base64
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="PNG")
+    buffer.seek(0)
+    base64_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    return base64_string
+
+
+def _resize_with_aspect_ratio(
+    image: Any, target_width: int, target_height: int, pad_color: int = 255
+) -> Any:
+    """
+    Resize image to fit within target dimensions while preserving aspect ratio.
+    Pads the remaining space with the specified color (default: white).
+
+    Args:
+        image: Input grayscale image as numpy array
+        target_width: Target width in pixels
+        target_height: Target height in pixels
+        pad_color: Grayscale value for padding (0=black, 255=white)
+
+    Returns:
+        Resized and padded image with exact target dimensions
+    """
+    h, w = image.shape[:2]
+
+    # Calculate scale factor to fit within target while preserving aspect ratio
+    scale = min(target_width / w, target_height / h)
+
+    # Calculate new dimensions
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    # Resize image with aspect ratio preserved
+    resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    # Create canvas with padding color
+    canvas = np.full((target_height, target_width), pad_color, dtype=np.uint8)
+
+    # Calculate position to center the resized image
+    x_offset = (target_width - new_w) // 2
+    y_offset = (target_height - new_h) // 2
+
+    # Place resized image on canvas
+    canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
+
+    return canvas
 
 
 def _extract_image_features(image: Any) -> list[float]:
@@ -1604,20 +1648,19 @@ def _extract_image_features(image: Any) -> list[float]:
     Extract feature vector from image using OpenCV.
     Uses HOG (Histogram of Oriented Gradients) and pixel intensity features.
 
+    Expects normalized images with fixed dimensions from _normalize_signature().
+
     Args:
-        image: Input image as numpy array (OpenCV format)
+        image: Input image as numpy array (grayscale, fixed dimensions)
 
     Returns:
-        Feature vector as list of floats
+        Feature vector as list of floats (fixed length)
     """
-    # Convert to grayscale
-    gray: Any = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image  # type: ignore[assignment]
+    # Use grayscale directly if already grayscale, otherwise convert
+    gray: Any = image if len(image.shape) == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # type: ignore[assignment]
 
-    # Calculate HOG features
-    win_size = (gray.shape[1] // 16 * 16, gray.shape[0] // 16 * 16)  # type: ignore[attr-defined]
-    if win_size[0] < 16 or win_size[1] < 16:  # type: ignore[misc]
-        win_size = (64, 64)
-        gray = cv2.resize(gray, win_size)  # type: ignore[assignment]
+    # Calculate HOG features with fixed window size
+    win_size = (SIGNATURE_NORMALIZED_WIDTH // 16 * 16, SIGNATURE_NORMALIZED_HEIGHT // 16 * 16)
 
     hog = cv2.HOGDescriptor(
         win_size,  # type: ignore[arg-type]
@@ -1764,6 +1807,51 @@ def _validate_padding_parameter(
         )
 
     return padding, None
+
+
+def _validate_size_ratio_parameter(
+    ratio_str: str, param_name: str, request_id: str
+) -> tuple[float, func.HttpResponse | None]:
+    """
+    Validate and parse size ratio parameter.
+
+    Args:
+        ratio_str: String value of ratio parameter (0.0-1.0)
+        param_name: Name of the parameter for error messages
+        request_id: Request ID for logging
+
+    Returns:
+        Tuple of (ratio_value, error_response). If valid, error_response is None.
+    """
+    try:
+        ratio = float(ratio_str)
+    except ValueError:
+        return 0.0, func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Invalid parameters",
+                    "message": f"{param_name} must be a number",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+
+    if not (0.0 <= ratio <= 1.0):
+        return 0.0, func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Invalid parameters",
+                    "message": f"{param_name} must be between 0.0 and 1.0",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+
+    return ratio, None
 
 
 def _parse_json_body(
@@ -1992,117 +2080,47 @@ async def health_check(req: func.HttpRequest) -> func.HttpResponse:
 @require_api_key
 async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Compare signatures between specimen signatures on ID and selfie with ID.
+    Compare signatures between specimen signatures and valid ID signature.
 
-    Accepts multipart/form-data with 3 files:
-    - valid_id: Image of valid ID (front)
-    - specimen_signatures: Image of valid ID with 3 specimen signatures
-    - selfie_with_id: Selfie photo holding valid ID
+    Request Body (JSON):
+        - valid_id (required): Base64-encoded signature image from valid ID
+        - specimen_signatures (required): Array of specimen signature objects (1-3 items)
+            Each object contains:
+            - content (required): Base64-encoded signature image
+            - field_name (optional): Name identifier for the signature
+            - bounding_box (optional): Original bounding box coordinates
 
-    Returns similarity scores between signatures using computer vision features.
+    Returns:
+        JSON response with similarity scores and confidence levels:
+        - specimen_internal_consistency: Similarity between specimen signatures
+        - specimen_vs_valid_id: Similarity between each specimen and valid ID
+        - confidence_scores: Overall confidence assessment
     """
     request_id = _generate_request_id()
     start_time = time.time()
     logger.info(f"[{request_id}] Signature comparison request initiated")
 
     try:
-        # Parse multipart form data
-        files = req.files
+        # Parse and validate JSON body
+        body, body_error = _parse_json_body(req, request_id)
+        if body_error:
+            return body_error
 
-        # Validate required files
-        required_files = ["valid_id", "specimen_signatures"]
-        for file_key in required_files:
-            if file_key not in files:
-                logger.warning(f"[{request_id}] Missing required file: {file_key}")
-                return func.HttpResponse(
-                    json.dumps(
-                        {
-                            "error": "Missing required files",
-                            "message": f"Please provide all required files: {', '.join(required_files)}",
-                            "request_id": request_id,
-                        }
-                    ),
-                    mimetype="application/json",
-                    status_code=400,
-                )
+        # Validate required fields
+        fields_error = _validate_required_fields(body, ["valid_id", "specimen_signatures"], request_id)
+        if fields_error:
+            return fields_error
 
-        # Load and validate files
-        valid_id_file = files["valid_id"]
-        specimen_file = files["specimen_signatures"]
-        selfie_file = files.get("selfie_with_id")
+        valid_id_base64 = body.get("valid_id")
+        specimen_signatures_data = body.get("specimen_signatures", [])
 
-        # Validate file types
-        files_to_validate = [
-            (valid_id_file, "valid_id"),
-            (specimen_file, "specimen_signatures"),
-        ]
-        if selfie_file:
-            files_to_validate.append((selfie_file, "selfie_with_id"))
-
-        for file_obj, name in files_to_validate:
-            filename = file_obj.filename or ""
-            file_ext = os.path.splitext(filename.lower())[1]
-            if file_ext not in ALLOWED_FILE_TYPES:
-                logger.warning(f"[{request_id}] Invalid file type for {name}: {file_ext}")
-                return func.HttpResponse(
-                    json.dumps(
-                        {
-                            "error": "Invalid file type",
-                            "message": f"{name} must be one of: {', '.join(ALLOWED_FILE_TYPES)}",
-                            "request_id": request_id,
-                        }
-                    ),
-                    mimetype="application/json",
-                    status_code=400,
-                )
-
-        logger.info(f"[{request_id}] Loading images from uploaded files")
-
-        # Read raw file bytes
-        valid_id_bytes = valid_id_file.read()
-        specimen_bytes = specimen_file.read()
-        selfie_bytes = selfie_file.read() if selfie_file else None
-
-        # Extract signatures - _extract_signatures handles PDF conversion internally
-        # (200 DPI for Azure DI, 150 DPI for OpenCV)
-        extraction_start = time.time()
-        logger.info(f"[{request_id}] Extracting signatures from images")
-
-        valid_id_signatures = _extract_signatures(
-            valid_id_bytes, valid_id_file.filename or "valid_id", f"{request_id}_valid_id"
-        )
-        specimen_signatures = _extract_signatures(
-            specimen_bytes,
-            specimen_file.filename or "specimen_signatures",
-            f"{request_id}_specimen",
-        )
-        selfie_signatures = (
-            _extract_signatures(
-                selfie_bytes,
-                (selfie_file.filename if selfie_file else None) or "selfie_with_id",
-                f"{request_id}_selfie",
-            )
-            if selfie_bytes
-            else []
-        )
-
-        extraction_time = time.time() - extraction_start
-
-        logger.info(
-            f"[{request_id}] Extracted signatures: valid_id={len(valid_id_signatures)}, "
-            f"specimen={len(specimen_signatures)}, selfie={len(selfie_signatures)}"
-        )
-
-        if len(specimen_signatures) < 3:
-            logger.warning(
-                f"[{request_id}] Expected 3 specimen signatures, found {len(specimen_signatures)}"
-            )
+        # Validate specimen_signatures is a list with 1-3 items
+        if not isinstance(specimen_signatures_data, list):
             return func.HttpResponse(
                 json.dumps(
                     {
-                        "error": "Insufficient specimen signatures",
-                        "message": f"Expected 3 specimen signatures, found only {len(specimen_signatures)}. "
-                        "Please ensure the image clearly shows 3 specimen signatures.",
+                        "error": "Invalid request format",
+                        "message": "specimen_signatures must be an array",
                         "request_id": request_id,
                     }
                 ),
@@ -2110,30 +2128,145 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        # Normalize all signatures
+        if len(specimen_signatures_data) == 0:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid request",
+                        "message": "specimen_signatures must contain at least 1 signature",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        if len(specimen_signatures_data) > 3:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid request",
+                        "message": "specimen_signatures can contain at most 3 signatures",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Decode valid_id image
+        valid_id_bytes, decode_error = _decode_base64_content(valid_id_base64, request_id)
+        if decode_error:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid valid_id",
+                        "message": "Failed to decode valid_id base64 content",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Decode specimen signatures
+        specimen_images: list[dict[str, Any]] = []
+        for idx, spec_data in enumerate(specimen_signatures_data):
+            if not isinstance(spec_data, dict):
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid specimen_signatures format",
+                            "message": f"specimen_signatures[{idx}] must be an object",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+            content = spec_data.get("content")
+            if not content:
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing content",
+                            "message": f"specimen_signatures[{idx}].content is required",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+            spec_bytes, spec_decode_error = _decode_base64_content(content, request_id)
+            if spec_decode_error:
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid specimen signature",
+                            "message": f"Failed to decode specimen_signatures[{idx}].content",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+            specimen_images.append({
+                "bytes": spec_bytes,
+                "field_name": spec_data.get("field_name", f"signature_{idx + 1}"),
+                "bounding_box": spec_data.get("bounding_box"),
+            })
+
+        logger.info(
+            f"[{request_id}] Processing {len(specimen_images)} specimen signature(s) "
+            f"and 1 valid_id signature"
+        )
+
+        # Convert bytes to OpenCV images and normalize
         normalization_start = time.time()
         logger.info(f"[{request_id}] Normalizing signatures")
 
-        normalized_specimen = [
-            _normalize_signature(sig, f"{request_id}_specimen", i)
-            for i, sig in enumerate(specimen_signatures[:3])
-        ]
-        normalized_valid_id = (
-            [
-                _normalize_signature(sig, f"{request_id}_valid_id", i)
-                for i, sig in enumerate(valid_id_signatures)
-            ]
-            if valid_id_signatures
-            else []
-        )
-        normalized_selfie = (
-            [
-                _normalize_signature(sig, f"{request_id}_selfie", i)
-                for i, sig in enumerate(selfie_signatures)
-            ]
-            if selfie_signatures
-            else []
-        )
+        # Convert valid_id bytes to OpenCV image
+        valid_id_nparr = np.frombuffer(valid_id_bytes, np.uint8)
+        valid_id_cv = cv2.imdecode(valid_id_nparr, cv2.IMREAD_COLOR)
+        if valid_id_cv is None:
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid image",
+                        "message": "Failed to decode valid_id image",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+        normalized_valid_id = _normalize_signature(valid_id_cv)
+
+        # Convert specimen signatures to OpenCV images and normalize
+        normalized_specimens: list[Any] = []
+        specimen_field_names: list[str] = []
+        for idx, spec_info in enumerate(specimen_images):
+            spec_nparr = np.frombuffer(spec_info["bytes"], np.uint8)
+            spec_cv = cv2.imdecode(spec_nparr, cv2.IMREAD_COLOR)
+            if spec_cv is None:
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid image",
+                            "message": f"Failed to decode specimen_signatures[{idx}] image",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+            normalized_specimens.append(
+                _normalize_signature(spec_cv)
+            )
+            specimen_field_names.append(spec_info["field_name"])
 
         normalization_time = time.time() - normalization_start
 
@@ -2142,9 +2275,8 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         logger.info(f"[{request_id}] Extracting image features")
 
         # Extract features using OpenCV (runs locally, no API calls)
-        specimen_features = [_extract_image_features(sig) for sig in normalized_specimen]
-        valid_id_features = [_extract_image_features(sig) for sig in normalized_valid_id]
-        selfie_features = [_extract_image_features(sig) for sig in normalized_selfie]
+        valid_id_features = _extract_image_features(normalized_valid_id)
+        specimen_features = [_extract_image_features(sig) for sig in normalized_specimens]
 
         feature_time = time.time() - feature_start
 
@@ -2152,95 +2284,107 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         similarity_start = time.time()
         logger.info(f"[{request_id}] Calculating similarity scores")
 
-        # 1. Check if specimen signatures match each other
+        specimen_count = len(specimen_features)
+
+        # 1. Check if specimen signatures match each other (only if more than 1 specimen)
         specimen_similarity_matrix: list[list[float]] = []
-        for i in range(3):
-            row: list[float] = []
-            for j in range(3):
-                if i == j:
-                    row.append(1.0)
-                else:
-                    similarity = _cosine_similarity(specimen_features[i], specimen_features[j])
-                    row.append(round(similarity, 4))
-            specimen_similarity_matrix.append(row)
+        specimen_comparisons: list[dict[str, Any]] = []
 
-        # Average similarity between specimen signatures
-        specimen_avg_similarity = (
-            sum(specimen_similarity_matrix[i][j] for i in range(3) for j in range(i + 1, 3)) / 3
-        )
+        if specimen_count > 1:
+            for i in range(specimen_count):
+                row: list[float] = []
+                for j in range(specimen_count):
+                    if i == j:
+                        row.append(1.0)
+                    else:
+                        similarity = _cosine_similarity(specimen_features[i], specimen_features[j])
+                        row.append(round(similarity, 4))
+                        # Record pairwise comparison (only upper triangle to avoid duplicates)
+                        if i < j:
+                            specimen_comparisons.append({
+                                "pair": [specimen_field_names[i], specimen_field_names[j]],
+                                "similarity": round(similarity, 4),
+                                "confidence": _similarity_to_confidence(similarity),
+                            })
+                specimen_similarity_matrix.append(row)
 
-        # 2. Compare specimen signatures against valid ID signature(s)
-        valid_id_similarities: list[float] = []
-        if valid_id_features:
-            for spec_feat in specimen_features:
-                best_match = max(
-                    _cosine_similarity(spec_feat, id_feat) for id_feat in valid_id_features
-                )
-                valid_id_similarities.append(round(best_match, 4))
+            # Average similarity between specimen signatures
+            pair_count = specimen_count * (specimen_count - 1) // 2
+            specimen_avg_similarity = (
+                sum(specimen_similarity_matrix[i][j] for i in range(specimen_count) for j in range(i + 1, specimen_count))
+                / pair_count
+            ) if pair_count > 0 else 1.0
+        else:
+            specimen_avg_similarity = 1.0  # Single specimen is consistent with itself
 
-        # 3. Compare specimen signatures against selfie signature(s)
-        selfie_similarities: list[float] = []
-        if selfie_features:
-            for spec_feat in specimen_features:
-                best_match = max(
-                    _cosine_similarity(spec_feat, selfie_feat) for selfie_feat in selfie_features
-                )
-                selfie_similarities.append(round(best_match, 4))
+        # 2. Compare specimen signatures against valid ID signature
+        valid_id_comparisons: list[dict[str, Any]] = []
+        for idx, spec_feat in enumerate(specimen_features):
+            similarity = _cosine_similarity(spec_feat, valid_id_features)
+            valid_id_comparisons.append({
+                "specimen": specimen_field_names[idx],
+                "similarity": round(similarity, 4),
+                "confidence": _similarity_to_confidence(similarity),
+            })
+
+        valid_id_avg_similarity = (
+            sum(comp["similarity"] for comp in valid_id_comparisons) / len(valid_id_comparisons)
+        ) if valid_id_comparisons else 0.0
 
         similarity_time = time.time() - similarity_start
         total_time = time.time() - start_time
 
+        # Calculate overall confidence
+        overall_confidence = _calculate_overall_confidence(
+            specimen_avg_similarity, valid_id_avg_similarity, specimen_count
+        )
+
+        # Create stacked visualization of all normalized signatures
+        # Order: valid_id first, then all specimen signatures
+        all_normalized_images = [normalized_valid_id] + normalized_specimens
+        stacked_image_base64 = _stack_images_vertically(all_normalized_images, padding=100)
+
         # Prepare response
         result: dict[str, Any] = {
             "request_id": request_id,
-            "specimen_signatures_count": 3,
-            "valid_id_signatures_count": len(valid_id_signatures),
-            "selfie_signatures_count": len(selfie_signatures),
+            "specimen_signatures_count": specimen_count,
             "specimen_internal_consistency": {
-                "similarity_matrix": specimen_similarity_matrix,
+                "similarity_matrix": specimen_similarity_matrix if specimen_count > 1 else None,
+                "pairwise_comparisons": specimen_comparisons if specimen_count > 1 else None,
                 "average_similarity": round(specimen_avg_similarity, 4),
                 "status": "MATCH" if specimen_avg_similarity >= 0.85 else "MISMATCH",
+                "confidence": _similarity_to_confidence(specimen_avg_similarity),
             },
             "specimen_vs_valid_id": {
-                "similarities": valid_id_similarities,
-                "average_similarity": round(
-                    sum(valid_id_similarities) / len(valid_id_similarities), 4
-                )
-                if valid_id_similarities
-                else 0.0,
-                "status": "MATCH"
-                if valid_id_similarities
-                and sum(valid_id_similarities) / len(valid_id_similarities) >= 0.80
-                else "MISMATCH",
-            }
-            if valid_id_similarities
-            else {"status": "NO_SIGNATURE_FOUND"},
-            "specimen_vs_selfie": {
-                "similarities": selfie_similarities,
-                "average_similarity": round(sum(selfie_similarities) / len(selfie_similarities), 4)
-                if selfie_similarities
-                else 0.0,
-                "status": "MATCH"
-                if selfie_similarities
-                and sum(selfie_similarities) / len(selfie_similarities) >= 0.80
-                else "MISMATCH",
-            }
-            if selfie_similarities
-            else {"status": "NO_SIGNATURE_FOUND"},
+                "comparisons": valid_id_comparisons,
+                "average_similarity": round(valid_id_avg_similarity, 4),
+                "status": "MATCH" if valid_id_avg_similarity >= 0.80 else "MISMATCH",
+                "confidence": _similarity_to_confidence(valid_id_avg_similarity),
+            },
+            "confidence_scores": {
+                "overall_confidence": overall_confidence["level"],
+                "overall_score": overall_confidence["score"],
+                "specimen_consistency_score": round(specimen_avg_similarity, 4),
+                "valid_id_match_score": round(valid_id_avg_similarity, 4),
+                "recommendation": overall_confidence["recommendation"],
+            },
             "performance": {
-                "extraction_ms": round(extraction_time * 1000, 2),
                 "normalization_ms": round(normalization_time * 1000, 2),
                 "feature_extraction_ms": round(feature_time * 1000, 2),
                 "similarity_ms": round(similarity_time * 1000, 2),
                 "total_ms": round(total_time * 1000, 2),
+            },
+            "debug_visualization": {
+                "description": "Stacked normalized signatures (valid_id on top, specimens below)",
+                "image_base64": stacked_image_base64,
             },
         }
 
         logger.info(
             f"[{request_id}] Signature comparison completed: "
             f"specimen_consistency={specimen_avg_similarity:.4f}, "
-            f"valid_id_match={sum(valid_id_similarities) / len(valid_id_similarities) if valid_id_similarities else 0:.4f}, "
-            f"selfie_match={sum(selfie_similarities) / len(selfie_similarities) if selfie_similarities else 0:.4f}"
+            f"valid_id_match={valid_id_avg_similarity:.4f}, "
+            f"overall_confidence={overall_confidence['level']}"
         )
 
         return func.HttpResponse(
@@ -2268,6 +2412,59 @@ async def compare_signatures(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+def _similarity_to_confidence(similarity: float) -> str:
+    """
+    Convert similarity score to confidence level.
+
+    Args:
+        similarity: Cosine similarity score (0.0 to 1.0)
+
+    Returns:
+        Confidence level string: "HIGH", "MEDIUM", or "LOW"
+    """
+    if similarity >= 0.90:
+        return "HIGH"
+    if similarity >= 0.75:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _calculate_overall_confidence(
+    specimen_avg: float, valid_id_avg: float, specimen_count: int
+) -> dict[str, Any]:
+    """
+    Calculate overall confidence assessment for signature comparison.
+
+    Args:
+        specimen_avg: Average similarity between specimen signatures
+        valid_id_avg: Average similarity between specimens and valid ID
+        specimen_count: Number of specimen signatures
+
+    Returns:
+        Dictionary with confidence level, score, and recommendation
+    """
+    # Weight specimen consistency more when multiple specimens are provided
+    # Combined score: 40% specimen consistency + 60% valid ID match (or 100% valid ID for single specimen)
+    overall_score = (specimen_avg * 0.4 + valid_id_avg * 0.6) if specimen_count > 1 else valid_id_avg
+
+    # Determine confidence level
+    if overall_score >= 0.85 and specimen_avg >= 0.80 and valid_id_avg >= 0.75:
+        level = "HIGH"
+        recommendation = "Signatures appear to match with high confidence."
+    elif overall_score >= 0.70 and valid_id_avg >= 0.60:
+        level = "MEDIUM"
+        recommendation = "Signatures show moderate similarity. Manual review recommended."
+    else:
+        level = "LOW"
+        recommendation = "Signatures show low similarity. Further verification required."
+
+    return {
+        "level": level,
+        "score": round(overall_score, 4),
+        "recommendation": recommendation,
+    }
+
+
 @app.route(route="gpt_crop", methods=["POST"])
 @require_api_key
 async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
@@ -2281,6 +2478,8 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         - opencv_upscale (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
         - prompt (optional): Custom prompt for signature extraction (defaults to built-in SIGNATURE_EXTRACTION_PROMPT)
+        - min_size_ratio (optional): Minimum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.25)
+        - max_size_ratio (optional): Maximum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.80)
 
     Request Body:
         JSON with the following fields:
@@ -2314,6 +2513,8 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         opencv_upscale_str = req.params.get("opencv_upscale", "false").lower()
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
         custom_prompt = req.params.get("prompt")
+        min_size_ratio_str = req.params.get("min_size_ratio", "0.25")
+        max_size_ratio_str = req.params.get("max_size_ratio", "0.80")
 
         # Validate and parse padding
         padding, padding_error = _validate_padding_parameter(padding_str, request_id)
@@ -2322,6 +2523,36 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         opencv_upscale = opencv_upscale_str in ("true", "1", "yes")
         opencv_crop = opencv_crop_str in ("true", "1", "yes")
+
+        # Validate and parse size ratio parameters
+        min_size_ratio, min_ratio_error = _validate_size_ratio_parameter(
+            min_size_ratio_str, "min_size_ratio", request_id
+        )
+        if min_ratio_error:
+            return min_ratio_error
+
+        max_size_ratio, max_ratio_error = _validate_size_ratio_parameter(
+            max_size_ratio_str, "max_size_ratio", request_id
+        )
+        if max_ratio_error:
+            return max_ratio_error
+
+        # Validate min <= max
+        if min_size_ratio > max_size_ratio:
+            logger.warning(
+                f"[{request_id}] min_size_ratio ({min_size_ratio}) > max_size_ratio ({max_size_ratio})"
+            )
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid size ratio parameters",
+                        "message": f"min_size_ratio ({min_size_ratio}) must be less than or equal to max_size_ratio ({max_size_ratio})",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
 
         # Parse and validate JSON body
         body, body_error = _parse_json_body(req, request_id)
@@ -2411,7 +2642,14 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
         bounding_box = target_signature.get("bounding_box", {})
         try:
             cropped_base64, opencv_signatures = _crop_signature_from_gpt(
-                image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
+                image_bytes,
+                bounding_box,
+                padding,
+                opencv_upscale,
+                opencv_crop,
+                request_id,
+                min_size_ratio,
+                max_size_ratio,
             )
         except ValueError as e:
             logger.error(f"[{request_id}] Failed to crop signature: {str(e)}")
@@ -2471,16 +2709,13 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
             "opencv_upscaling": opencv_upscale,
             "opencv_processing": opencv_crop,
             "request_id": request_id,
+            "opencv_signatures": opencv_signatures,
             "performance": {
                 "extraction_ms": round(extraction_time * 1000, 2),
                 "crop_ms": round(crop_time * 1000, 2),
                 "total_ms": round(total_time * 1000, 2),
             },
         }
-
-        # Add OpenCV signatures if available
-        if opencv_signatures:
-            result["opencv_signatures"] = opencv_signatures
 
         logger.info(
             f"[{request_id}] Signature cropping completed: "
@@ -2516,7 +2751,11 @@ async def gpt_crop(req: func.HttpRequest) -> func.HttpResponse:
 
 # GPT deduplication prompt for selecting cleanest signature
 GPT_DEDUP_PROMPT = """
-The attached image shows numbered signature crops on the left with corresponding handwritten signature images on the right. Identify which crop is the cleanest, it must fully capture the complete handwritten signature with no extra surrounding elements. Return only the number of the cleanest crop.
+The attached image shows numbered label on the left with corresponding handwritten signature images on the right.
+Identify which cropped signature is the cleanest, it must fully capture the complete handwritten signature with no extra surrounding elements.
+Return only the number of the cleanest crop.
+
+# VERY IMPORTANT: the chosen signature should have minimal padding around the signature and must be located at the center of the image.
 
 Return your response in the following JSON format:
 {
@@ -2620,7 +2859,6 @@ def _combine_signatures_vertically(
 ) -> tuple[bytes, list[dict[str, Any]]]:
     """
     Combine multiple signature images vertically with index labels for GPT deduplication.
-    Similar to the stacking logic in _opencv_crop_signature().
 
     Args:
         opencv_signatures: List of signature objects with 'content' field (base64-encoded PNG)
@@ -3009,6 +3247,8 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         - padding (optional): Additional padding around signature in pixels (default: 4)
         - opencv_upscale (optional): Enable OpenCV post-processing (grayscale, sharpen, upscale 2x) (default: false)
         - opencv_crop (optional): Enable OpenCV signature cropping using contour detection (default: false)
+        - min_size_ratio (optional): Minimum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.25)
+        - max_size_ratio (optional): Maximum cropped area ratio (0.0-1.0) for OpenCV signature filtering (default: 0.80)
 
     Request Body:
         JSON with the following fields:
@@ -3040,6 +3280,8 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         padding_str = req.params.get("padding", "4")
         opencv_upscale_str = req.params.get("opencv_upscale", "false").lower()
         opencv_crop_str = req.params.get("opencv_crop", "false").lower()
+        min_size_ratio_str = req.params.get("min_size_ratio", "0.25")
+        max_size_ratio_str = req.params.get("max_size_ratio", "0.80")
 
         # Validate and parse padding
         padding, padding_error = _validate_padding_parameter(padding_str, request_id)
@@ -3048,6 +3290,36 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         opencv_upscale = opencv_upscale_str in ("true", "1", "yes")
         opencv_crop = opencv_crop_str in ("true", "1", "yes")
+
+        # Validate and parse size ratio parameters
+        min_size_ratio, min_ratio_error = _validate_size_ratio_parameter(
+            min_size_ratio_str, "min_size_ratio", request_id
+        )
+        if min_ratio_error:
+            return min_ratio_error
+
+        max_size_ratio, max_ratio_error = _validate_size_ratio_parameter(
+            max_size_ratio_str, "max_size_ratio", request_id
+        )
+        if max_ratio_error:
+            return max_ratio_error
+
+        # Validate min <= max
+        if min_size_ratio > max_size_ratio:
+            logger.warning(
+                f"[{request_id}] min_size_ratio ({min_size_ratio}) > max_size_ratio ({max_size_ratio})"
+            )
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid size ratio parameters",
+                        "message": f"min_size_ratio ({min_size_ratio}) must be less than or equal to max_size_ratio ({max_size_ratio})",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
 
         # Parse and validate JSON body
         body, body_error = _parse_json_body(req, request_id)
@@ -3102,28 +3374,27 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
 
         logger.info(f"[{request_id}] Found {signatures_found} signature(s)")
 
-        # Determine target signature and bounding box
+        # Crop all signatures from the image
         crop_start = time.time()
-        target_signature: dict[str, Any] | None = None
-        bounding_box: dict[str, float] | None = None
 
-        if signatures:
-            # Use the first detected signature
-            target_signature = signatures[0]
-            bounding_box = target_signature.get("bounding_box")
-            logger.info(
-                f"[{request_id}] Using first signature (ID: {target_signature.get('id')}, field: {target_signature.get('field_name')})"
-            )
-        else:
+        if not signatures and (opencv_upscale or opencv_crop):
             # No signatures found, but opencv_upscale or opencv_crop is enabled
             # Process entire image with OpenCV
             logger.info(
                 f"[{request_id}] No signatures detected, processing entire image with OpenCV "
                 f"(upscale={opencv_upscale}, crop={opencv_crop})"
             )
+
         try:
-            cropped_base64, opencv_signatures = _crop_signature_from_adi(
-                image_bytes, bounding_box, padding, opencv_upscale, opencv_crop, request_id
+            signature_images = _crop_signature_from_adi(
+                image_bytes,
+                signatures,
+                padding,
+                opencv_upscale,
+                opencv_crop,
+                request_id,
+                min_size_ratio,
+                max_size_ratio,
             )
         except ValueError as e:
             logger.error(f"[{request_id}] Failed to crop signature: {str(e)}")
@@ -3165,14 +3436,18 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
         crop_time = time.time() - crop_start
         total_time = time.time() - start_time
 
+        # Get first signature's base64 for backward compatibility (cropped_signature field)
+        first_signature_base64 = signature_images[0]["content"] if signature_images else ""
+
         # Build response
         result: dict[str, Any] = {
-            "cropped_signature": cropped_base64,
+            "cropped_signature": first_signature_base64,
             "signatures_found": signatures_found,
             "model_used": model_id or AZURE_DI_MODEL_ID,
             "opencv_upscaling": opencv_upscale,
             "opencv_processing": opencv_crop,
             "request_id": request_id,
+            "signature_images": signature_images,
             "performance": {
                 "extraction_ms": round(extraction_time * 1000, 2),
                 "crop_ms": round(crop_time * 1000, 2),
@@ -3180,31 +3455,30 @@ async def adi_crop(req: func.HttpRequest) -> func.HttpResponse:
             },
         }
 
-        # Add OpenCV signatures if available
-        if opencv_signatures:
-            result["opencv_signatures"] = opencv_signatures
-
-        # Add signature info only if a signature was detected
-        if target_signature:
-            result["signature_info"] = {
-                "id": target_signature.get("id"),
-                "field_name": target_signature.get("field_name"),
-                "page_number": target_signature.get("page_number"),
-                "bounding_box": bounding_box,
-            }
+        # Add signature info for all detected signatures
+        if signatures:
+            result["signatures_info"] = [
+                {
+                    "id": sig.get("id"),
+                    "field_name": sig.get("field_name"),
+                    "page_number": sig.get("page_number"),
+                    "bounding_box": sig.get("bounding_box"),
+                }
+                for sig in signatures
+            ]
             logger.info(
                 f"[{request_id}] Azure DI signature cropping completed: "
                 f"total_signatures={signatures_found}, "
-                f"used_id={target_signature.get('id')}, "
-                f"field={target_signature.get('field_name')}, "
+                f"extracted_images={len(signature_images)}, "
                 f"total_time={total_time:.3f}s"
             )
         else:
-            result["signature_info"] = None
+            result["signatures_info"] = []
             result["message"] = "No signatures detected by Azure DI. OpenCV processing applied to entire image."
             logger.info(
                 f"[{request_id}] Azure DI signature cropping completed (no signatures detected): "
                 f"opencv_processing applied to entire image, "
+                f"extracted_images={len(signature_images)}, "
                 f"total_time={total_time:.3f}s"
             )
 
@@ -3472,6 +3746,8 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
         - faces_masked: Number of faces masked
         - fields_masked: Number of ID fields masked
         - signature_fields_preserved: List of signature field names preserved
+        - signature_images: Dictionary of cropped signature images keyed by field name
+          e.g., {"signature1": "base64...", "CustomerSignature": "base64..."}
         - performance: Timing metrics for each processing step
     """
     request_id = _generate_request_id()
@@ -3536,6 +3812,7 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
         faces_masked = 0
         fields_masked = 0
         signature_fields_preserved: list[str] = []
+        signature_field_regions: list[tuple[str, int, list[float]]] = []
         masked_fields: list[dict[str, Any]] = []
         face_time = 0.0
         id_time = 0.0
@@ -3599,6 +3876,7 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
 
                     fields_masked = mask_result.get("fields_masked", 0)
                     signature_fields_preserved = mask_result.get("signature_fields_preserved", [])
+                    signature_field_regions = mask_result.get("signature_field_regions", [])
                     masked_fields = mask_result.get("masked_fields", [])
                     current_image_bytes = mask_result.get("masked_image_bytes", current_image_bytes)
 
@@ -3626,6 +3904,43 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
         masked_base64 = base64.b64encode(current_image_bytes).decode("utf-8")
         encode_time = time.time() - encode_start
 
+        # Crop all signature images from the masked image using _crop_signature_from_adi
+        signature_crop_start = time.time()
+        signature_images: list[dict[str, Any]] = []
+
+        # Build list of signature dicts from signature_field_regions for _crop_signature_from_adi
+        signatures_to_crop: list[dict[str, Any]] = []
+        for field_name, _page_number, polygon in signature_field_regions:
+            # Convert polygon to bounding box
+            min_x, min_y, max_x, max_y = _polygon_to_bbox(polygon)
+            signatures_to_crop.append({
+                "field_name": field_name,
+                "bounding_box": {
+                    "min_x": min_x,
+                    "min_y": min_y,
+                    "max_x": max_x,
+                    "max_y": max_y,
+                },
+            })
+
+        if signatures_to_crop:
+            try:
+                # Crop all signatures at once - use output directly
+                signature_images = _crop_signature_from_adi(
+                    current_image_bytes,
+                    signatures_to_crop,
+                    padding=4,
+                    opencv_upscale=False,
+                    opencv_crop=False,
+                    request_id=request_id,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[{request_id}] Failed to crop signature fields: {str(e)}"
+                )
+
+        signature_crop_time = time.time() - signature_crop_start
+
         total_time = time.time() - start_time
 
         # Build response
@@ -3634,6 +3949,7 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
             "faces_masked": faces_masked,
             "fields_masked": fields_masked,
             "signature_fields_preserved": signature_fields_preserved,
+            "signature_images": signature_images,
             "masked_fields": masked_fields,
             "model_used": model_id or AZURE_DI_MODEL_ID,
             "request_id": request_id,
@@ -3641,6 +3957,7 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
                 "face_masking_ms": round(face_time * 1000, 2),
                 "id_masking_ms": round(id_time * 1000, 2),
                 "encode_ms": round(encode_time * 1000, 2),
+                "signature_crop_ms": round(signature_crop_time * 1000, 2),
                 "total_ms": round(total_time * 1000, 2),
             },
         }
@@ -3650,6 +3967,7 @@ async def id_masking(req: func.HttpRequest) -> func.HttpResponse:
             f"faces_masked={faces_masked}, "
             f"fields_masked={fields_masked}, "
             f"signatures_preserved={len(signature_fields_preserved)}, "
+            f"signature_images_extracted={len(signature_images)}, "
             f"total_time={total_time:.3f}s"
         )
 

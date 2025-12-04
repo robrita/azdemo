@@ -527,7 +527,11 @@ The result is an image with faces and personal information hidden, but signature
   "masked_image": "base64_encoded_masked_image",
   "faces_masked": 1,
   "fields_masked": 8,
-  "signature_fields_preserved": ["signature", "owner_signature"],
+  "signature_fields_preserved": ["signature1", "CustomerSignature"],
+  "signature_images": {
+    "signature1": "base64_encoded_cropped_signature_1",
+    "CustomerSignature": "base64_encoded_cropped_signature_2"
+  },
   "masked_fields": [
     {
       "index": 1,
@@ -548,7 +552,8 @@ The result is an image with faces and personal information hidden, but signature
     "face_masking_ms": 450.23,
     "id_masking_ms": 1200.45,
     "encode_ms": 15.67,
-    "total_ms": 1666.35
+    "signature_crop_ms": 25.34,
+    "total_ms": 1691.69
   }
 }
 ```
@@ -568,7 +573,8 @@ The result is an image with faces and personal information hidden, but signature
 4. **Document Analysis**: Call Azure Document Intelligence to detect document fields
 5. **Field Filtering**: Identify signature fields vs non-signature fields
 6. **ID Masking**: Draw white rectangles over non-signature fields (preserving signatures)
-7. **Output Encoding**: Encode final masked image to base64 PNG
+7. **Signature Cropping**: Extract each signature field as individual cropped images
+8. **Output Encoding**: Encode final masked image and signature images to base64 PNG
 
 **Partial Results**:
 
@@ -579,10 +585,11 @@ The result is an image with faces and personal information hidden, but signature
 **Important Notes**:
 
 1. **Signature Preservation**: Any field containing "signature" in its name is preserved (not masked)
-2. **Face Padding**: Faces are masked with expanded rectangles to cover hair, forehead, and ears
-3. **Serverless Compatible**: All processing is in-memory (no file system writes)
-4. **Async Operations**: Uses `aiohttp` for Face API and `asyncio.to_thread` for Document Intelligence
-5. **Custom Models**: Use a custom-trained Document Intelligence model for best field detection accuracy
+2. **Signature Images**: Each preserved signature is cropped and returned in `signature_images` dictionary, keyed by the actual field name from Azure Document Intelligence (e.g., `signature1`, `CustomerSignature`)
+3. **Face Padding**: Faces are masked with expanded rectangles to cover hair, forehead, and ears
+4. **Serverless Compatible**: All processing is in-memory (no file system writes)
+5. **Async Operations**: Uses `aiohttp` for Face API and `asyncio.to_thread` for Document Intelligence
+6. **Custom Models**: Use a custom-trained Document Intelligence model for best field detection accuracy
 
 **Example cURL Request**:
 
@@ -698,9 +705,6 @@ AZURE_OPENAI_MODEL=gpt-4.1                   # Default: gpt-4.1 (must support vi
 # OpenCV Post-Processing (Required for opencv_process=true in /gpt_crop)
 LAPSRN_MODEL_PATH=notebook/LapSRN_x2.pb      # Default: notebook/LapSRN_x2.pb
                                               # Download from: https://github.com/opencv/opencv_contrib/tree/master/modules/dnn_superres
-
-# Debug/Development
-SAVE_CROPS=true                        # Default: false (saves cropped signatures to ./tmp/)
 ```
 
 ### Authentication & Authorization
@@ -813,33 +817,6 @@ curl -X POST "http://localhost:7071/api/adi_crop?model_id=valid_id2&opencv_proce
 - Create a `testdata/` directory
 - Add sample images: `valid_id.jpg`, `specimen_signatures.jpg`, `selfie_with_id.jpg`
 - Supported formats: PNG, JPG, JPEG, PDF
-
-### Local Debugging
-
-For development and debugging, you can enable saving of cropped signature images by setting `SAVE_CROPS=true` in your `.env` file. When enabled, extracted signature images are automatically saved to `./tmp/` directory for verification purposes.
-
-Each extracted signature is saved with:
-
-- Prefix indicating source image (`valid_id`, `specimen`, `selfie`)
-- Request ID for tracking
-- Signature index (1, 2, 3)
-- Timestamp in milliseconds
-
-Example filenames:
-
-```
-./tmp/abc12345_valid_id_sig_1_1699632000123.png
-./tmp/abc12345_specimen_sig_1_1699632000123.png
-./tmp/abc12345_specimen_sig_2_1699632000123.png
-./tmp/abc12345_specimen_sig_3_1699632000123.png
-./tmp/abc12345_selfie_sig_1_1699632000123.png
-```
-
-**Important**:
-
-- Crop saving is disabled by default (`SAVE_CROPS=false`)
-- This should only be enabled in local development
-- Do not enable in Azure Functions production environment to avoid file system operations
 
 ### Common Commands
 
