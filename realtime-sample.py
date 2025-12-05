@@ -15,25 +15,6 @@ stream_sid = None
 CONFIGS = GA_REALTIME_MINI_CONFIGS
 MODEL_PROVIDER = "azure"
 api_key = CONFIGS[MODEL_PROVIDER]["headers"]['api-key']
- 
-# Session configuration
-session_config = {
-    "modalities": ["text", "audio"],
-    "instructions": "You are a helpful AI assistant. Keep responses concise and natural for voice conversation.",
-    "voice": "sage",
-    "input_audio_format": "pcmu",
-    "output_audio_format": "pcmu",
-    "turn_detection": {
-        "type": "server_vad",
-        "threshold": 0.5,
-        "prefix_padding_ms": 300,
-        "silence_duration_ms": 200
-    },
-    "input_audio_transcription": {
-        "model": "whisper-1"
-    },
-    "temperature": 0.8
-}
 
 # Your Azure endpoint
 connect_url = "wss://voiceaiagent-swedencent-resource.cognitiveservices.azure.com/openai/v1/realtime?model=gpt-realtime-mini&temperature=0.8"
@@ -71,9 +52,6 @@ session_config = {
         }
     }
 }
-
-
-
 
 
 async def send_event(event):
