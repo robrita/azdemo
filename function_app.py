@@ -40,8 +40,8 @@ MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
 MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024
 
 # Signature comparison constants
-SIGNATURE_NORMALIZED_WIDTH = 300
-SIGNATURE_NORMALIZED_HEIGHT = 150
+SIGNATURE_NORMALIZED_WIDTH = 600
+SIGNATURE_NORMALIZED_HEIGHT = 300
 ALLOWED_FILE_TYPES = {".png", ".jpg", ".jpeg", ".pdf"}
 
 # Azure Document Intelligence configuration (optional)
