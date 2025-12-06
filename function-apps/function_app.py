@@ -36,7 +36,7 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 # Configuration constants
 MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
 MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024
-DEFAULT_TIMEOUT_SECONDS = int(os.getenv("DEFAULT_TIMEOUT_SECONDS", "30"))
+DEFAULT_TIMEOUT_SECONDS = int(os.getenv("DEFAULT_TIMEOUT_SECONDS", "60"))
 AISEARCH_TIMEOUT_SECONDS = int(os.getenv("AISEARCH_TIMEOUT_SECONDS", "60"))
 HEALTH_CHECK_TIMEOUT_SECONDS = int(os.getenv("HEALTH_CHECK_TIMEOUT_SECONDS", "5"))
 COSMOS_RETRY_MAX_ATTEMPTS = int(os.getenv("COSMOS_RETRY_MAX_ATTEMPTS", "3"))
@@ -84,6 +84,34 @@ def _generate_request_id() -> str:
     return str(uuid.uuid4())[:8]
 
 
+def _generate_cosmosdb_id(value: str) -> str:
+    """
+    Generate a Cosmos DB-safe document ID from a value using base64 encoding.
+
+    Cosmos DB document IDs have the following restrictions:
+    - Cannot contain: '/', '\\', '?', '#'
+    - Cannot end with a space
+    - Maximum length of 255 characters
+
+    Args:
+        value: The value to convert to a Cosmos DB-safe ID
+
+    Returns:
+        A base64-encoded, sanitized string suitable for use as a Cosmos DB document ID
+    """
+    # Encode the value to base64 (URL-safe variant to avoid / and +)
+    encoded = base64.urlsafe_b64encode(value.encode("utf-8")).decode("utf-8")
+
+    # Remove padding characters (=) which are safe but can be omitted
+    encoded = encoded.rstrip("=")
+
+    # Ensure the ID doesn't exceed the 100 character limit
+    if len(encoded) > 100:
+        encoded = encoded[:100]
+
+    return encoded
+
+
 def _validate_url_parameter(value: str | None, param_name: str) -> tuple[bool, str | None]:
     """
     Validate URL format for endpoint parameters.
@@ -104,9 +132,7 @@ def _validate_url_parameter(value: str | None, param_name: str) -> tuple[bool, s
     return True, None
 
 
-def _validate_api_key_and_size(
-    req: func.HttpRequest, request_id: str
-) -> func.HttpResponse | None:
+def _validate_api_key_and_size(req: func.HttpRequest, request_id: str) -> func.HttpResponse | None:
     """
     Common validation logic for API key and request size.
     Returns HttpResponse with error if validation fails, None if valid.
@@ -319,7 +345,9 @@ async def _retry_cosmos_operation(
 
     # All retries exhausted
     if last_exception:
-        logger.error(f"[{request_id}] {operation_name} failed after {COSMOS_RETRY_MAX_ATTEMPTS} retries")
+        logger.error(
+            f"[{request_id}] {operation_name} failed after {COSMOS_RETRY_MAX_ATTEMPTS} retries"
+        )
         raise last_exception
     raise RuntimeError(f"{operation_name} failed with unknown error")
 
@@ -718,9 +746,7 @@ async def _delete_document(
         def _delete_operation() -> None:
             container.delete_item(item=doc_id, partition_key=partition_key)
 
-        await _retry_cosmos_operation(
-            _delete_operation, request_id, f"Delete document id={doc_id}"
-        )
+        await _retry_cosmos_operation(_delete_operation, request_id, f"Delete document id={doc_id}")
         delete_time = time.time() - delete_start
 
         logger.info(
@@ -773,7 +799,9 @@ async def _delete_blob(
     except Exception as e:
         delete_time = time.time() - delete_start
         error_msg = str(e)
-        logger.error(f"[{request_id}] Failed to delete blob (container={container_name}): {error_msg}")
+        logger.error(
+            f"[{request_id}] Failed to delete blob (container={container_name}): {error_msg}"
+        )
         return (blob_path, container_name, blob_name, False, error_msg, delete_time)
 
 
@@ -827,7 +855,9 @@ async def _execute_aisearch_query(
             )
             query_time = time.time() - query_start
 
-            logger.info(f"[{request_id}] AI Search query returned {len(items)} results (duration={query_time:.3f}s)")
+            logger.info(
+                f"[{request_id}] AI Search query returned {len(items)} results (duration={query_time:.3f}s)"
+            )
 
             return (search_text, items, query_time)
     except aiohttp.ClientError as e:
@@ -909,7 +939,11 @@ async def query_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
         logger.error(f"[{request_id}] Failed to initialize clients or read request body: {str(e)}")
         return func.HttpResponse(
             json.dumps(
-                {"error": "Initialization error", "message": "Failed to initialize Azure services", "request_id": request_id}
+                {
+                    "error": "Initialization error",
+                    "message": "Failed to initialize Azure services",
+                    "request_id": request_id,
+                }
             ),
             mimetype="application/json",
             status_code=500,
@@ -1029,7 +1063,11 @@ async def upsert_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
         logger.error(f"[{request_id}] Failed to initialize clients or read request body: {str(e)}")
         return func.HttpResponse(
             json.dumps(
-                {"error": "Initialization error", "message": "Failed to initialize Cosmos DB container", "request_id": request_id}
+                {
+                    "error": "Initialization error",
+                    "message": "Failed to initialize Cosmos DB container",
+                    "request_id": request_id,
+                }
             ),
             mimetype="application/json",
             status_code=500,
@@ -1179,6 +1217,16 @@ async def upsert_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
+        # Check for optional 'generate_id' parameter to auto-generate document ID
+        generate_id_value = req.params.get("generate_id")
+        if generate_id_value:
+            # Use the parameter value directly to generate Cosmos DB-safe ID
+            generated_id = _generate_cosmosdb_id(generate_id_value)
+            req_body["id"] = generated_id
+            logger.info(
+                f"[{request_id}] Generated document ID from 'generate_id' parameter: {generated_id[:50]}..."
+            )
+
         # Check for required 'id' field (Cosmos DB requires an 'id' for upsert)
         if "id" not in req_body:
             logger.warning(
@@ -1188,7 +1236,7 @@ async def upsert_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                 json.dumps(
                     {
                         "error": "Validation error",
-                        "message": "Document must contain an 'id' field for upsert operation",
+                        "message": "Document must contain an 'id' field for upsert operation, or use 'generate_id' parameter to auto-generate from a field",
                         "request_id": request_id,
                     }
                 ),
@@ -1213,6 +1261,7 @@ async def upsert_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                     body=json.dumps(
                         {
                             "message": "Document upserted successfully",
+                            "id": doc_id,
                             "document": upserted_item,
                             "request_id": request_id,
                             "performance": {
@@ -1428,7 +1477,9 @@ async def search_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                         "error": str(result),
                     }
                 )
-                logger.error(f"[{request_id}] Search query failed: {search_queries[i]}: {str(result)}")
+                logger.error(
+                    f"[{request_id}] Search query failed: {search_queries[i]}: {str(result)}"
+                )
                 continue
 
             if isinstance(result, tuple) and len(result) == 4:
@@ -2206,7 +2257,9 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
                         "error": str(result),
                     }
                 )
-                logger.error(f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}")
+                logger.error(
+                    f"[{request_id}] AI Search query failed: {search_queries[i]}: {str(result)}"
+                )
                 continue
 
             # Type guard: ensure result is a tuple with expected length
@@ -2290,13 +2343,17 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
     """
     Extract content from documents or images using Azure Content Understanding service.
 
-    Request body should contain the binary content of the document/image.
+    Request body (JSON):
+    {
+        "content": "<base64-encoded file content>"
+    }
 
     Query parameters:
     - acu_endpoint: Azure Content Understanding endpoint URL
     - acu_key: API key for ACU (can also be provided via X-ACU-Key header)
+    - timeout: HTTP request timeout in seconds (default: DEFAULT_TIMEOUT_SECONDS)
     - polling_timeout: Maximum time to poll for results in seconds (default: 300)
-    - polling_interval: Interval between polling attempts in seconds (default: 2)
+    - polling_interval: Interval between polling attempts in seconds (default: 5)
 
     Returns:
     - content_markdown: Extracted content in markdown format
@@ -2314,8 +2371,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
         headers = cast(dict[str, str], req.headers)
         acu_key = headers.get("X-ACU-Key") or req.params.get("acu_key")
 
+        timeout_str = req.params.get("timeout")
         polling_timeout_str = req.params.get("polling_timeout", "300")
-        polling_interval_str = req.params.get("polling_interval", "2")
+        polling_interval_str = req.params.get("polling_interval", "5")
 
         # Validate required parameters
         if not acu_endpoint or not acu_key:
@@ -2348,6 +2406,27 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
+        # Parse timeout parameter (optional, defaults to DEFAULT_TIMEOUT_SECONDS)
+        request_timeout = DEFAULT_TIMEOUT_SECONDS
+        if timeout_str:
+            try:
+                request_timeout = float(timeout_str)
+                if request_timeout <= 0:
+                    raise ValueError("timeout must be greater than 0")
+            except ValueError as e:
+                logger.warning(f"[{request_id}] Invalid timeout parameter: {str(e)}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid parameter",
+                            "message": f"timeout must be a positive number: {str(e)}",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
         # Parse polling parameters
         try:
             polling_timeout = int(polling_timeout_str)
@@ -2368,33 +2447,108 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        # Get document content from request body (base64 encoded)
-        document_content_base64 = req.get_body()
+        # Get document content from request body
+        # JSON format: {"content": "<base64-encoded content>"}
+        document_content: bytes | None = None
 
-        if not document_content_base64:
-            logger.warning(f"[{request_id}] Validation failed: document content is empty")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Validation error",
-                        "message": "Request body must contain document/image content",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
-
-        # Decode base64 content to binary
         try:
-            document_content = base64.b64decode(document_content_base64)
+            raw_body_bytes = req.get_body()
+
+            if not raw_body_bytes:
+                logger.warning(f"[{request_id}] Validation failed: request body is empty")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Validation error",
+                            "message": "Request body is empty",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+            # Try to decode as UTF-8 and parse as JSON first
+            try:
+                raw_body = raw_body_bytes.decode("utf-8")
+                req_body = json.loads(raw_body)
+
+                # JSON format with 'content' field containing base64-encoded data
+                document_content_base64 = req_body.get("content")
+
+                # Optional content-type field for logging purposes
+                content_type = req_body.get("content-type")
+                if content_type:
+                    logger.info(f"[{request_id}] Request content-type: {content_type}")
+
+                if document_content_base64:
+                    # Decode base64 content to binary
+                    try:
+                        document_content = base64.b64decode(document_content_base64)
+                        logger.info(f"[{request_id}] Parsed JSON format with base64 content")
+                    except Exception as e:
+                        logger.warning(f"[{request_id}] Failed to decode base64 content: {str(e)}")
+                        return func.HttpResponse(
+                            json.dumps(
+                                {
+                                    "error": "Validation error",
+                                    "message": "The 'content' field must be valid base64-encoded content",
+                                    "request_id": request_id,
+                                }
+                            ),
+                            mimetype="application/json",
+                            status_code=400,
+                        )
+                else:
+                    # JSON but missing required 'content' field
+                    logger.warning(f"[{request_id}] JSON body missing 'content' field")
+                    return func.HttpResponse(
+                        json.dumps(
+                            {
+                                "error": "Validation error",
+                                "message": "JSON request body must contain 'content' field with base64-encoded data",
+                                "request_id": request_id,
+                            }
+                        ),
+                        mimetype="application/json",
+                        status_code=400,
+                    )
+
+            except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                # Not valid UTF-8 or not valid JSON - return error for debugging
+                error_type = type(e).__name__
+                error_message = str(e)
+
+                # Try to get a preview of the body for debugging (first 500 bytes, safely encoded)
+                try:
+                    body_preview = raw_body_bytes[:500].decode("utf-8", errors="replace")
+                except Exception:
+                    body_preview = repr(raw_body_bytes[:500])
+
+                logger.warning(
+                    f"[{request_id}] Failed to parse request body as JSON: {error_type}: {error_message}"
+                )
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid request body format",
+                            "message": f"Request body must be valid JSON with 'content' field. Parse error: {error_message}",
+                            "error_type": error_type,
+                            "body_preview": body_preview,
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
         except Exception as e:
-            logger.warning(f"[{request_id}] Failed to decode base64 content: {str(e)}")
+            logger.warning(f"[{request_id}] Failed to read request body: {str(e)}")
             return func.HttpResponse(
                 json.dumps(
                     {
-                        "error": "Validation error",
-                        "message": "Request body must be valid base64-encoded content",
+                        "error": "Invalid request body",
+                        "message": f"Failed to read request body: {str(e)}",
                         "request_id": request_id,
                     }
                 ),
@@ -2402,14 +2556,30 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        logger.info(f"[{request_id}] Submitting content extraction job (size={len(document_content)} bytes)")
+        if not document_content:
+            logger.warning(f"[{request_id}] Validation failed: no document content found")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Validation error",
+                        "message": "No document content found in request body",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        logger.info(
+            f"[{request_id}] Submitting content extraction job (size={len(document_content)} bytes)"
+        )
 
         # STEP 1: Submit the analysis job
         submit_start = time.time()
         operation_location: str | None = None
 
         try:
-            timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT_SECONDS)
+            timeout = aiohttp.ClientTimeout(total=request_timeout)
             async with (
                 aiohttp.ClientSession() as session,
                 session.post(
@@ -2429,7 +2599,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 operation_location = response.headers.get("Operation-Location")
 
                 if not operation_location:
-                    logger.error(f"[{request_id}] ACU service did not return Operation-Location header")
+                    logger.error(
+                        f"[{request_id}] ACU service did not return Operation-Location header"
+                    )
                     return func.HttpResponse(
                         json.dumps(
                             {
@@ -2443,7 +2615,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                     )
 
                 submit_time = time.time() - submit_start
-                logger.info(f"[{request_id}] Content extraction job submitted (duration={submit_time:.3f}s)")
+                logger.info(
+                    f"[{request_id}] Content extraction job submitted (duration={submit_time:.3f}s, operation_location={operation_location})"
+                )
 
         except aiohttp.ClientError as e:
             submit_time = time.time() - submit_start
@@ -2461,7 +2635,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # STEP 2: Poll for results
-        logger.info(f"[{request_id}] Polling for results (timeout={polling_timeout}s, interval={polling_interval}s)")
+        logger.info(
+            f"[{request_id}] Polling for results (timeout={polling_timeout}s, interval={polling_interval}s)"
+        )
 
         poll_start = time.time()
         poll_attempts = 0
@@ -2469,7 +2645,7 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
         result_data: dict[str, Any] | None = None
 
         try:
-            timeout_obj = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT_SECONDS)
+            timeout_obj = aiohttp.ClientTimeout(total=request_timeout)
             async with aiohttp.ClientSession() as session:
                 while True:
                     poll_attempts += 1
@@ -2477,7 +2653,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
 
                     # Check if we've exceeded the polling timeout
                     if elapsed > polling_timeout:
-                        logger.warning(f"[{request_id}] Polling timeout exceeded after {poll_attempts} attempts")
+                        logger.warning(
+                            f"[{request_id}] Polling timeout exceeded after {poll_attempts} attempts"
+                        )
                         return func.HttpResponse(
                             json.dumps(
                                 {
@@ -2509,7 +2687,9 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                         if status == "succeeded":
                             result_data = poll_data
                             poll_time = time.time() - poll_start
-                            logger.info(f"[{request_id}] Content extraction completed (duration={poll_time:.3f}s, attempts={poll_attempts})")
+                            logger.info(
+                                f"[{request_id}] Content extraction completed (duration={poll_time:.3f}s, attempts={poll_attempts})"
+                            )
                             break
 
                         if status == "failed":
@@ -2565,24 +2745,63 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=500,
             )
 
-        # Extract content_markdown and fields from the result
-        # Adjust these paths based on actual ACU response structure
-        analyze_result = result_data.get("analyzeResult", {})
-        content_markdown = analyze_result.get("content", "")
-        fields = analyze_result.get("fields", {})
-        pages = analyze_result.get("pages", [])
+        # Extract content_markdown, fields, and page count from the result
+        # Structure: result_data.result.contents[] where each content has kind, fields, markdown
+        result_obj = result_data.get("result", {})
+        contents = result_obj.get("contents", [])
+
+        # Extract fields from the first content item with fields (typically kind="document" at page 0)
+        fields: dict[str, Any] = {}
+        content_markdown_parts: list[str] = []
+        total_pages = 0
+
+        for content_item in contents:
+            # Extract fields if present
+            if "fields" in content_item and not fields:
+                fields = content_item.get("fields", {})
+
+            # Extract markdown content if present
+            if "markdown" in content_item:
+                content_markdown_parts.append(content_item.get("markdown", ""))
+
+            # Track max page number to determine total pages
+            end_page = content_item.get("endPageNumber", 0)
+            if end_page > total_pages:
+                total_pages = end_page
+
+        # Combine all markdown parts
+        content_markdown = "\n\n".join(content_markdown_parts)
+
+        # Also check usage.documentPages for accurate page count
+        usage = result_data.get("usage", {})
+        document_pages = usage.get("documentPages", total_pages)
+        if document_pages > total_pages:
+            total_pages = document_pages
+
+        # Normalize entities: extract valueString from each entity in the entities array
+        normalized_entities: list[str] = []
+        entities_field = fields.get("entities", {})
+        if entities_field.get("type") == "array":
+            value_array = entities_field.get("valueArray", [])
+            for entity_item in value_array:
+                if isinstance(entity_item, dict) and "valueString" in entity_item:
+                    normalized_entities.append(entity_item["valueString"])
 
         total_time = time.time() - start_time
 
-        logger.info(f"[{request_id}] Content extraction successful (content_length={len(content_markdown)}, fields_count={len(fields)})")
+        logger.info(
+            f"[{request_id}] Content extraction successful (content_length={len(content_markdown)}, fields_count={len(fields)}, pages={total_pages}, entities={len(normalized_entities)})"
+        )
 
         return func.HttpResponse(
             body=json.dumps(
                 {
                     "content_markdown": content_markdown,
                     "fields": fields,
-                    "pages": pages,
+                    "normalized_entities": normalized_entities,
+                    "pages": total_pages,
                     "request_id": request_id,
+                    "operation_location": operation_location,
                     "performance": {
                         "submit_ms": round(submit_time * 1000, 2),
                         "poll_ms": round(poll_time * 1000, 2),
