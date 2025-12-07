@@ -13,6 +13,7 @@
 @aiSearchVectorFields = vector1,vector2
 @acuEndpoint = https://your-acu-resource.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer:analyze?api-version=2025-09-01
 @acuKey = your-acu-key-here
+@operationLocation = https://your-acu-resource.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer/operations/your-operation-id?api-version=2025-09-01
 
 ### Health Check
 GET {{baseUrl}}/health
@@ -1577,65 +1578,116 @@ Content-Type: application/json
 }
 
 ### Extract Content - Basic Document (Default polling settings)
-# NOTE: Request body must be base64-encoded document/image content
+# New job mode: requires acu_endpoint and base64 content in JSON body
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_DOCUMENT_CONTENT_HERE",
+  "content-type": "application/pdf"
+}
 
 ### Extract Content - With Custom Polling Settings
-# NOTE: Request body must be base64-encoded document/image content
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}&polling_timeout=600&polling_interval=3
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_DOCUMENT_CONTENT_HERE",
+  "content-type": "application/pdf"
+}
 
 ### Extract Content - Using Header Authentication
-# NOTE: Request body must be base64-encoded document/image content
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&polling_timeout=300&polling_interval=2
 X-API-Key: {{apiKey}}
 X-ACU-Key: {{acuKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_IMAGE_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_IMAGE_CONTENT_HERE",
+  "content-type": "image/png"
+}
 
 ### Extract Content - Image Document
-# NOTE: Request body must be base64-encoded document/image content
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_IMAGE_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_IMAGE_CONTENT_HERE",
+  "content-type": "image/jpeg"
+}
 
 ### Extract Content - Large Document with Extended Timeout
-# NOTE: Request body must be base64-encoded document/image content
-POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}&polling_timeout=900&polling_interval=5
+POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}&polling_timeout=900&polling_interval=5&min_chunk_size=15000
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_LARGE_DOCUMENT_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_LARGE_DOCUMENT_CONTENT_HERE",
+  "content-type": "application/pdf"
+}
+
+### Extract Content - Resume Mode (Poll Existing Job)
+# Use operation_location from a previous extraction response to resume polling
+# acu_endpoint and content are not required in resume mode
+POST {{baseUrl}}/extract_content?operation_location={{operationLocation}}&acu_key={{acuKey}}&polling_timeout=300&polling_interval=5
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "content-type": "application/pdf"
+}
+
+### Extract Content - Resume Mode with Header Authentication
+POST {{baseUrl}}/extract_content?operation_location={{operationLocation}}&polling_timeout=600
+X-API-Key: {{apiKey}}
+X-ACU-Key: {{acuKey}}
+Content-Type: application/json
+
+{}
+
+### Extract Content - Resume Mode (Empty Body is OK)
+POST {{baseUrl}}/extract_content?operation_location={{operationLocation}}&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
 
 ### Extract Content - Missing API Key (Error Scenario)
-# NOTE: Request body must be base64-encoded document/image content
+# ACU API key is required for both new job and resume mode
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_DOCUMENT_CONTENT_HERE"
+}
 
-### Extract Content - Empty Body (Error Scenario)
+### Extract Content - Empty Body in New Job Mode (Error Scenario)
 POST {{baseUrl}}/extract_content?acu_endpoint={{acuEndpoint}}&acu_key={{acuKey}}
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
 ### Extract Content - Invalid Endpoint (Error Scenario)
-# NOTE: Request body must be base64-encoded document/image content
 POST {{baseUrl}}/extract_content?acu_endpoint=not-a-valid-url&acu_key={{acuKey}}
 X-API-Key: {{apiKey}}
-Content-Type: text/plain
+Content-Type: application/json
 
-BASE64_ENCODED_DOCUMENT_CONTENT_HERE
+{
+  "content": "BASE64_ENCODED_DOCUMENT_CONTENT_HERE"
+}
+
+### Extract Content - Invalid Operation Location (Error Scenario)
+POST {{baseUrl}}/extract_content?operation_location=not-a-valid-url&acu_key={{acuKey}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
+
+### Extract Content - Resume Mode Missing ACU Key (Error Scenario)
+POST {{baseUrl}}/extract_content?operation_location={{operationLocation}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{}
 
 

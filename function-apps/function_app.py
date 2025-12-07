@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -34,7 +35,7 @@ logging.getLogger("azure.identity").setLevel(logging.WARNING)
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # Configuration constants
-MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
+MAX_REQUEST_SIZE_MB = int(os.getenv("MAX_REQUEST_SIZE_MB", "100"))
 MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = int(os.getenv("DEFAULT_TIMEOUT_SECONDS", "60"))
 AISEARCH_TIMEOUT_SECONDS = int(os.getenv("AISEARCH_TIMEOUT_SECONDS", "60"))
@@ -110,6 +111,446 @@ def _generate_cosmosdb_id(value: str) -> str:
         encoded = encoded[:100]
 
     return encoded
+
+
+def _detect_file_type(content_type: str | None) -> str:
+    """
+    Detect file type based on content_type value.
+
+    Args:
+        content_type: The MIME type or content-type string
+
+    Returns:
+        File type identifier: 'pdf', 'image', 'docx', 'xlsx', 'pptx', 'csv', 'json', 'audio', 'video', 'text', or 'unknown'
+    """
+    if not content_type:
+        return "unknown"
+
+    content_type_lower = content_type.lower()
+
+    # PDF files
+    if "/pdf" in content_type_lower or content_type_lower.endswith(".pdf"):
+        return "pdf"
+
+    # Image files
+    if "image/" in content_type_lower:
+        return "image"
+
+    # Microsoft Office documents
+    if ".document" in content_type_lower or "wordprocessingml" in content_type_lower:
+        return "docx"
+    if ".sheet" in content_type_lower or "spreadsheetml" in content_type_lower:
+        return "xlsx"
+    if ".presentation" in content_type_lower or "presentationml" in content_type_lower:
+        return "pptx"
+
+    # CSV files
+    if "/csv" in content_type_lower or "/csv" in content_type_lower or content_type_lower.endswith(".csv"):
+        return "csv"
+
+    # JSON files
+    if "/json" in content_type_lower or "/json" in content_type_lower or content_type_lower.endswith(".json"):
+        return "json"
+
+    # Audio files
+    if "audio/" in content_type_lower:
+        return "audio"
+
+    # Video files
+    if "video/" in content_type_lower:
+        return "video"
+
+    # Plain text files
+    if "text/plain" in content_type_lower or "text/" in content_type_lower:
+        return "text"
+
+    return "unknown"
+
+
+def _default_pagination(
+    content: str,
+    min_chunk_size: int = 10000,
+    request_id: str = "",
+    min_chunk_threshold: int = 15000,
+) -> list[dict[str, Any]]:
+    """
+    Default pagination for unknown file types using a multi-strategy approach.
+
+    Strategy:
+    1. First, try to split by PageBreak markers (<!-- PageBreak -->)
+    2. If no PageBreak markers and content length > min_chunk_threshold, use sentence-based chunking
+    3. Fallback to single page if content is empty, too short for chunking, or chunking fails
+
+    A sentence is defined as each item when splitting by newline characters (\\n or \\n\\n).
+    Sentences are grouped together until the chunk reaches at least min_chunk_size characters,
+    then a new page is started.
+
+    Args:
+        content: The content to chunk
+        min_chunk_size: Minimum number of characters per chunk before starting a new page (default: 10000)
+        request_id: Request ID for logging
+        min_chunk_threshold: Minimum content length required for sentence-based chunking (default: 15000)
+
+    Returns:
+        List of page dictionaries with 'page_number' and 'content' keys
+    """
+    import re
+
+    pages: list[dict[str, Any]] = []
+
+    if not content or not content.strip():
+        logger.info(f"[{request_id}] Content chunking: empty content")
+        return pages
+
+    # Strategy 1: Try PageBreak markers first
+    page_delimiter = "<!-- PageBreak -->"
+
+    if page_delimiter in content:
+        page_contents = content.split(page_delimiter)
+        for idx, page_content in enumerate(page_contents):
+            stripped_content = page_content.strip()
+            if stripped_content:
+                pages.append({
+                    "page_number": idx + 1,
+                    "content": stripped_content,
+                })
+        logger.info(f"[{request_id}] Content chunking (PageBreak): {len(pages)} pages")
+        return pages
+
+    # Check if content length qualifies for sentence-based chunking (> min_chunk_threshold)
+    content_length = len(content.strip())
+    if content_length <= min_chunk_threshold:
+        # Fallback to single page for shorter content
+        pages.append({
+            "page_number": 1,
+            "content": content.strip(),
+        })
+        logger.info(f"[{request_id}] Content chunking: 1 page (content length {content_length} <= {min_chunk_threshold} chars)")
+        return pages
+
+    # Strategy 2: Sentence-based chunking (only for content > min_chunk_threshold)
+    # Split by one or more newlines to get sentences/paragraphs
+    sentences = re.split(r'\n+', content.strip())
+
+    # Filter out empty sentences
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    if not sentences:
+        # Strategy 3: Fallback to single page
+        pages.append({
+            "page_number": 1,
+            "content": content.strip(),
+        })
+        logger.info(f"[{request_id}] Content chunking: 1 page (no sentences found)")
+        return pages
+
+    def _split_oversized_sentence(text: str, target_size: int) -> list[str]:
+        """
+        Split an oversized sentence into smaller parts at word boundaries.
+        Each part will be approximately target_size characters.
+        """
+        if len(text) <= target_size:
+            return [text]
+
+        parts: list[str] = []
+        remaining = text
+
+        while remaining:
+            if len(remaining) <= target_size:
+                parts.append(remaining)
+                break
+
+            # Find a good split point near target_size
+            # Look for the last space before target_size
+            split_point = remaining.rfind(' ', 0, target_size)
+
+            if split_point == -1:
+                # No space found, try to find punctuation
+                for punct in ['.', ',', ';', ':', '!', '?', '-']:
+                    split_point = remaining.rfind(punct, 0, target_size)
+                    if split_point != -1:
+                        split_point += 1  # Include the punctuation
+                        break
+
+            if split_point <= 0:
+                # No good split point found, force split at target_size
+                split_point = target_size
+
+            parts.append(remaining[:split_point].strip())
+            remaining = remaining[split_point:].strip()
+
+        return [p for p in parts if p]  # Filter out empty parts
+
+    current_chunk: list[str] = []
+    current_size = 0
+    page_number = 0
+
+    for sentence in sentences:
+        sentence_len = len(sentence)
+
+        # Handle oversized sentences by splitting them
+        if sentence_len > min_chunk_size:
+            # First, save current chunk if not empty
+            if current_chunk:
+                page_number += 1
+                pages.append({
+                    "page_number": page_number,
+                    "content": "\n\n".join(current_chunk),
+                })
+                current_chunk = []
+                current_size = 0
+
+            # Split the oversized sentence into parts
+            sentence_parts = _split_oversized_sentence(sentence, min_chunk_size)
+            logger.info(f"[{request_id}] Split oversized sentence ({sentence_len} chars) into {len(sentence_parts)} parts")
+
+            # Add each part as a separate page (except possibly the last one)
+            for i, part in enumerate(sentence_parts):
+                if i < len(sentence_parts) - 1:
+                    # Not the last part - add as its own page
+                    page_number += 1
+                    pages.append({
+                        "page_number": page_number,
+                        "content": part,
+                    })
+                else:
+                    # Last part - start a new chunk with it (may be merged with next sentences)
+                    current_chunk = [part]
+                    current_size = len(part)
+            continue
+
+        # Account for the newline separator between sentences
+        separator_len = 2 if current_chunk else 0  # "\n\n" between sentences
+
+        # Add sentence to current chunk
+        current_chunk.append(sentence)
+        current_size += separator_len + sentence_len
+
+        # Check if current chunk has reached the minimum size threshold
+        # If so, save it and start a new chunk
+        if current_size >= min_chunk_size:
+            page_number += 1
+            pages.append({
+                "page_number": page_number,
+                "content": "\n\n".join(current_chunk),
+            })
+            current_chunk = []
+            current_size = 0
+
+    # Handle the last chunk - merge with previous page if too small, otherwise create new page
+    if current_chunk:
+        last_chunk_content = "\n\n".join(current_chunk)
+        if pages and current_size < min_chunk_size:
+            # Merge with the previous page since the last chunk is too small
+            previous_page = pages[-1]
+            previous_page["content"] = previous_page["content"] + "\n\n" + last_chunk_content
+            logger.info(f"[{request_id}] Merged small last chunk ({current_size} chars) with previous page")
+        else:
+            # Create a new page (either no previous pages or chunk is large enough)
+            page_number += 1
+            pages.append({
+                "page_number": page_number,
+                "content": last_chunk_content,
+            })
+
+    if pages:
+        logger.info(f"[{request_id}] Content chunking: {len(pages)} chunks (min_size={min_chunk_size})")
+    else:
+        # Fallback to single page if no chunks were created
+        pages.append({
+            "page_number": 1,
+            "content": content.strip(),
+        })
+        logger.info(f"[{request_id}] Content chunking: 1 page (fallback)")
+
+    return pages
+
+
+def _paginate_markdown_content(
+    content_markdown: str,
+    file_type: str,
+    request_id: str,
+    min_chunk_size: int = 10000,
+) -> list[dict[str, Any]]:
+    """
+    Split markdown content into pages based on file type.
+
+    Args:
+        content_markdown: The full markdown content to paginate
+        file_type: The detected file type ('pdf', 'image', 'docx', 'xlsx', 'pptx', etc.)
+        request_id: Request ID for logging
+        min_chunk_size: Minimum characters per chunk for sentence-based splitting (default: 10000)
+
+    Returns:
+        List of page dictionaries with 'page_number' and 'content' keys
+    """
+    pages: list[dict[str, Any]] = []
+
+    if not content_markdown or not content_markdown.strip():
+        logger.info(f"[{request_id}] No content to paginate")
+        return pages
+
+    # If content is shorter than min_chunk_size, use default pagination (returns single page)
+    content_length = len(content_markdown.strip())
+    if content_length < min_chunk_size:
+        logger.info(f"[{request_id}] Content length {content_length} < {min_chunk_size}, using default pagination")
+        return _default_pagination(content_markdown, min_chunk_size, request_id)
+
+    if file_type == "pdf":
+        pages = _default_pagination(content_markdown, min_chunk_size, request_id)
+        logger.info(f"[{request_id}] PDF pagination: {len(pages)} pages extracted")
+
+    elif file_type == "xlsx":
+        # Excel: Split by H1 headers as worksheet/section markers
+        section_pattern = re.compile(r'^#\s+.+$', re.MULTILINE)
+        parts = section_pattern.split(content_markdown)
+        matches = section_pattern.findall(content_markdown)
+
+        if len(matches) > 1:  # Multiple sections
+            page_number = 0
+
+            if parts and parts[0].strip():
+                page_number += 1
+                pages.append({
+                    "page_number": page_number,
+                    "content": parts[0].strip(),
+                })
+
+            for i, match in enumerate(matches):
+                page_number += 1
+                content_idx = i + 1 if i + 1 < len(parts) else -1
+                section_content = parts[content_idx].strip() if content_idx > 0 and content_idx < len(parts) else ""
+
+                # Extract sheet name from H1 header (remove leading # and whitespace)
+                sheet_name = match.strip().lstrip('#').strip()
+
+                pages.append({
+                    "page_number": page_number,
+                    "content": f"{match.strip()}\n\n{section_content}".strip(),
+                    "sheet_name": sheet_name,
+                })
+        else:
+            # Single section or no headers, use default pagination
+            pages = _default_pagination(content_markdown, min_chunk_size, request_id)
+
+        logger.info(f"[{request_id}] Excel pagination: {len(pages)} worksheets extracted")
+
+    elif file_type == "pptx":
+        # PowerPoint: Split by slide markers (## Slide or <!-- Slide)
+        import re
+
+        # Pattern to match slide headers or markers
+        slide_pattern = re.compile(
+            r'(^#{1,2}\s*Slide\s*\d*[:\s]?|<!-- Slide \d+ -->)',
+            re.MULTILINE | re.IGNORECASE
+        )
+
+        parts = slide_pattern.split(content_markdown)
+        matches = slide_pattern.findall(content_markdown)
+
+        if matches:
+            page_number = 0
+
+            # Check if there's content before the first slide marker
+            if parts and parts[0].strip():
+                page_number += 1
+                pages.append({
+                    "page_number": page_number,
+                    "content": parts[0].strip(),
+                    "slide_title": "Title Slide",
+                })
+
+            # Process each slide
+            for i, match in enumerate(matches):
+                page_number += 1
+                content_idx = i + 1 if i + 1 < len(parts) else -1
+                slide_content = parts[content_idx].strip() if content_idx > 0 and content_idx < len(parts) else ""
+
+                pages.append({
+                    "page_number": page_number,
+                    "content": f"{match.strip()}\n\n{slide_content}".strip(),
+                })
+        else:
+            # No slide markers found, use default pagination
+            pages = _default_pagination(content_markdown, min_chunk_size, request_id)
+
+        logger.info(f"[{request_id}] PowerPoint pagination: {len(pages)} slides extracted")
+
+    elif file_type == "docx":
+        # Word documents: Split by H1 headers as section markers
+        section_pattern = re.compile(r'^#\s+.+$', re.MULTILINE)
+        parts = section_pattern.split(content_markdown)
+        matches = section_pattern.findall(content_markdown)
+
+        if len(matches) > 1:  # Multiple sections
+            page_number = 0
+
+            if parts and parts[0].strip():
+                page_number += 1
+                pages.append({
+                    "page_number": page_number,
+                    "content": parts[0].strip(),
+                })
+
+            for i, match in enumerate(matches):
+                page_number += 1
+                content_idx = i + 1 if i + 1 < len(parts) else -1
+                section_content = parts[content_idx].strip() if content_idx > 0 and content_idx < len(parts) else ""
+
+                pages.append({
+                    "page_number": page_number,
+                    "content": f"{match.strip()}\n\n{section_content}".strip(),
+                })
+        else:
+            # Single section or no headers, use default pagination
+            pages = _default_pagination(content_markdown, min_chunk_size, request_id)
+
+        logger.info(f"[{request_id}] Word document pagination: {len(pages)} pages/sections extracted")
+
+    elif file_type == "image":
+        # Images: Treat as single page
+        pages.append({
+            "page_number": 1,
+            "content": content_markdown.strip(),
+        })
+        logger.info(f"[{request_id}] Image pagination: 1 page")
+
+    elif file_type in ["csv", "json"]:
+        # CSV/JSON: Treat as single page (structured data)
+        pages.append({
+            "page_number": 1,
+            "content": content_markdown.strip(),
+        })
+        logger.info(f"[{request_id}] {file_type.upper()} pagination: 1 page (structured data)")
+
+    elif file_type in ["audio", "video"]:
+        # Audio/Video: Usually transcription, treat as single page or split by timestamps
+        import re
+
+        # Look for timestamp patterns like [00:00:00] or (00:00)
+        timestamp_pattern = re.compile(r'(^\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*)', re.MULTILINE)
+        matches = timestamp_pattern.findall(content_markdown)
+
+        if len(matches) > 5:  # Has significant timestamps, could split by segments
+            # For now, keep as single page but could implement time-based chunking
+            pages.append({
+                "page_number": 1,
+                "content": content_markdown.strip(),
+                "has_timestamps": True,
+            })
+        else:
+            pages.append({
+                "page_number": 1,
+                "content": content_markdown.strip(),
+            })
+
+        logger.info(f"[{request_id}] {file_type.capitalize()} pagination: {len(pages)} segment(s)")
+
+    else:
+        # Unknown file type: Use the default chunking helper
+        pages = _default_pagination(content_markdown, min_chunk_size, request_id)
+
+    return pages
 
 
 def _validate_url_parameter(value: str | None, param_name: str) -> tuple[bool, str | None]:
@@ -2343,21 +2784,29 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
     """
     Extract content from documents or images using Azure Content Understanding service.
 
-    Request body (JSON):
+    Request body (JSON) - required only when operation_location is not provided:
     {
-        "content": "<base64-encoded file content>"
+        "content": "<base64-encoded file content>",
+        "content-type": "<optional MIME type for file type detection>"
     }
 
     Query parameters:
-    - acu_endpoint: Azure Content Understanding endpoint URL
+    - operation_location: Optional polling URL from a previous extraction job. When provided,
+                          skips job submission and directly polls for results. acu_endpoint
+                          and request body content become optional.
+    - acu_endpoint: Azure Content Understanding endpoint URL (required if operation_location not provided)
     - acu_key: API key for ACU (can also be provided via X-ACU-Key header)
     - timeout: HTTP request timeout in seconds (default: DEFAULT_TIMEOUT_SECONDS)
     - polling_timeout: Maximum time to poll for results in seconds (default: 300)
     - polling_interval: Interval between polling attempts in seconds (default: 5)
+    - min_chunk_size: Minimum characters per chunk for unknown file types (default: 10000)
 
     Returns:
-    - content_markdown: Extracted content in markdown format
+    - pages: List of page objects with 'page_number' and 'content' keys
+    - page_count: Total number of pages
+    - file_type: Detected file type identifier
     - fields: Extracted fields/metadata from the document
+    - normalized_entities: List of extracted entity strings
     """
     request_id = _generate_request_id()
     start_time = time.time()
@@ -2366,6 +2815,7 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
     try:
         # Extract Azure Content Understanding configuration from parameters
         acu_endpoint = req.params.get("acu_endpoint")
+        operation_location_param = req.params.get("operation_location")
 
         # API key from header (preferred) or query parameter (fallback)
         headers = cast(dict[str, str], req.headers)
@@ -2374,37 +2824,73 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
         timeout_str = req.params.get("timeout")
         polling_timeout_str = req.params.get("polling_timeout", "300")
         polling_interval_str = req.params.get("polling_interval", "5")
+        min_chunk_size_str = req.params.get("min_chunk_size", "10000")
 
-        # Validate required parameters
-        if not acu_endpoint or not acu_key:
-            logger.warning(f"[{request_id}] Missing required ACU parameters")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Missing required parameters",
-                        "message": "Please provide acu_endpoint and X-ACU-Key header (or acu_key param)",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
+        # Determine if we're resuming an existing job or starting a new one
+        resume_mode = bool(operation_location_param)
 
-        # Validate acu_endpoint URL format
-        is_valid, error_message = _validate_url_parameter(acu_endpoint, "acu_endpoint")
-        if not is_valid:
-            logger.warning(f"[{request_id}] Invalid acu_endpoint: {error_message}")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Invalid parameter",
-                        "message": error_message,
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
+        if resume_mode:
+            # Resume mode: validate operation_location URL format
+            is_valid, error_message = _validate_url_parameter(operation_location_param, "operation_location")
+            if not is_valid:
+                logger.warning(f"[{request_id}] Invalid operation_location: {error_message}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid parameter",
+                            "message": error_message,
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+            # API key is still required for polling
+            if not acu_key:
+                logger.warning(f"[{request_id}] Missing ACU API key for resume mode")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing required parameters",
+                            "message": "Please provide X-ACU-Key header (or acu_key param) for polling",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+            logger.info(f"[{request_id}] Resume mode: polling existing job at {operation_location_param}")
+        else:
+            # New job mode: validate required parameters
+            if not acu_endpoint or not acu_key:
+                logger.warning(f"[{request_id}] Missing required ACU parameters")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing required parameters",
+                            "message": "Please provide acu_endpoint and X-ACU-Key header (or acu_key param), or provide operation_location to resume an existing job",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+
+            # Validate acu_endpoint URL format
+            is_valid, error_message = _validate_url_parameter(acu_endpoint, "acu_endpoint")
+            if not is_valid:
+                logger.warning(f"[{request_id}] Invalid acu_endpoint: {error_message}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Invalid parameter",
+                            "message": error_message,
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
 
         # Parse timeout parameter (optional, defaults to DEFAULT_TIMEOUT_SECONDS)
         request_timeout = DEFAULT_TIMEOUT_SECONDS
@@ -2447,66 +2933,62 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        # Get document content from request body
-        # JSON format: {"content": "<base64-encoded content>"}
-        document_content: bytes | None = None
-
+        # Parse min_chunk_size parameter (for sentence-based chunking of unknown file types)
         try:
-            raw_body_bytes = req.get_body()
+            min_chunk_size = int(min_chunk_size_str)
+            if min_chunk_size <= 0:
+                raise ValueError("min_chunk_size must be greater than 0")
+        except ValueError as e:
+            logger.warning(f"[{request_id}] Invalid min_chunk_size parameter: {str(e)}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"min_chunk_size must be a positive integer: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
 
-            if not raw_body_bytes:
-                logger.warning(f"[{request_id}] Validation failed: request body is empty")
-                return func.HttpResponse(
-                    json.dumps(
-                        {
-                            "error": "Validation error",
-                            "message": "Request body is empty",
-                            "request_id": request_id,
-                        }
-                    ),
-                    mimetype="application/json",
-                    status_code=400,
-                )
+        # Initialize variables for tracking
+        submit_time = 0.0
+        operation_location: str | None = None
+        content_type: str | None = None
 
-            # Try to decode as UTF-8 and parse as JSON first
+        if resume_mode:
+            # Resume mode: use provided operation_location, skip document submission
+            operation_location = operation_location_param
+            logger.info(f"[{request_id}] Skipping job submission, using provided operation_location")
+
+            # Try to extract content-type from request body if provided (optional)
             try:
-                raw_body = raw_body_bytes.decode("utf-8")
-                req_body = json.loads(raw_body)
+                raw_body_bytes = req.get_body()
+                if raw_body_bytes:
+                    raw_body = raw_body_bytes.decode("utf-8")
+                    req_body = json.loads(raw_body)
+                    content_type = req_body.get("content-type")
+                    if content_type:
+                        logger.info(f"[{request_id}] Request content-type: {content_type}")
+            except Exception:
+                # Content-type is optional in resume mode, ignore errors
+                pass
+        else:
+            # New job mode: get document content from request body
+            # JSON format: {"content": "<base64-encoded content>"}
+            document_content: bytes | None = None
 
-                # JSON format with 'content' field containing base64-encoded data
-                document_content_base64 = req_body.get("content")
+            try:
+                raw_body_bytes = req.get_body()
 
-                # Optional content-type field for logging purposes
-                content_type = req_body.get("content-type")
-                if content_type:
-                    logger.info(f"[{request_id}] Request content-type: {content_type}")
-
-                if document_content_base64:
-                    # Decode base64 content to binary
-                    try:
-                        document_content = base64.b64decode(document_content_base64)
-                        logger.info(f"[{request_id}] Parsed JSON format with base64 content")
-                    except Exception as e:
-                        logger.warning(f"[{request_id}] Failed to decode base64 content: {str(e)}")
-                        return func.HttpResponse(
-                            json.dumps(
-                                {
-                                    "error": "Validation error",
-                                    "message": "The 'content' field must be valid base64-encoded content",
-                                    "request_id": request_id,
-                                }
-                            ),
-                            mimetype="application/json",
-                            status_code=400,
-                        )
-                else:
-                    # JSON but missing required 'content' field
-                    logger.warning(f"[{request_id}] JSON body missing 'content' field")
+                if not raw_body_bytes:
+                    logger.warning(f"[{request_id}] Validation failed: request body is empty")
                     return func.HttpResponse(
                         json.dumps(
                             {
                                 "error": "Validation error",
-                                "message": "JSON request body must contain 'content' field with base64-encoded data",
+                                "message": "Request body is empty",
                                 "request_id": request_id,
                             }
                         ),
@@ -2514,27 +2996,87 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                         status_code=400,
                     )
 
-            except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                # Not valid UTF-8 or not valid JSON - return error for debugging
-                error_type = type(e).__name__
-                error_message = str(e)
-
-                # Try to get a preview of the body for debugging (first 500 bytes, safely encoded)
+                # Try to decode as UTF-8 and parse as JSON first
                 try:
-                    body_preview = raw_body_bytes[:500].decode("utf-8", errors="replace")
-                except Exception:
-                    body_preview = repr(raw_body_bytes[:500])
+                    raw_body = raw_body_bytes.decode("utf-8")
+                    req_body = json.loads(raw_body)
 
-                logger.warning(
-                    f"[{request_id}] Failed to parse request body as JSON: {error_type}: {error_message}"
-                )
+                    # JSON format with 'content' field containing base64-encoded data
+                    document_content_base64 = req_body.get("content")
+
+                    # Optional content-type field for logging purposes
+                    content_type = req_body.get("content-type")
+                    if content_type:
+                        logger.info(f"[{request_id}] Request content-type: {content_type}")
+
+                    if document_content_base64:
+                        # Decode base64 content to binary
+                        try:
+                            document_content = base64.b64decode(document_content_base64)
+                            logger.info(f"[{request_id}] Parsed JSON format with base64 content")
+                        except Exception as e:
+                            logger.warning(f"[{request_id}] Failed to decode base64 content: {str(e)}")
+                            return func.HttpResponse(
+                                json.dumps(
+                                    {
+                                        "error": "Validation error",
+                                        "message": "The 'content' field must be valid base64-encoded content",
+                                        "request_id": request_id,
+                                    }
+                                ),
+                                mimetype="application/json",
+                                status_code=400,
+                            )
+                    else:
+                        # JSON but missing required 'content' field
+                        logger.warning(f"[{request_id}] JSON body missing 'content' field")
+                        return func.HttpResponse(
+                            json.dumps(
+                                {
+                                    "error": "Validation error",
+                                    "message": "JSON request body must contain 'content' field with base64-encoded data",
+                                    "request_id": request_id,
+                                }
+                            ),
+                            mimetype="application/json",
+                            status_code=400,
+                        )
+
+                except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                    # Not valid UTF-8 or not valid JSON - return error for debugging
+                    error_type = type(e).__name__
+                    error_message = str(e)
+
+                    # Try to get a preview of the body for debugging (first 500 bytes, safely encoded)
+                    try:
+                        body_preview = raw_body_bytes[:500].decode("utf-8", errors="replace")
+                    except Exception:
+                        body_preview = repr(raw_body_bytes[:500])
+
+                    logger.warning(
+                        f"[{request_id}] Failed to parse request body as JSON: {error_type}: {error_message}"
+                    )
+                    return func.HttpResponse(
+                        json.dumps(
+                            {
+                                "error": "Invalid request body format",
+                                "message": f"Request body must be valid JSON with 'content' field. Parse error: {error_message}",
+                                "error_type": error_type,
+                                "body_preview": body_preview,
+                                "request_id": request_id,
+                            }
+                        ),
+                        mimetype="application/json",
+                        status_code=400,
+                    )
+
+            except Exception as e:
+                logger.warning(f"[{request_id}] Failed to read request body: {str(e)}")
                 return func.HttpResponse(
                     json.dumps(
                         {
-                            "error": "Invalid request body format",
-                            "message": f"Request body must be valid JSON with 'content' field. Parse error: {error_message}",
-                            "error_type": error_type,
-                            "body_preview": body_preview,
+                            "error": "Invalid request body",
+                            "message": f"Failed to read request body: {str(e)}",
                             "request_id": request_id,
                         }
                     ),
@@ -2542,97 +3084,82 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                     status_code=400,
                 )
 
-        except Exception as e:
-            logger.warning(f"[{request_id}] Failed to read request body: {str(e)}")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Invalid request body",
-                        "message": f"Failed to read request body: {str(e)}",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
-
-        if not document_content:
-            logger.warning(f"[{request_id}] Validation failed: no document content found")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Validation error",
-                        "message": "No document content found in request body",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
-
-        logger.info(
-            f"[{request_id}] Submitting content extraction job (size={len(document_content)} bytes)"
-        )
-
-        # STEP 1: Submit the analysis job
-        submit_start = time.time()
-        operation_location: str | None = None
-
-        try:
-            timeout = aiohttp.ClientTimeout(total=request_timeout)
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(
-                    acu_endpoint,
-                    headers={
-                        "Ocp-Apim-Subscription-Key": acu_key,
-                        "Content-Type": "application/octet-stream",
-                        "x-ms-useragent": "content-understanding-document-extraction",
-                    },
-                    data=document_content,
-                    timeout=timeout,
-                ) as response,
-            ):
-                response.raise_for_status()
-
-                # Get the Operation-Location header for polling
-                operation_location = response.headers.get("Operation-Location")
-
-                if not operation_location:
-                    logger.error(
-                        f"[{request_id}] ACU service did not return Operation-Location header"
-                    )
-                    return func.HttpResponse(
-                        json.dumps(
-                            {
-                                "error": "Service error",
-                                "message": "Azure Content Understanding service did not return polling URL",
-                                "request_id": request_id,
-                            }
-                        ),
-                        mimetype="application/json",
-                        status_code=500,
-                    )
-
-                submit_time = time.time() - submit_start
-                logger.info(
-                    f"[{request_id}] Content extraction job submitted (duration={submit_time:.3f}s, operation_location={operation_location})"
+            if not document_content:
+                logger.warning(f"[{request_id}] Validation failed: no document content found")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Validation error",
+                            "message": "No document content found in request body",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
                 )
 
-        except aiohttp.ClientError as e:
-            submit_time = time.time() - submit_start
-            logger.error(f"[{request_id}] Failed to submit ACU job: {str(e)}")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Submission failed",
-                        "message": f"Failed to submit content extraction job: {str(e)}",
-                        "request_id": request_id,
-                    }
-                ),
-                mimetype="application/json",
-                status_code=500,
+            logger.info(
+                f"[{request_id}] Submitting content extraction job (size={len(document_content)} bytes)"
             )
+
+            # STEP 1: Submit the analysis job
+            submit_start = time.time()
+
+            try:
+                timeout = aiohttp.ClientTimeout(total=request_timeout)
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        acu_endpoint,
+                        headers={
+                            "Ocp-Apim-Subscription-Key": acu_key,
+                            "Content-Type": "application/octet-stream",
+                            "x-ms-useragent": "content-understanding-document-extraction",
+                        },
+                        data=document_content,
+                        timeout=timeout,
+                    ) as response,
+                ):
+                    response.raise_for_status()
+
+                    # Get the Operation-Location header for polling
+                    operation_location = response.headers.get("Operation-Location")
+
+                    if not operation_location:
+                        logger.error(
+                            f"[{request_id}] ACU service did not return Operation-Location header"
+                        )
+                        return func.HttpResponse(
+                            json.dumps(
+                                {
+                                    "error": "Service error",
+                                    "message": "Azure Content Understanding service did not return polling URL",
+                                    "request_id": request_id,
+                                }
+                            ),
+                            mimetype="application/json",
+                            status_code=500,
+                        )
+
+                    submit_time = time.time() - submit_start
+                    logger.info(
+                        f"[{request_id}] Content extraction job submitted (duration={submit_time:.3f}s, operation_location={operation_location})"
+                    )
+
+            except aiohttp.ClientError as e:
+                submit_time = time.time() - submit_start
+                logger.error(f"[{request_id}] Failed to submit ACU job: {str(e)}")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Submission failed",
+                            "message": f"Failed to submit content extraction job: {str(e)}",
+                            "request_id": request_id,
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=500,
+                )
 
         # STEP 2: Poll for results
         logger.info(
@@ -2787,19 +3314,44 @@ async def extract_content(req: func.HttpRequest) -> func.HttpResponse:
                 if isinstance(entity_item, dict) and "valueString" in entity_item:
                     normalized_entities.append(entity_item["valueString"])
 
+        # Normalize fields: extract valueString from each field and remove entities
+        normalized_fields: dict[str, Any] = {}
+        for field_name, field_value in fields.items():
+            # Skip entities field since we already have normalized_entities
+            if field_name == "entities":
+                continue
+            # Extract valueString if the field has the expected structure
+            if isinstance(field_value, dict) and "valueString" in field_value:
+                value_string = field_value["valueString"]
+                # Only add if valueString has data (not empty or None)
+                if value_string:
+                    normalized_fields[field_name] = value_string
+            elif field_value:
+                # Keep the original value if it doesn't match the expected structure and has data
+                normalized_fields[field_name] = field_value
+
+        # Detect file type and paginate content
+        file_type = _detect_file_type(content_type)
+        logger.info(f"[{request_id}] Detected file type: {file_type} (content_type: {content_type})")
+
+        # Paginate the markdown content based on file type
+        paginated_pages = _paginate_markdown_content(content_markdown, file_type, request_id, min_chunk_size)
+
         total_time = time.time() - start_time
 
         logger.info(
-            f"[{request_id}] Content extraction successful (content_length={len(content_markdown)}, fields_count={len(fields)}, pages={total_pages}, entities={len(normalized_entities)})"
+            f"[{request_id}] Content extraction successful (content_length={len(content_markdown)}, fields_count={len(normalized_fields)}, pages={len(paginated_pages)}, entities={len(normalized_entities)})"
         )
 
         return func.HttpResponse(
             body=json.dumps(
                 {
-                    "content_markdown": content_markdown,
-                    "fields": fields,
-                    "normalized_entities": normalized_entities,
-                    "pages": total_pages,
+                    "markdown": content_markdown,
+                    "pages": paginated_pages,
+                    "page_count": len(paginated_pages),
+                    "file_type": file_type,
+                    "fields": normalized_fields,
+                    "entities": normalized_entities,
                     "request_id": request_id,
                     "operation_location": operation_location,
                     "performance": {

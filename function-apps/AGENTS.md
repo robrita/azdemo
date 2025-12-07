@@ -410,6 +410,58 @@ These functions follow a consistent error-handling pattern where they return eit
 
 Always check for errors immediately after calling these functions and return early if validation fails.
 
+### Avoid Hard-Coded Values
+
+**CRITICAL**: When implementing logic with configurable thresholds or limits:
+
+1. **ALWAYS** use function parameters with default values instead of hard-coded magic numbers
+2. **ALWAYS** document default values in docstrings
+3. **ALWAYS** ensure all callers and dependencies use consistent default values
+4. Parameters should be named descriptively to indicate their purpose
+
+**Pattern for Configurable Parameters**:
+
+```python
+# ❌ WRONG: Hard-coded magic numbers
+def process_content(content: str) -> list[dict]:
+    if len(content) <= 15000:  # Magic number - hard to maintain
+        return [{"page": 1, "content": content}]
+    # ... chunking logic with max_size = 10000
+
+# ✅ CORRECT: Configurable parameters with defaults
+def process_content(
+    content: str,
+    max_chunk_size: int = 10000,
+    min_chunk_threshold: int = 15000,
+) -> list[dict]:
+    """
+    Process content with configurable chunking.
+
+    Args:
+        content: The content to process
+        max_chunk_size: Maximum characters per chunk (default: 10000)
+        min_chunk_threshold: Minimum content length to trigger chunking (default: 15000)
+    """
+    if len(content) <= min_chunk_threshold:
+        return [{"page": 1, "content": content}]
+    # ... chunking logic using max_chunk_size
+```
+
+**Key Principles**:
+
+- **Maintainability**: Default values are defined in one place (function signature)
+- **Flexibility**: Callers can override defaults when needed
+- **Documentation**: Docstrings explain what each parameter controls
+- **Consistency**: When a function calls another, ensure default values align across the call chain
+
+**Checking Dependencies**:
+When adding configurable parameters, verify all places that use the function:
+
+1. Search for all usages of the function
+2. Update any API endpoints that expose the parameter
+3. Update documentation (docstrings, README, API docs)
+4. Ensure environment variable defaults match if applicable
+
 ### Feature Removal and Cleanup
 
 **CRITICAL**: When removing features or dependencies:

@@ -23,41 +23,49 @@ All endpoints require authentication via `X-API-Key` header (or `api_key` query 
 ### Cosmos DB Operations
 
 #### `POST /api/query_cosmosdb`
+
 Execute read-only SQL query (SELECT/WITH only - write operations blocked).
 
 **Query Parameters**: `cosmos_endpoint`, `cosmos_database`, `cosmos_container`
 
 **Request Body** (raw SQL):
+
 ```sql
 SELECT * FROM c WHERE c.status = 'active'
 ```
 
 #### `POST /api/upsert_cosmosdb`
+
 Upsert single document or batch (via `documents` array).
 
 **Query Parameters**: `cosmos_endpoint`, `cosmos_database`, `cosmos_container`
 
 **Single Document**:
+
 ```json
-{"id": "doc123", "name": "Sample"}
+{ "id": "doc123", "name": "Sample" }
 ```
 
 **Batch**:
+
 ```json
 {"documents": [{"id": "doc1", ...}, {"id": "doc2", ...}]}
 ```
 
 #### `DELETE /api/delete_cosmosdb`
+
 Batch delete documents.
 
 **Query Parameters**: `cosmos_endpoint`, `cosmos_database`, `cosmos_container`
 
 **Request Body**:
+
 ```json
 {"documents": [{"id": "doc1", "partition": "key1"}, ...]}
 ```
 
 #### `POST /api/search_cosmosdb`
+
 Hybrid vector + full-text search using RRF.
 
 **Query Parameters**: `cosmos_endpoint`, `cosmos_database`, `cosmos_container`, `openai_endpoint`, `openai_embedding_deployment`
@@ -65,6 +73,7 @@ Hybrid vector + full-text search using RRF.
 **Headers**: `X-OpenAI-Key` (or `openai_key` param)
 
 **Request Body**:
+
 ```json
 {
   "search": ["query1", "query2"],
@@ -75,11 +84,13 @@ Hybrid vector + full-text search using RRF.
 ### Blob Storage Operations
 
 #### `GET /api/get_blob`
+
 Read blob content.
 
 **Query Parameters**: `blob_endpoint`, `blob_container`, `blob_name`
 
 #### `POST /api/save_blob`
+
 Write blob content (overwrites existing).
 
 **Query Parameters**: `blob_endpoint`, `blob_container`, `blob_name`
@@ -87,18 +98,21 @@ Write blob content (overwrites existing).
 **Request Body**: Raw content (any format)
 
 #### `DELETE /api/delete_blob`
+
 Batch delete blobs.
 
 **Query Parameters**: `blob_endpoint`
 
 **Request Body** (JSON array or single path):
+
 ```json
-{"blobs": ["container/blob1", "container/blob2"]}
+{ "blobs": ["container/blob1", "container/blob2"] }
 ```
 
 ### AI Search Operations
 
 #### `POST /api/query_aisearch`
+
 Hybrid text + vector search using Azure AI Search.
 
 **Query Parameters**: `search_endpoint`, `top` (default: 10), `vector_fields` (comma-separated)
@@ -106,31 +120,45 @@ Hybrid text + vector search using Azure AI Search.
 **Headers**: `X-Search-Key` (or `search_api_key` param)
 
 **Request Body**:
+
 ```json
-{"search": ["query1", "query2"]}
+{ "search": ["query1", "query2"] }
 ```
 
 ### Content Extraction Operations
 
 #### `POST /api/extract_content`
-Extract content from documents or images using Azure Content Understanding service. Submits analysis job and polls for results until completion or timeout.
 
-**Query Parameters**: 
-- `acu_endpoint`: Azure Content Understanding endpoint URL (required)
+Extract content from documents or images using Azure Content Understanding service. Submits analysis job and polls for results until completion or timeout. Supports resume mode to poll an existing job.
+
+**Query Parameters**:
+
+- `operation_location`: Optional polling URL from a previous extraction job. When provided, skips job submission and directly polls for results (resume mode)
+- `acu_endpoint`: Azure Content Understanding endpoint URL (required if `operation_location` not provided)
 - `polling_timeout`: Maximum polling time in seconds (default: 300)
-- `polling_interval`: Polling interval in seconds (default: 2)
+- `polling_interval`: Polling interval in seconds (default: 5)
+- `min_chunk_size`: Minimum characters per chunk for unknown file types (default: 10000)
+- `timeout`: HTTP request timeout in seconds (default: 30)
 
-**Headers**: `X-ACU-Key` (or `acu_key` param)
+**Headers**: `X-ACU-Key` (or `acu_key` param) - required for both new jobs and resume mode
 
-**Request Body**: Base64-encoded document/image content (text/plain)
+**Request Body** (JSON):
+
+- New job mode: `{"content": "<base64-encoded content>", "content-type": "<optional MIME type>"}`
+- Resume mode: Optional `{"content-type": "<MIME type>"}` for file type detection
 
 **Response**:
+
 ```json
 {
-  "content_markdown": "Extracted text in markdown format",
-  "fields": {"field1": "value1", "field2": "value2"},
-  "pages": [...],
+  "markdown": "Extracted text in markdown format",
+  "pages": [{ "page_number": 1, "content": "..." }],
+  "page_count": 5,
+  "file_type": "pdf",
+  "fields": { "field1": "value1", "field2": "value2" },
+  "entities": ["entity1", "entity2"],
   "request_id": "abc12345",
+  "operation_location": "https://...",
   "performance": {
     "submit_ms": 150.23,
     "poll_ms": 2500.45,
@@ -141,14 +169,18 @@ Extract content from documents or images using Azure Content Understanding servi
 ```
 
 **Notes**:
-- Request body must contain base64-encoded document/image binary content
+
+- **New Job Mode**: Requires `acu_endpoint` and base64-encoded content in request body
+- **Resume Mode**: Provide `operation_location` to poll an existing job (useful for resuming after timeout)
 - Supports various document formats (PDF, DOCX, etc.) and images (JPG, PNG, etc.)
 - Uses async polling with configurable timeout to handle long-running extractions
 - Returns 408 if extraction exceeds `polling_timeout`
+- The `operation_location` in response can be used to resume polling if the request times out
 
 ### Health Check
 
 #### `GET /api/health`
+
 Service health status (tests Cosmos DB and Blob Storage connectivity if configured).
 
 **Response**: `200` (healthy) or `503` (degraded)
@@ -170,7 +202,7 @@ COSMOS_ENDPOINT=https://your-cosmos.documents.azure.com:443/
 BLOB_ENDPOINT=https://your-storage.blob.core.windows.net
 
 # Performance Tuning
-MAX_REQUEST_SIZE_MB=10                 # Default: 10
+MAX_REQUEST_SIZE_MB=100                # Default: 100
 DEFAULT_TIMEOUT_SECONDS=30             # Default: 30
 AISEARCH_TIMEOUT_SECONDS=30            # Default: 30
 HEALTH_CHECK_TIMEOUT_SECONDS=5         # Default: 5
@@ -231,12 +263,19 @@ curl -X POST http://localhost:7071/api/query_cosmosdb \
   -H "X-API-Key: your-key" \
   -d "SELECT * FROM c"
 
-# Extract content from document
-curl -X POST "http://localhost:7071/api/extract_content?acu_endpoint=https://your-acu.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer:analyze?api-version=2025-09-01&polling_timeout=300&polling_interval=2" \
+# Extract content from document (new job)
+curl -X POST "http://localhost:7071/api/extract_content?acu_endpoint=https://your-acu.cognitiveservices.azure.com/contentunderstanding/analyzers/your-analyzer:analyze?api-version=2025-09-01&polling_timeout=300&polling_interval=5" \
   -H "X-API-Key: your-key" \
   -H "X-ACU-Key: your-acu-key" \
-  -H "Content-Type: text/plain" \
-  -d "BASE64_ENCODED_DOCUMENT_CONTENT"
+  -H "Content-Type: application/json" \
+  -d '{"content": "BASE64_ENCODED_CONTENT", "content-type": "application/pdf"}'
+
+# Resume polling an existing job
+curl -X POST "http://localhost:7071/api/extract_content?operation_location=https://your-acu.cognitiveservices.azure.com/...&polling_timeout=300" \
+  -H "X-API-Key: your-key" \
+  -H "X-ACU-Key: your-acu-key" \
+  -H "Content-Type: application/json" \
+  -d '{"content-type": "application/pdf"}'
 ```
 
 ### Common Commands
