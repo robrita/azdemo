@@ -113,17 +113,86 @@ Batch delete blobs.
 
 #### `POST /api/query_aisearch`
 
-Hybrid text + vector search using Azure AI Search.
+Hybrid text + vector search using Azure AI Search with optional LLM-based result filtering.
 
-**Query Parameters**: `search_endpoint`, `top` (default: 10), `vector_fields` (comma-separated)
+**Query Parameters**:
 
-**Headers**: `X-Search-Key` (or `search_api_key` param)
+- `search_endpoint`: Azure AI Search endpoint URL (required)
+- `top_search`: Number of results per query from Azure AI Search (default: 50)
+- `top_k`: Number of vector results for hybrid search (default: 50)
+- `top_results`: Maximum unique results to return after deduplication (default: 20)
+- `vector_fields`: Comma-separated vector field names (required)
+- `select`: Comma-separated list of fields to return (optional, e.g., `pageContent,pageNumber,pageLink`). When not specified, all fields are returned
+- `llm_filter`: Azure OpenAI GPT model deployment name for filtering results (optional, e.g., `gpt-4.1`). When specified, requires `openai_endpoint` and `X-OpenAI-Key` header
+
+**Headers**:
+
+- `X-Search-Key` (or `search_api_key` param)
+- `X-OpenAI-Key` (required when `llm_filter` is specified)
 
 **Request Body**:
 
 ```json
 { "search": ["query1", "query2"] }
 ```
+
+**Response** (with LLM filter):
+
+```json
+{
+  "search_queries": ["query1"],
+  "results": [...],
+  "llm_filter": {
+    "model": "gpt-4.1",
+    "applied": true,
+    "pre_filter_count": 20,
+    "post_filter_count": 5,
+    "filter_ms": 1250.45
+  },
+  "performance": { ... }
+}
+```
+
+#### `POST /api/index_aisearch`
+
+Submit documents for indexing in Azure AI Search.
+
+**Query Parameters**:
+
+- `search_endpoint`: Azure AI Search index endpoint (format: `https://<service>.search.windows.net/indexes/<index>/docs/index?api-version=2024-07-01`)
+- `action`: Search action to apply to all documents (required). Valid values: `mergeOrUpload`, `upload`, `merge`, `delete`
+
+**Headers**: `X-Search-Key` (or `search_api_key` param)
+
+**Request Body**:
+
+```json
+{
+  "value": [
+    { "id": "1", "title": "Doc 1", "content": "..." },
+    { "id": "2", "title": "Doc 2", "content": "..." }
+  ]
+}
+```
+
+**Response**:
+
+```json
+{
+  "message": "Indexing completed successfully",
+  "action": "mergeOrUpload",
+  "total_documents": 2,
+  "results": [...],
+  "request_id": "abc12345",
+  "performance": { "index_ms": 150.23, "total_ms": 165.45 }
+}
+```
+
+**Notes**:
+
+- The `@search.action` field is automatically added to each document based on the `action` parameter
+- Handles partial failures (207 Multi-Status) with detailed per-document results
+- Uses async HTTP client for serverless compatibility
 
 ### Content Extraction Operations
 

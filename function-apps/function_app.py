@@ -44,6 +44,11 @@ COSMOS_RETRY_MAX_ATTEMPTS = int(os.getenv("COSMOS_RETRY_MAX_ATTEMPTS", "3"))
 COSMOS_RETRY_BASE_DELAY = float(os.getenv("COSMOS_RETRY_BASE_DELAY", "1.0"))
 RRF_WEIGHTS = [10, 1]  # Weights for full-text score and vector distance in RRF ranking
 
+# LLM Filter System Prompt for filtering search results
+LLM_FILTER_SYSTEM_PROMPT = """You are a relevance evaluator. Analyze the retrieved document and determine if it contains information that directly answers or is relevant to the user's query.
+
+Respond with only "true" if the document is relevant, or "false" if it is not relevant."""
+
 # Module-level client cache (singleton pattern)
 _cosmos_clients: dict[str, CosmosClient] = {}
 _blob_service_clients: dict[str, BlobServiceClient] = {}
@@ -862,8 +867,10 @@ def get_cosmos_container(req: func.HttpRequest, request_id: str) -> Any | func.H
 
 
 def get_openai_client(
-    req: func.HttpRequest, request_id: str
-) -> tuple[AzureOpenAI, str] | func.HttpResponse:
+    req: func.HttpRequest,
+    request_id: str,
+    require_embedding: bool = True,
+) -> tuple[AzureOpenAI, str | None] | func.HttpResponse:
     """
     Extract Azure OpenAI parameters from request and initialize OpenAI client.
     API keys are accepted via X-OpenAI-Key header (preferred) or openai_key query parameter (deprecated).
@@ -871,9 +878,10 @@ def get_openai_client(
     Args:
         req: HTTP request object
         request_id: Request ID for logging purposes
+        require_embedding: If True, embedding_deployment is required. If False, it's optional.
 
     Returns:
-        Tuple of (OpenAI client instance, embedding deployment name) if successful,
+        Tuple of (OpenAI client instance, embedding deployment name or None) if successful,
         or HttpResponse with error if parameters are missing or initialization fails
     """
     try:
@@ -887,18 +895,33 @@ def get_openai_client(
 
         embedding_deployment = req.params.get("openai_embedding_deployment")
 
-        if not api_key or not embedding_deployment:
-            logger.warning(f"[{request_id}] Missing required Azure OpenAI parameters")
-            return func.HttpResponse(
-                json.dumps(
-                    {
-                        "error": "Missing required parameters",
-                        "message": "Please provide openai_endpoint, X-OpenAI-Key header (or openai_key param), and openai_embedding_deployment parameters",
-                    }
-                ),
-                mimetype="application/json",
-                status_code=400,
-            )
+        # Check required parameters based on require_embedding flag
+        if require_embedding:
+            if not api_key or not embedding_deployment:
+                logger.warning(f"[{request_id}] Missing required Azure OpenAI parameters")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing required parameters",
+                            "message": "Please provide openai_endpoint, X-OpenAI-Key header (or openai_key param), and openai_embedding_deployment parameters",
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
+        else:
+            if not azure_endpoint or not api_key:
+                logger.warning(f"[{request_id}] Missing required Azure OpenAI parameters (endpoint/key)")
+                return func.HttpResponse(
+                    json.dumps(
+                        {
+                            "error": "Missing required parameters",
+                            "message": "Please provide openai_endpoint and X-OpenAI-Key header (or openai_key param)",
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=400,
+                )
 
         # Validate azure_endpoint URL format
         is_valid, error_message = _validate_url_parameter(azure_endpoint, "openai_endpoint")
@@ -938,7 +961,7 @@ def get_openai_client(
 
 def get_aisearch_config(
     req: func.HttpRequest, request_id: str
-) -> tuple[str, str, int, list[str]] | func.HttpResponse:
+) -> tuple[str, str, int, int, int, list[str], str, AzureOpenAI | None, list[str] | None] | func.HttpResponse:
     """
     Extract and validate Azure AI Search configuration from request parameters.
 
@@ -947,8 +970,10 @@ def get_aisearch_config(
         request_id: Request ID for logging purposes
 
     Returns:
-        Tuple of (search_endpoint, search_api_key, top, vector_fields) if successful,
-        or HttpResponse with error if parameters are missing or invalid
+        Tuple of (search_endpoint, search_api_key, top_search, top_k, top_results, vector_fields, llm_filter, openai_client, select) if successful,
+        or HttpResponse with error if parameters are missing or invalid.
+        When llm_filter is specified, openai_client will be initialized; otherwise it's None.
+        select is an optional list of fields to return from search results.
     """
     try:
         # Extract Azure AI Search configuration
@@ -958,8 +983,12 @@ def get_aisearch_config(
         headers = cast(dict[str, str], req.headers)
         search_api_key = headers.get("X-Search-Key") or req.params.get("search_api_key")
 
-        top_param = req.params.get("top", "10")
+        top_search_param = req.params.get("top_search", "50")
+        top_k_param = req.params.get("top_k", "50")
+        top_results_param = req.params.get("top_results", "20")
         vector_fields_param = req.params.get("vector_fields", "")
+        llm_filter_param = req.params.get("llm_filter", "")
+        select_param = req.params.get("select", "")
 
         # Validate required parameters
         if not search_api_key:
@@ -992,18 +1021,56 @@ def get_aisearch_config(
                 status_code=400,
             )
 
-        # Parse top parameter
+        # Parse top_search parameter
         try:
-            top = int(top_param)
-            if top <= 0:
-                raise ValueError("top must be greater than 0")
+            top_search = int(top_search_param)
+            if top_search <= 0:
+                raise ValueError("top_search must be greater than 0")
         except ValueError as e:
-            logger.warning(f"[{request_id}] Invalid top parameter: {top_param}")
+            logger.warning(f"[{request_id}] Invalid top_search parameter: {top_search_param}")
             return func.HttpResponse(
                 json.dumps(
                     {
                         "error": "Invalid parameter",
-                        "message": f"top parameter must be a positive integer: {str(e)}",
+                        "message": f"top_search parameter must be a positive integer: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse top_k parameter
+        try:
+            top_k = int(top_k_param)
+            if top_k <= 0:
+                raise ValueError("top_k must be greater than 0")
+        except ValueError as e:
+            logger.warning(f"[{request_id}] Invalid top_k parameter: {top_k_param}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"top_k parameter must be a positive integer: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Parse top_results parameter (optional, default: 20)
+        try:
+            top_results = int(top_results_param)
+            if top_results <= 0:
+                raise ValueError("top_results must be greater than 0")
+        except ValueError as e:
+            logger.warning(f"[{request_id}] Invalid top_results parameter: {top_results_param}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"top_results parameter must be a positive integer: {str(e)}",
                         "request_id": request_id,
                     }
                 ),
@@ -1041,9 +1108,27 @@ def get_aisearch_config(
                 status_code=400,
             )
 
+        # Initialize OpenAI client if llm_filter is specified
+        openai_client: AzureOpenAI | None = None
+        if llm_filter_param:
+            openai_result = get_openai_client(req, request_id, require_embedding=False)
+            if isinstance(openai_result, func.HttpResponse):
+                return openai_result
+            openai_client, _ = openai_result
+            logger.info(f"[{request_id}] LLM filter enabled with model: {llm_filter_param}")
+
+        # Parse select parameter (comma-separated, optional)
+        select_fields: list[str] | None = None
+        if select_param:
+            select_fields = [field.strip() for field in select_param.split(",") if field.strip()]
+            if select_fields:
+                logger.info(f"[{request_id}] Select fields configured: {select_fields}")
+            else:
+                select_fields = None
+
         logger.info(f"[{request_id}] Azure AI Search configuration validated")
         # Type assertion: search_endpoint is guaranteed to be str after validation
-        return (cast(str, search_endpoint), search_api_key, top, vector_fields)
+        return (cast(str, search_endpoint), search_api_key, top_search, top_k, top_results, vector_fields, llm_filter_param, openai_client, select_fields)
 
     except Exception as e:
         logger.error(f"[{request_id}] Failed to parse Azure AI Search configuration: {str(e)}")
@@ -1058,6 +1143,63 @@ def get_aisearch_config(
             mimetype="application/json",
             status_code=500,
         )
+
+
+async def _apply_llm_filter(
+    search_text: str,
+    document_content: str,
+    openai_client: AzureOpenAI,
+    llm_filter_model: str,
+    request_id: str,
+) -> tuple[bool, float]:
+    """
+    Apply LLM-based filtering to a single document to determine relevance.
+
+    Args:
+        search_text: The user's search query
+        document_content: The document content with metadata to evaluate
+        openai_client: Azure OpenAI client instance
+        llm_filter_model: The GPT model deployment name to use for filtering
+        request_id: Request ID for logging
+
+    Returns:
+        Tuple of (is_relevant, filter_time_seconds)
+    """
+    filter_start = time.time()
+
+    try:
+        # Prepare the user message with query and document
+        user_content = f"USER QUERY: {search_text}\n\n<Retrieved_Document>{document_content}</Retrieved_Document>"
+
+        # Make the LLM call
+        response = await asyncio.to_thread(
+            openai_client.chat.completions.create,
+            model=llm_filter_model,
+            messages=[
+                {"role": "system", "content": LLM_FILTER_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0,
+            top_p=1,
+            response_format={"type": "text"},
+        )
+
+        filter_time = time.time() - filter_start
+
+        # Parse the response - expecting "true" or "false"
+        response_content = response.choices[0].message.content
+        if not response_content:
+            logger.warning(f"[{request_id}] LLM filter returned empty response")
+            return False, filter_time
+
+        is_relevant = response_content.strip().lower() == "true"
+        return is_relevant, filter_time
+
+    except Exception as e:
+        filter_time = time.time() - filter_start
+        logger.error(f"[{request_id}] LLM filter failed: {type(e).__name__}: {str(e)}")
+        # Return False if LLM call fails
+        return False, filter_time
 
 
 async def _execute_search_query(
@@ -1250,27 +1392,44 @@ async def _execute_aisearch_query(
     search_text: str,
     search_endpoint: str,
     search_api_key: str,
-    top: int,
+    top_search: int,
+    top_k: int,
     vector_fields: list[str],
     request_id: str,
+    select_fields: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]], float]:
     """
     Execute a single Azure AI Search hybrid query using aiohttp.
     Returns (search_text, results, query_time).
+
+    Args:
+        search_text: The search query text
+        search_endpoint: Azure AI Search endpoint URL
+        search_api_key: API key for authentication
+        top_search: Number of results to return from search
+        top_k: Number of nearest neighbors for vector search
+        vector_fields: List of vector field names to search
+        request_id: Request ID for logging
+        select_fields: Optional list of fields to return (e.g., ["pageContent", "pageNumber", "pageLink"])
     """
     # Build Azure AI Search request payload
     search_payload: dict[str, Any] = {
         "search": search_text,
         "count": True,
-        "top": top,
+        "top": top_search,
         "vectorQueries": [
             {
                 "kind": "text",
                 "text": search_text,
                 "fields": ", ".join(vector_fields),
+                "k": top_k,
             }
         ],
     }
+
+    # Add select fields if specified
+    if select_fields:
+        search_payload["select"] = ",".join(select_fields)
 
     # Execute Azure AI Search query
     query_start = time.time()
@@ -2054,17 +2213,26 @@ async def delete_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     if len(documents) == 0:
-        logger.warning(f"[{request_id}] Validation failed: documents array is empty")
+        total_time = time.time() - start_time
+        logger.info(f"[{request_id}] No documents to delete: input array is empty")
         return func.HttpResponse(
             json.dumps(
                 {
-                    "error": "Validation error",
-                    "message": "'documents' array must contain at least one document to delete",
+                    "message": "No documents deleted: input array is empty",
+                    "total_documents": 0,
+                    "successful_deletes": 0,
+                    "failed_deletes": 0,
+                    "successful": [],
+                    "failed": [],
                     "request_id": request_id,
+                    "performance": {
+                        "total_delete_ms": 0.0,
+                        "total_ms": round(total_time * 1000, 2),
+                    },
                 }
             ),
             mimetype="application/json",
-            status_code=400,
+            status_code=200,
         )
 
     # Validate each document has required fields
@@ -2599,7 +2767,7 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
         aisearch_config = get_aisearch_config(req, request_id)
         if isinstance(aisearch_config, func.HttpResponse):
             return aisearch_config
-        search_endpoint, search_api_key, top, vector_fields = aisearch_config
+        search_endpoint, search_api_key, top_search, top_k, top_results, vector_fields, llm_filter, openai_client, select_fields = aisearch_config
 
         # Get request body
         req_body = req.get_json()
@@ -2679,9 +2847,11 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
                 search_text,
                 search_endpoint,
                 search_api_key,
-                top,
+                top_search,
+                top_k,
                 vector_fields,
                 request_id,
+                select_fields,
             )
             for search_text in search_queries
         ]
@@ -2716,45 +2886,134 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 )
 
-        # Remove duplicates based on unique document identifier
-        # Azure AI Search typically uses '@search.score' and a document id field
+        # Remove duplicates based on unique document identifier (pageId)
         seen: set[str] = set()
         unique_results: list[dict[str, Any]] = []
         for item in all_results:
-            # Try common id fields - adjust based on your index schema
-            doc_id = item.get("id") or item.get("@search.documentKey") or str(item)
-            if doc_id not in seen:
-                seen.add(doc_id)
+            page_id = item.get("pageId") or item.get("pageContent") or str(item)
+            if page_id not in seen:
+                seen.add(page_id)
                 unique_results.append(item)
+
+        # Limit unique_results by top_results
+        unique_results_count = len(unique_results)
+        unique_results = unique_results[:top_results]
+
+        # Apply LLM filter if configured
+        llm_filter_time = 0.0
+        pre_filter_count = len(unique_results)
+        if llm_filter and openai_client and len(unique_results) > 0:
+            # Track actual wall-clock time for the entire LLM filter block
+            llm_filter_start = time.time()
+
+            # Use first search query as user query for LLM filter
+            user_query = search_queries[0] if search_queries else ""
+
+            # Prepare document contents with metadata for each result
+            async def filter_single_result(
+                idx: int, result: dict[str, Any]
+            ) -> tuple[int, bool, float]:
+                """Filter a single result and return (index, is_relevant, filter_time)."""
+                # Combine pageContent with metadata
+                content = result.get("pageContent", "")
+                metadata = result.get("metadata", "")
+                document_content = f"Content:\n{content}\n\nMetadata:\n{metadata}"
+
+                is_relevant, filter_time = await _apply_llm_filter(
+                    user_query,
+                    document_content,
+                    openai_client,
+                    llm_filter,
+                    request_id,
+                )
+                return idx, is_relevant, filter_time
+
+            # Execute all LLM filter calls in parallel
+            filter_tasks = [
+                filter_single_result(idx, result)
+                for idx, result in enumerate(unique_results)
+            ]
+            filter_results = await asyncio.gather(*filter_tasks, return_exceptions=True)
+
+            # Collect results that returned true
+            filtered_results: list[dict[str, Any]] = []
+            for filter_result in filter_results:
+                if isinstance(filter_result, Exception):
+                    logger.error(
+                        f"[{request_id}] LLM filter task failed: {str(filter_result)}"
+                    )
+                    continue
+                idx, is_relevant, filter_time = filter_result
+                if is_relevant:
+                    # Extract only pageContent, pageNumber, pageLink fields
+                    original_result = unique_results[idx]
+                    filtered_results.append({
+                        "pageContent": original_result.get("pageContent", ""),
+                        "pageNumber": original_result.get("pageNumber", ""),
+                        "pageLink": original_result.get("pageLink", ""),
+                    })
+
+            # Calculate actual wall-clock time for the entire LLM filter block
+            llm_filter_time = time.time() - llm_filter_start
+
+            # If filtered_results is empty, return "Not Found" placeholder
+            if len(filtered_results) == 0:
+                filtered_results = [
+                    {
+                        "pageContent": "Not Found",
+                        "pageNumber": None,
+                        "pageLink": None,
+                    }
+                ]
+
+            unique_results = filtered_results
+
+            logger.info(
+                f"[{request_id}] LLM filter applied: {pre_filter_count} -> {len(unique_results)} results (total_duration={llm_filter_time:.3f}s)"
+            )
 
         total_time = time.time() - start_time
 
         logger.info(
-            f"[{request_id}] Azure AI Search completed: {len(all_results)} total results, {len(unique_results)} unique results"
+            f"[{request_id}] Azure AI Search completed: {len(all_results)} total results, {unique_results_count} unique results, {len(unique_results)} returned (top_results={top_results})"
         )
 
+        # Build response with optional LLM filter info
+        response_data: dict[str, Any] = {
+            "search_queries": search_queries,
+            "vector_fields": vector_fields,
+            "top_search": top_search,
+            "top_k": top_k,
+            "top_results": top_results,
+            "results": unique_results,
+            "total_results": len(all_results),
+            "unique_results": unique_results_count,
+            "results_returned": len(unique_results),
+            "duplicates_removed": len(all_results) - unique_results_count,
+            "request_id": request_id,
+            "query_details": query_details,
+            "failed_queries": failed_queries,
+            "queries_failed": len(failed_queries),
+            "performance": {
+                "total_query_ms": round(total_query_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+                "queries_executed": len(search_queries),
+                "queries_succeeded": len(query_details),
+            },
+        }
+
+        # Add LLM filter info if it was applied
+        if llm_filter:
+            response_data["llm_filter"] = {
+                "model": llm_filter,
+                "applied": openai_client is not None and pre_filter_count > 0,
+                "pre_filter_count": pre_filter_count,
+                "post_filter_count": len(unique_results),
+                "filter_ms": round(llm_filter_time * 1000, 2),
+            }
+
         return func.HttpResponse(
-            body=json.dumps(
-                {
-                    "search_queries": search_queries,
-                    "vector_fields": vector_fields,
-                    "top": top,
-                    "results": unique_results,
-                    "total_results": len(all_results),
-                    "unique_results": len(unique_results),
-                    "duplicates_removed": len(all_results) - len(unique_results),
-                    "request_id": request_id,
-                    "query_details": query_details,
-                    "failed_queries": failed_queries,
-                    "queries_failed": len(failed_queries),
-                    "performance": {
-                        "total_query_ms": round(total_query_time * 1000, 2),
-                        "total_ms": round(total_time * 1000, 2),
-                        "queries_executed": len(search_queries),
-                        "queries_succeeded": len(query_details),
-                    },
-                }
-            ),
+            body=json.dumps(response_data),
             mimetype="application/json",
             status_code=200,
         )
@@ -2769,6 +3028,310 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
             body=json.dumps(
                 {
                     "error": "Azure AI Search operation failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=500,
+        )
+
+
+@app.route(route="index_aisearch", methods=["POST"])
+@require_api_key
+async def index_aisearch(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Submit documents for indexing in Azure AI Search.
+
+    Query parameters:
+    - search_endpoint: Azure AI Search endpoint URL (required)
+                       Format: https://<service>.search.windows.net/indexes/<index>/docs/index?api-version=2024-07-01
+    - action: The search action to apply to all documents (required)
+              Valid values: 'mergeOrUpload', 'upload', 'merge', 'delete'
+
+    Headers:
+    - X-Search-Key: Azure AI Search admin API key (required)
+    - X-API-Key: API key for this function (required)
+
+    Request body (JSON):
+    {
+        "value": [
+            {"id": "1", "title": "Doc 1", "content": "..."},
+            {"id": "2", "title": "Doc 2", "content": "..."}
+        ]
+    }
+
+    Returns:
+    - Indexing results from Azure AI Search
+    - Performance metrics
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] Azure AI Search indexing request initiated")
+
+    try:
+        # Extract Azure AI Search configuration
+        search_endpoint = req.params.get("search_endpoint")
+        action = req.params.get("action")
+
+        # API key from header (preferred) or query parameter (fallback)
+        headers = cast(dict[str, str], req.headers)
+        search_api_key = headers.get("X-Search-Key") or req.params.get("search_api_key")
+
+        # Validate required parameters
+        if not search_api_key:
+            logger.warning(f"[{request_id}] Missing required Azure AI Search API key")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing required parameters",
+                        "message": "Please provide X-Search-Key header (or search_api_key param)",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Validate search_endpoint URL format
+        is_valid, error_message = _validate_url_parameter(search_endpoint, "search_endpoint")
+        if not is_valid:
+            logger.warning(f"[{request_id}] Invalid search_endpoint: {error_message}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": error_message,
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Validate action parameter
+        valid_actions = ["mergeOrUpload", "upload", "merge", "delete"]
+        if not action:
+            logger.warning(f"[{request_id}] Missing required action parameter")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Missing required parameters",
+                        "message": f"Please provide 'action' query parameter. Valid values: {', '.join(valid_actions)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        if action not in valid_actions:
+            logger.warning(f"[{request_id}] Invalid action parameter: {action}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"Invalid action '{action}'. Valid values: {', '.join(valid_actions)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Get request body
+        req_body = req.get_json()
+        documents: list[dict[str, Any]] | None = req_body.get("value")
+
+        # Validate documents
+        if not isinstance(documents, list):
+            logger.warning(f"[{request_id}] Validation failed: 'value' parameter is not a list/array")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Validation error",
+                        "message": "'value' parameter must be an array of documents",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        if len(documents) == 0:
+            total_time = time.time() - start_time
+            logger.info(f"[{request_id}] No documents to index: input array is empty")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "message": "No documents indexed: input array is empty",
+                        "action": action,
+                        "total_documents": 0,
+                        "results": [],
+                        "request_id": request_id,
+                        "performance": {
+                            "index_ms": 0.0,
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=200,
+            )
+
+        # Add @search.action to each document
+        for doc in documents:
+            doc["@search.action"] = action
+
+        logger.info(
+            f"[{request_id}] Submitting {len(documents)} documents for indexing with action '{action}'"
+        )
+
+        # Build the index payload
+        index_payload: dict[str, Any] = {"value": documents}
+
+        # Execute indexing request
+        index_start = time.time()
+        timeout = aiohttp.ClientTimeout(total=AISEARCH_TIMEOUT_SECONDS)
+
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                cast(str, search_endpoint),
+                headers={
+                    "Content-Type": "application/json",
+                    "api-key": search_api_key,
+                },
+                json=index_payload,
+                timeout=timeout,
+            ) as response,
+        ):
+            index_time = time.time() - index_start
+            response_body = await response.json()
+
+            # Check for partial failures (207 Multi-Status)
+            if response.status == 207:
+                # Some documents may have failed
+                results = response_body.get("value", [])
+                succeeded = sum(1 for r in results if r.get("status", False))
+                failed = len(results) - succeeded
+
+                total_time = time.time() - start_time
+                logger.warning(
+                    f"[{request_id}] Partial indexing success: {succeeded} succeeded, {failed} failed"
+                )
+
+                return func.HttpResponse(
+                    body=json.dumps(
+                        {
+                            "message": "Partial indexing success",
+                            "action": action,
+                            "total_documents": len(documents),
+                            "succeeded": succeeded,
+                            "failed": failed,
+                            "results": results,
+                            "request_id": request_id,
+                            "performance": {
+                                "index_ms": round(index_time * 1000, 2),
+                                "total_ms": round(total_time * 1000, 2),
+                            },
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=207,
+                )
+
+            # Check for errors
+            if response.status >= 400:
+                total_time = time.time() - start_time
+                error_message = response_body.get("error", {}).get("message", str(response_body))
+                logger.error(
+                    f"[{request_id}] Indexing failed with status {response.status}: {error_message}"
+                )
+
+                return func.HttpResponse(
+                    body=json.dumps(
+                        {
+                            "error": "Indexing failed",
+                            "message": error_message,
+                            "status_code": response.status,
+                            "request_id": request_id,
+                            "performance": {
+                                "index_ms": round(index_time * 1000, 2),
+                                "total_ms": round(total_time * 1000, 2),
+                            },
+                        }
+                    ),
+                    mimetype="application/json",
+                    status_code=response.status,
+                )
+
+            # Success
+            total_time = time.time() - start_time
+            results = response_body.get("value", [])
+
+            logger.info(
+                f"[{request_id}] Indexing completed successfully: {len(documents)} documents indexed"
+            )
+
+            return func.HttpResponse(
+                body=json.dumps(
+                    {
+                        "message": "Indexing completed successfully",
+                        "action": action,
+                        "total_documents": len(documents),
+                        "results": results,
+                        "request_id": request_id,
+                        "performance": {
+                            "index_ms": round(index_time * 1000, 2),
+                            "total_ms": round(total_time * 1000, 2),
+                        },
+                    }
+                ),
+                mimetype="application/json",
+                status_code=200,
+            )
+
+    except ValueError as e:
+        logger.error(f"[{request_id}] Invalid JSON in request body: {str(e)}")
+        return func.HttpResponse(
+            json.dumps(
+                {
+                    "error": "Invalid request body",
+                    "message": "Please provide valid JSON with a 'value' array of documents",
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=400,
+        )
+    except aiohttp.ClientError as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Azure AI Search indexing request failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "error": "Azure AI Search indexing request failed",
+                    "message": str(e),
+                    "request_id": request_id,
+                }
+            ),
+            mimetype="application/json",
+            status_code=502,
+        )
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(
+            f"[{request_id}] Azure AI Search indexing operation failed after {total_time:.3f}s: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            body=json.dumps(
+                {
+                    "error": "Azure AI Search indexing operation failed",
                     "message": str(e),
                     "request_id": request_id,
                 }
