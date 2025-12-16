@@ -1,0 +1,374 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "HTTP_Trigger": {
+                "type": "Request",
+                "description": "",
+                "kind": "Http",
+                "inputs": {
+                    "method": "POST"
+                }
+            }
+        },
+        "actions": {
+            "Initialize_variables": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "signature",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "runAfter": {}
+            },
+            "Extract_Signature": {
+                "type": "Scope",
+                "actions": {
+                    "Mask_ID": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('id_masking')",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}"
+                            },
+                            "queries": {
+                                "model_id": "gov_id",
+                                "padding": "4"
+                            },
+                            "body": "@triggerBody()?['valid_id']"
+                        },
+                        "runAfter": {
+                            "Compose": [
+                                "Succeeded"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "ADI_Crop_ID": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('adi_crop')",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}"
+                            },
+                            "queries": {
+                                "model_id": "gov_id",
+                                "padding": "4"
+                            },
+                            "body": {
+                                "content": "@{body('Mask_ID')?['masked_image']}"
+                            }
+                        },
+                        "runAfter": {
+                            "Mask_ID": [
+                                "Succeeded"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Failed_Cropping": {
+                        "type": "If",
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@contains(body('ADI_Crop_ID'), 'cropped_signature')",
+                                        false
+                                    ]
+                                }
+                            ]
+                        },
+                        "actions": {
+                            "GPT_Crop": {
+                                "type": "Scope",
+                                "actions": {
+                                    "GPT_Crop_60": {
+                                        "type": "Http",
+                                        "inputs": {
+                                            "uri": "@parameters('gpt_crop')",
+                                            "method": "POST",
+                                            "headers": {
+                                                "X-API-Key": "@{parameters('function_key')}"
+                                            },
+                                            "queries": {
+                                                "model": "gpt-4.1",
+                                                "padding": "60",
+                                                "opencv_upscale": "true",
+                                                "opencv_crop": "true",
+                                                "min_size_ratio": "0.10",
+                                                "max_size_ratio": "0.50"
+                                            },
+                                            "body": {
+                                                "filename": "@{triggerBody()?['valid_id']?['filename']}",
+                                                "content": "@{body('Mask_ID')?['masked_image']}"
+                                            }
+                                        },
+                                        "runtimeConfiguration": {
+                                            "contentTransfer": {
+                                                "transferMode": "Chunked"
+                                            }
+                                        }
+                                    },
+                                    "GPT_Crop_Opencv": {
+                                        "type": "Http",
+                                        "inputs": {
+                                            "uri": "@parameters('gpt_crop')",
+                                            "method": "POST",
+                                            "headers": {
+                                                "X-API-Key": "@{parameters('function_key')}"
+                                            },
+                                            "queries": {
+                                                "model": "gpt-4.1",
+                                                "padding": "60",
+                                                "opencv_crop": "true",
+                                                "min_size_ratio": "0.10",
+                                                "max_size_ratio": "0.50"
+                                            },
+                                            "body": {
+                                                "filename": "@{triggerBody()?['valid_id']?['filename']}",
+                                                "content": "@{body('Mask_ID')?['masked_image']}"
+                                            }
+                                        },
+                                        "runtimeConfiguration": {
+                                            "contentTransfer": {
+                                                "transferMode": "Chunked"
+                                            }
+                                        }
+                                    },
+                                    "GPT_Crop_40": {
+                                        "type": "Http",
+                                        "inputs": {
+                                            "uri": "@parameters('gpt_crop')",
+                                            "method": "POST",
+                                            "headers": {
+                                                "X-API-Key": "@{parameters('function_key')}"
+                                            },
+                                            "queries": {
+                                                "model": "gpt-4.1",
+                                                "padding": "40",
+                                                "opencv_upscale": "true",
+                                                "opencv_crop": "true"
+                                            },
+                                            "body": {
+                                                "filename": "@{triggerBody()?['valid_id']?['filename']}",
+                                                "content": "@{body('Mask_ID')?['masked_image']}"
+                                            }
+                                        },
+                                        "runtimeConfiguration": {
+                                            "contentTransfer": {
+                                                "transferMode": "Chunked"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "GPT_Dedup": {
+                                "type": "Http",
+                                "inputs": {
+                                    "uri": "@parameters('gpt_dedup')",
+                                    "method": "POST",
+                                    "headers": {
+                                        "X-API-Key": "@{parameters('function_key')}"
+                                    },
+                                    "queries": {
+                                        "model": "gpt-4.1"
+                                    },
+                                    "body": {
+                                        "opencv_signatures": "@union(\r\n  body('GPT_Crop_60')?['opencv_signatures'],\r\n  body('GPT_Crop_40')?['opencv_signatures'],\r\n  body('GPT_Crop_Opencv')?['opencv_signatures']\r\n)"
+                                    }
+                                },
+                                "runAfter": {
+                                    "GPT_Crop": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "runtimeConfiguration": {
+                                    "contentTransfer": {
+                                        "transferMode": "Chunked"
+                                    }
+                                }
+                            },
+                            "Set_GPT_Dedup": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                    "name": "signature",
+                                    "value": "@body('GPT_Dedup')?['cropped_signature']"
+                                },
+                                "runAfter": {
+                                    "GPT_Dedup": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            }
+                        },
+                        "else": {
+                            "actions": {
+                                "Set_ADI_Crop": {
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "signature",
+                                        "value": "@body('ADI_Crop_ID')?['cropped_signature']"
+                                    }
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "ADI_Crop_ID": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Compose_ID": {
+                        "type": "Compose",
+                        "inputs": "@variables('signature')",
+                        "runAfter": {
+                            "Failed_Cropping": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Mask_Specimen": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('id_masking')",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}"
+                            },
+                            "queries": {
+                                "model_id": "specimen_id",
+                                "padding": "40"
+                            },
+                            "body": "@triggerBody()?['specimen_signatures']"
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "ADI_Crop_Specimen": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('adi_crop')",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}"
+                            },
+                            "queries": {
+                                "model_id": "specimen_id",
+                                "padding": "4"
+                            },
+                            "body": {
+                                "content": "@{body('Mask_Specimen')?['masked_image']}"
+                            }
+                        },
+                        "runAfter": {
+                            "Mask_Specimen": [
+                                "Succeeded"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Compose_Specimen": {
+                        "type": "Compose",
+                        "inputs": "@body('ADI_Crop_Specimen')?['signature_images']",
+                        "runAfter": {
+                            "ADI_Crop_Specimen": [
+                                "Succeeded"
+                            ]
+                        }
+                    },
+                    "Compose": {
+                        "type": "Compose",
+                        "inputs": "@variables('signature')"
+                    }
+                },
+                "runAfter": {
+                    "Initialize_variables": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Compare_Signatures": {
+                "type": "Http",
+                "inputs": {
+                    "uri": "@parameters('compare_signatures')",
+                    "method": "POST",
+                    "headers": {
+                        "X-API-Key": "@{parameters('function_key')}"
+                    },
+                    "body": {
+                        "valid_id": "@{outputs('Compose_ID')}",
+                        "specimen_signatures": "@outputs('Compose_Specimen')"
+                    }
+                },
+                "runAfter": {
+                    "Extract_Signature": [
+                        "Succeeded"
+                    ]
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "function_key": {
+                "defaultValue": "<FUNCTION_KEY>",
+                "type": "String"
+            },
+            "gpt_crop": {
+                "defaultValue": "https://sigcompare.azurewebsites.net/api/gpt_crop",
+                "type": "String"
+            },
+            "adi_crop": {
+                "defaultValue": "https://sigcompare.azurewebsites.net/api/adi_crop",
+                "type": "String"
+            },
+            "id_masking": {
+                "defaultValue": "https://sigcompare.azurewebsites.net/api/id_masking",
+                "type": "String"
+            },
+            "gpt_dedup": {
+                "defaultValue": "https://sigcompare.azurewebsites.net/api/gpt_dedup",
+                "type": "String"
+            },
+            "compare_signatures": {
+                "defaultValue": "https://sigcompare.azurewebsites.net/api/compare_signatures",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {}
+        }
+    }
+}
