@@ -37,15 +37,10 @@
                                 "X-API-Key": "@{parameters('function_key')}"
                             },
                             "queries": {
-                                "model_id": "gov_id",
+                                "model_id": "gov_id2",
                                 "padding": "4"
                             },
                             "body": "@triggerBody()?['valid_id']"
-                        },
-                        "runAfter": {
-                            "Compose": [
-                                "Succeeded"
-                            ]
                         },
                         "runtimeConfiguration": {
                             "contentTransfer": {
@@ -62,7 +57,7 @@
                                 "X-API-Key": "@{parameters('function_key')}"
                             },
                             "queries": {
-                                "model_id": "gov_id",
+                                "model_id": "gov_id2",
                                 "padding": "4"
                             },
                             "body": {
@@ -87,6 +82,12 @@
                                 {
                                     "equals": [
                                         "@contains(body('ADI_Crop_ID'), 'cropped_signature')",
+                                        false
+                                    ]
+                                },
+                                {
+                                    "equals": [
+                                        "@greater(\r\n  length(body('Mask_ID')?['signature_images']),\r\n  0\r\n)",
                                         false
                                     ]
                                 }
@@ -217,11 +218,37 @@
                         },
                         "else": {
                             "actions": {
-                                "Set_ADI_Crop": {
-                                    "type": "SetVariable",
-                                    "inputs": {
-                                        "name": "signature",
-                                        "value": "@body('ADI_Crop_ID')?['cropped_signature']"
+                                "Has_Cropped_Signature": {
+                                    "type": "If",
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@contains(body('ADI_Crop_ID'), 'cropped_signature')",
+                                                    true
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "actions": {
+                                        "Set_ADI_Crop": {
+                                            "type": "SetVariable",
+                                            "inputs": {
+                                                "name": "signature",
+                                                "value": "@body('ADI_Crop_ID')?['cropped_signature']"
+                                            }
+                                        }
+                                    },
+                                    "else": {
+                                        "actions": {
+                                            "Set_ADI_Signature": {
+                                                "type": "SetVariable",
+                                                "inputs": {
+                                                    "name": "signature",
+                                                    "value": "@body('Mask_ID')?['signature_images']?[0]?['content']"
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -251,7 +278,7 @@
                             },
                             "queries": {
                                 "model_id": "specimen_id",
-                                "padding": "40"
+                                "padding": "4"
                             },
                             "body": "@triggerBody()?['specimen_signatures']"
                         },
@@ -296,10 +323,6 @@
                                 "Succeeded"
                             ]
                         }
-                    },
-                    "Compose": {
-                        "type": "Compose",
-                        "inputs": "@variables('signature')"
                     }
                 },
                 "runAfter": {
