@@ -1,0 +1,148 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "HTTP_request_trigger": {
+                "type": "Request",
+                "description": "Use this tool to search for BSP information",
+                "kind": "Http",
+                "inputs": {
+                    "method": "POST"
+                }
+            }
+        },
+        "actions": {
+            "HTTP_Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "@body('AI_Search_query')?['results']"
+                },
+                "runAfter": {
+                    "Agentic_Retrieval": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Agentic_Retrieval": {
+                "type": "Scope",
+                "actions": {
+                    "AI_Search_query": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@{parameters('function_endpoint')}/query_aisearch",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}",
+                                "X-Search-Key": "",
+                                "X-OpenAI-Key": "",
+                                "Content-Type": "application/json"
+                            },
+                            "queries": {
+                                "search_endpoint": "",
+                                "vector_fields": "vector",
+                                "top_search": "50",
+                                "top_k": "50",
+                                "top_results": "20",
+                                "select_fields": "pageContent,pageNumber,pageLink,pageId,metadata",
+                                "openai_endpoint": "",
+                                "llm_filter": "gpt-4.1-mini"
+                            },
+                            "body": {
+                                "search": [
+                                    "tell me about memo 2024-016",
+                                    "what is memo 2024-016",
+                                    "memo 2024-016"
+                                ]
+                            }
+                        },
+                        "runAfter": {
+                            "Compose": [
+                                "Succeeded"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Cosmos_DB_query": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@{parameters('function_endpoint')}/search_cosmosdb",
+                            "method": "POST",
+                            "headers": {
+                                "X-API-Key": "@{parameters('function_key')}",
+                                "X-OpenAI-Key": "",
+                                "Content-Type": "application/json"
+                            },
+                            "queries": {
+                                "cosmos_endpoint": "",
+                                "cosmos_database": "sharepoint",
+                                "cosmos_container": "chunks",
+                                "openai_endpoint": "",
+                                "openai_embedding_deployment": "text-embedding-3-small",
+                                "select_fields": "pageContent,pageNumber,pageLink,pageId,fileName,metadata,entities",
+                                "top_search": "50",
+                                "top_results": "20",
+                                "llm_filter": "gpt-4.1-mini"
+                            },
+                            "body": {
+                                "search": [
+                                    "tell me about memo 2024-016",
+                                    "what is memo 2024-016",
+                                    "memo 2024-016"
+                                ],
+                                "entities": [
+                                    "Memorandum",
+                                    "M-2024-016",
+                                    "memo",
+                                    "bsp"
+                                ]
+                            }
+                        },
+                        "runAfter": {
+                            "Compose": [
+                                "Succeeded"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Compose": {
+                        "type": "Compose",
+                        "inputs": "@triggerBody()"
+                    }
+                },
+                "runAfter": {}
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "function_endpoint": {
+                "defaultValue": "https://r0baidoc.azurewebsites.net/api",
+                "type": "String"
+            },
+            "function_key": {
+                "defaultValue": "TS0yMDI0LTAxNy5wZGY",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {}
+        }
+    }
+}

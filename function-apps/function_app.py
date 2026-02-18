@@ -42,7 +42,6 @@ AISEARCH_TIMEOUT_SECONDS = int(os.getenv("AISEARCH_TIMEOUT_SECONDS", "60"))
 HEALTH_CHECK_TIMEOUT_SECONDS = int(os.getenv("HEALTH_CHECK_TIMEOUT_SECONDS", "5"))
 COSMOS_RETRY_MAX_ATTEMPTS = int(os.getenv("COSMOS_RETRY_MAX_ATTEMPTS", "3"))
 COSMOS_RETRY_BASE_DELAY = float(os.getenv("COSMOS_RETRY_BASE_DELAY", "1.0"))
-RRF_WEIGHTS = [10, 1]  # Weights for full-text score and vector distance in RRF ranking
 
 # LLM Filter System Prompt for filtering search results
 LLM_FILTER_SYSTEM_PROMPT = """You are a relevance evaluator. Analyze the retrieved document and determine if it contains information that directly answers or is relevant to the user's query.
@@ -988,7 +987,7 @@ def get_aisearch_config(
         top_results_param = req.params.get("top_results", "20")
         vector_fields_param = req.params.get("vector_fields", "")
         llm_filter_param = req.params.get("llm_filter", "")
-        select_param = req.params.get("select", "")
+        select_param = req.params.get("select_fields", "")
 
         # Validate required parameters
         if not search_api_key:
@@ -1202,6 +1201,135 @@ async def _apply_llm_filter(
         return False, filter_time
 
 
+def _deduplicate_results(
+    all_results: list[dict[str, Any]],
+    top_results: int,
+    request_id: str,
+) -> tuple[list[dict[str, Any]], int]:
+    """
+    Remove duplicate results based on unique document identifier (pageId).
+
+    Args:
+        all_results: List of search results to deduplicate
+        top_results: Maximum number of unique results to return
+        request_id: Request ID for logging
+
+    Returns:
+        Tuple of (deduplicated results limited by top_results, total unique count before limiting)
+    """
+    seen: set[str] = set()
+    unique_results: list[dict[str, Any]] = []
+    for item in all_results:
+        page_id = item.get("pageId") or item.get("pageContent") or str(item)
+        if page_id not in seen:
+            seen.add(page_id)
+            unique_results.append(item)
+
+    unique_results_count = len(unique_results)
+    limited_results = unique_results[:top_results]
+
+    logger.info(
+        f"[{request_id}] Deduplication: {len(all_results)} total -> {unique_results_count} unique -> {len(limited_results)} returned (top_results={top_results})"
+    )
+
+    return limited_results, unique_results_count
+
+
+async def _apply_llm_filter_to_results(
+    results: list[dict[str, Any]],
+    search_queries: list[str],
+    openai_client: AzureOpenAI,
+    llm_filter_model: str,
+    request_id: str,
+) -> tuple[list[dict[str, Any]], float, int]:
+    """
+    Apply LLM-based filtering to search results to determine relevance.
+
+    Args:
+        results: List of search results to filter
+        search_queries: List of user search queries (first one is used for filtering)
+        openai_client: Azure OpenAI client instance
+        llm_filter_model: The GPT model deployment name to use for filtering
+        request_id: Request ID for logging
+
+    Returns:
+        Tuple of (filtered results, filter_time_seconds, pre_filter_count)
+    """
+    pre_filter_count = len(results)
+
+    if not results:
+        return results, 0.0, pre_filter_count
+
+    # Track actual wall-clock time for the entire LLM filter block
+    llm_filter_start = time.time()
+
+    # Use first search query as user query for LLM filter
+    user_query = search_queries[0] if search_queries else ""
+
+    # Prepare document contents with metadata for each result
+    async def filter_single_result(
+        idx: int, result: dict[str, Any]
+    ) -> tuple[int, bool, float]:
+        """Filter a single result and return (index, is_relevant, filter_time)."""
+        # Combine pageContent with metadata
+        content = result.get("pageContent", "")
+        metadata = result.get("metadata", "")
+        document_content = f"Content:\n{content}\n\nMetadata:\n{metadata}"
+
+        is_relevant, filter_time = await _apply_llm_filter(
+            user_query,
+            document_content,
+            openai_client,
+            llm_filter_model,
+            request_id,
+        )
+        return idx, is_relevant, filter_time
+
+    # Execute all LLM filter calls in parallel
+    filter_tasks = [
+        filter_single_result(idx, result)
+        for idx, result in enumerate(results)
+    ]
+    filter_results = await asyncio.gather(*filter_tasks, return_exceptions=True)
+
+    # Collect results that returned true
+    filtered_results: list[dict[str, Any]] = []
+    for filter_result in filter_results:
+        if isinstance(filter_result, Exception):
+            logger.error(
+                f"[{request_id}] LLM filter task failed: {str(filter_result)}"
+            )
+            continue
+        idx, is_relevant, _ = filter_result
+        if is_relevant:
+            # Extract only pageContent, pageNumber, pageLink fields
+            original_result = results[idx]
+            filtered_results.append({
+                "pageContent": original_result.get("pageContent", ""),
+                "pageNumber": original_result.get("pageNumber", ""),
+                "pageLink": original_result.get("pageLink", ""),
+            })
+
+    # Calculate actual wall-clock time for the entire LLM filter block
+    llm_filter_time = time.time() - llm_filter_start
+
+    # If filtered_results is empty, return "Not Found" placeholder
+    if len(filtered_results) == 0:
+        filtered_results = [
+            {
+                "pageContent": "Not Found",
+                "pageNumber": None,
+                "pageLink": None,
+            }
+        ]
+
+    logger.info(
+        f"[{request_id}] LLM filter applied: {pre_filter_count} -> {len(filtered_results)} results (total_duration={llm_filter_time:.3f}s)"
+    )
+
+    return filtered_results, llm_filter_time, pre_filter_count
+
+
 async def _execute_search_query(
     search_text: str,
     entities: list[str],
@@ -1213,7 +1341,16 @@ async def _execute_search_query(
     select_fields: str = "c.fileName, c.pageLink, c.pageNumber, c.pageContent",
 ) -> tuple[str, list[dict[str, Any]], float, float]:
     """
-    Execute a single search query with embedding generation and database lookup.
+    Execute a hybrid search query combining vector similarity and full-text search.
+
+    This function uses Reciprocal Rank Fusion (RRF) to merge three ranking signals:
+    1. Search text full-text score (user's natural language query)
+    2. Entity-based full-text score (keywords, document types)
+    3. Vector distance (semantic similarity)
+
+    The WHERE clause is removed to allow RRF to rank all documents, not just
+    pre-filtered ones, which improves recall for semantic queries.
+
     Returns (search_text, results, embed_time, query_time).
     """
     # Generate embedding (wrap sync call in async thread)
@@ -1228,42 +1365,48 @@ async def _execute_search_query(
         f"[{request_id}] Embedding generated (dimensions={len(embedding)}, duration={embed_time:.3f}s)"
     )
 
-    # Build the FullTextContainsAny and FullTextScore clauses with entities
-    if entities:
-        # Create parameter placeholders for each entity
-        entity_params = ", ".join([f"@entity{i}" for i in range(len(entities))])
-        fulltext_clause = f"FullTextContainsAny(c.chunkContent, {entity_params})"
-        fulltext_score = f"FullTextScore(c.chunkContent, {entity_params})"
-    else:
-        # Fallback to search parameter if no entities provided
-        fulltext_clause = "FullTextContainsAny(c.chunkContent, @search)"
-        fulltext_score = "FullTextScore(c.chunkContent, @search)"
-
-    # Use Reciprocal Rank Fusion (RRF) to combine full-text search and vector similarity scores
-    # RRF provides better ranking than single methods by merging multiple relevance signals
-    query = f"""
-    SELECT TOP @k {select_fields}
-    FROM c
-    WHERE {fulltext_clause}
-    ORDER BY RANK RRF(
-        {fulltext_score},
-        VectorDistance(c.vector, @embedding),
-        @weights
-    )
-    """
-
-    # Build parameters list
+    # Build query components
     parameters: list[dict[str, Any]] = [
         {"name": "@k", "value": top},
         {"name": "@embedding", "value": embedding},
-        {"name": "@search", "value": search_text},
-        {"name": "@weights", "value": RRF_WEIGHTS},
+        {"name": "@searchText", "value": search_text},
     ]
 
-    # Add entity parameters if entities are provided
+    # Build FullTextScore for search text (natural language query)
+    searchtext_fulltext_score = "FullTextScore(c.chunkContent, @searchText)"
+    searchtext_entities_score = "FullTextScore(c.entities, @searchText)"
+
+    # Build FullTextScore for entities (keywords, document types)
     if entities:
+        entity_params = ", ".join([f"@entity{i}" for i in range(len(entities))])
+        entity_fulltext_score = f"FullTextScore(c.chunkContent, {entity_params})"
+        entity_entities_score = f"FullTextScore(c.entities, {entity_params})"
         for i, entity in enumerate(entities):
             parameters.append({"name": f"@entity{i}", "value": entity})
+    else:
+        # Use search text as fallback for entity scoring if no entities provided
+        entity_fulltext_score = "FullTextScore(c.chunkContent, @searchText)"
+        entity_entities_score = "FullTextScore(c.entities, @searchText)"
+
+    # Use pure RRF ranking without WHERE clause to avoid excluding semantically
+    # relevant documents that don't contain exact keywords
+    # Weights: [chunkContent:searchText, chunkContent:entities, entities:searchText, entities:entities, vector]
+    query = f"""
+    SELECT TOP @k {select_fields}
+    FROM c
+    ORDER BY RANK RRF(
+        {searchtext_fulltext_score},
+        {entity_fulltext_score},
+        {searchtext_entities_score},
+        {entity_entities_score},
+        VectorDistance(c.vector, @embedding),
+        [1, 2, 2, 3, 4]
+    )
+    """
+
+    logger.info(
+        f"[{request_id}] Hybrid search: searchText='{search_text[:50]}...', entities={entities}"
+    )
 
     # Execute query with retry logic
     query_start = time.time()
@@ -1930,8 +2073,10 @@ async def search_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
         openai_client, embedding_deployment = openai_result
 
         # Extract query parameters
-        top_param = req.params.get("top", "10")
+        top_param = req.params.get("top_search", "50")
+        top_results_param = req.params.get("top_results", "20")
         select_fields_param = req.params.get("select_fields")
+        llm_filter_param = req.params.get("llm_filter", "")
 
         # Validate and parse top parameter
         try:
@@ -1951,6 +2096,34 @@ async def search_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json",
                 status_code=400,
             )
+
+        # Parse top_results parameter (optional, default: 20)
+        try:
+            top_results = int(top_results_param)
+            if top_results <= 0:
+                raise ValueError("top_results must be greater than 0")
+        except ValueError as e:
+            logger.warning(f"[{request_id}] Invalid top_results parameter: {top_results_param}")
+            return func.HttpResponse(
+                json.dumps(
+                    {
+                        "error": "Invalid parameter",
+                        "message": f"top_results parameter must be a positive integer: {str(e)}",
+                        "request_id": request_id,
+                    }
+                ),
+                mimetype="application/json",
+                status_code=400,
+            )
+
+        # Initialize LLM filter OpenAI client if llm_filter is specified
+        llm_openai_client: AzureOpenAI | None = None
+        if llm_filter_param:
+            llm_openai_result = get_openai_client(req, request_id, require_embedding=False)
+            if isinstance(llm_openai_result, func.HttpResponse):
+                return llm_openai_result
+            llm_openai_client, _ = llm_openai_result
+            logger.info(f"[{request_id}] LLM filter enabled with model: {llm_filter_param}")
 
         # Validate and parse select_fields parameter (required)
         if not select_fields_param:
@@ -2096,44 +2269,64 @@ async def search_cosmosdb(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 )
 
-        # Remove duplicates based on all fields from select_fields_param
-        seen: set[tuple[Any, ...]] = set()
-        unique_results: list[dict[str, Any]] = []
-        for item in all_results:
-            # Create a unique key from all selected fields
-            key = tuple(item.get(field, "") for field in field_names)
-            if key not in seen:
-                seen.add(key)
-                unique_results.append(item)
+        # Deduplicate results and limit by top_results
+        unique_results, unique_results_count = _deduplicate_results(
+            all_results, top_results, request_id
+        )
+
+        # Apply LLM filter if configured
+        llm_filter_time = 0.0
+        pre_filter_count = len(unique_results)
+        if llm_filter_param and llm_openai_client and len(unique_results) > 0:
+            unique_results, llm_filter_time, pre_filter_count = await _apply_llm_filter_to_results(
+                unique_results,
+                search_queries,
+                llm_openai_client,
+                llm_filter_param,
+                request_id,
+            )
 
         total_time = time.time() - start_time
 
         logger.info(
-            f"[{request_id}] Search completed: {len(all_results)} total results, {len(unique_results)} unique results"
+            f"[{request_id}] Search completed: {len(all_results)} total results, {unique_results_count} unique results, {len(unique_results)} returned (top_results={top_results})"
         )
 
+        # Build response with optional LLM filter info
+        response_data: dict[str, Any] = {
+            "search_queries": search_queries,
+            "entities": entities,
+            "top_results": top_results,
+            "results": unique_results,
+            "total_results": len(all_results),
+            "unique_results": unique_results_count,
+            "results_returned": len(unique_results),
+            "duplicates_removed": len(all_results) - unique_results_count,
+            "request_id": request_id,
+            "query_details": query_details,
+            "failed_queries": failed_queries,
+            "queries_failed": len(failed_queries),
+            "performance": {
+                "total_embedding_ms": round(total_embed_time * 1000, 2),
+                "total_query_ms": round(total_query_time * 1000, 2),
+                "total_ms": round(total_time * 1000, 2),
+                "queries_executed": len(search_queries),
+                "queries_succeeded": len(query_details),
+            },
+        }
+
+        # Add LLM filter info if it was applied
+        if llm_filter_param:
+            response_data["llm_filter"] = {
+                "model": llm_filter_param,
+                "applied": llm_openai_client is not None and pre_filter_count > 0,
+                "pre_filter_count": pre_filter_count,
+                "post_filter_count": len(unique_results),
+                "filter_ms": round(llm_filter_time * 1000, 2),
+            }
+
         return func.HttpResponse(
-            body=json.dumps(
-                {
-                    "search_queries": search_queries,
-                    "entities": entities,
-                    "results": unique_results,
-                    "total_results": len(all_results),
-                    "unique_results": len(unique_results),
-                    "duplicates_removed": len(all_results) - len(unique_results),
-                    "request_id": request_id,
-                    "query_details": query_details,
-                    "failed_queries": failed_queries,
-                    "queries_failed": len(failed_queries),
-                    "performance": {
-                        "total_embedding_ms": round(total_embed_time * 1000, 2),
-                        "total_query_ms": round(total_query_time * 1000, 2),
-                        "total_ms": round(total_time * 1000, 2),
-                        "queries_executed": len(search_queries),
-                        "queries_succeeded": len(query_details),
-                    },
-                }
-            ),
+            body=json.dumps(response_data),
             mimetype="application/json",
             status_code=200,
         )
@@ -2886,90 +3079,21 @@ async def query_aisearch(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 )
 
-        # Remove duplicates based on unique document identifier (pageId)
-        seen: set[str] = set()
-        unique_results: list[dict[str, Any]] = []
-        for item in all_results:
-            page_id = item.get("pageId") or item.get("pageContent") or str(item)
-            if page_id not in seen:
-                seen.add(page_id)
-                unique_results.append(item)
-
-        # Limit unique_results by top_results
-        unique_results_count = len(unique_results)
-        unique_results = unique_results[:top_results]
+        # Deduplicate results and limit by top_results
+        unique_results, unique_results_count = _deduplicate_results(
+            all_results, top_results, request_id
+        )
 
         # Apply LLM filter if configured
         llm_filter_time = 0.0
         pre_filter_count = len(unique_results)
         if llm_filter and openai_client and len(unique_results) > 0:
-            # Track actual wall-clock time for the entire LLM filter block
-            llm_filter_start = time.time()
-
-            # Use first search query as user query for LLM filter
-            user_query = search_queries[0] if search_queries else ""
-
-            # Prepare document contents with metadata for each result
-            async def filter_single_result(
-                idx: int, result: dict[str, Any]
-            ) -> tuple[int, bool, float]:
-                """Filter a single result and return (index, is_relevant, filter_time)."""
-                # Combine pageContent with metadata
-                content = result.get("pageContent", "")
-                metadata = result.get("metadata", "")
-                document_content = f"Content:\n{content}\n\nMetadata:\n{metadata}"
-
-                is_relevant, filter_time = await _apply_llm_filter(
-                    user_query,
-                    document_content,
-                    openai_client,
-                    llm_filter,
-                    request_id,
-                )
-                return idx, is_relevant, filter_time
-
-            # Execute all LLM filter calls in parallel
-            filter_tasks = [
-                filter_single_result(idx, result)
-                for idx, result in enumerate(unique_results)
-            ]
-            filter_results = await asyncio.gather(*filter_tasks, return_exceptions=True)
-
-            # Collect results that returned true
-            filtered_results: list[dict[str, Any]] = []
-            for filter_result in filter_results:
-                if isinstance(filter_result, Exception):
-                    logger.error(
-                        f"[{request_id}] LLM filter task failed: {str(filter_result)}"
-                    )
-                    continue
-                idx, is_relevant, filter_time = filter_result
-                if is_relevant:
-                    # Extract only pageContent, pageNumber, pageLink fields
-                    original_result = unique_results[idx]
-                    filtered_results.append({
-                        "pageContent": original_result.get("pageContent", ""),
-                        "pageNumber": original_result.get("pageNumber", ""),
-                        "pageLink": original_result.get("pageLink", ""),
-                    })
-
-            # Calculate actual wall-clock time for the entire LLM filter block
-            llm_filter_time = time.time() - llm_filter_start
-
-            # If filtered_results is empty, return "Not Found" placeholder
-            if len(filtered_results) == 0:
-                filtered_results = [
-                    {
-                        "pageContent": "Not Found",
-                        "pageNumber": None,
-                        "pageLink": None,
-                    }
-                ]
-
-            unique_results = filtered_results
-
-            logger.info(
-                f"[{request_id}] LLM filter applied: {pre_filter_count} -> {len(unique_results)} results (total_duration={llm_filter_time:.3f}s)"
+            unique_results, llm_filter_time, pre_filter_count = await _apply_llm_filter_to_results(
+                unique_results,
+                search_queries,
+                openai_client,
+                llm_filter,
+                request_id,
             )
 
         total_time = time.time() - start_time
