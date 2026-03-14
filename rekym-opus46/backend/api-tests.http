@@ -1,0 +1,460 @@
+###############################################################################
+# API Test File — KYM Upload Backend
+#
+# Usage:
+#   Install the "REST Client" VS Code extension (humao.rest-client).
+#   Click "Send Request" above each request block.
+#
+# Variables — adjust these for your environment:
+###############################################################################
+
+@baseUrl = http://localhost:8000
+
+# Replace with a valid upload ID from your Cosmos DB "upload" container
+@uploadId = abc12345
+
+# Replace with a valid partner ID
+@partnerId = partner-123
+
+# Replace with the CSRF token returned by GET /api/v1/public-uploads/{{uploadId}}
+@csrfToken = REPLACE_WITH_CSRF_TOKEN
+
+# Replace with a valid file metadata ID from a previous upload
+@fileMetadataId = REPLACE_WITH_FILE_METADATA_ID
+
+# Correlation / request ID for tracing
+@correlationId = test-{{$timestamp}}
+
+# Bearer token for internal / service-to-service endpoints (must match INTERNAL_API_TOKEN in .env)
+@bearerToken = local-dev-internal-token
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  1. HEALTH ENDPOINTS                                                     ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 1.1 — Basic liveness check
+# Expected: 200 { "status": "ok" }
+GET {{baseUrl}}/health HTTP/1.1
+
+###
+
+### 1.2 — Liveness probe
+# Expected: 200 { "status": "ok" }
+GET {{baseUrl}}/health/live HTTP/1.1
+
+###
+
+### 1.3 — Readiness probe (checks Cosmos DB connectivity)
+# Expected: 200 { "status": "ok" } when Cosmos is reachable
+# Expected: 200 { "status": "degraded", "cosmos": "unreachable" } when Cosmos is down
+GET {{baseUrl}}/health/ready HTTP/1.1
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  2. PUBLIC UPLOAD — GET STATE                                            ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 2.1 — Get upload link state (happy path — ready)
+# Pre-condition: seed a valid upload link in Cosmos with this uploadId.
+# Expected: 200 PublicUploadReady with csrf_token, expires_at, partner_id, etc.
+GET {{baseUrl}}/api/v1/public-uploads/{{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 2.2 — Get upload link state with X-Forwarded-For header
+# Simulates a request behind a reverse proxy / load balancer.
+GET {{baseUrl}}/api/v1/public-uploads/{{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-Forwarded-For: 203.0.113.42
+
+###
+
+### 2.3 — Non-existent upload ID → 404
+# Expected: 404 Not Found
+GET {{baseUrl}}/api/v1/public-uploads/nonexistent HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 2.4 — Empty upload ID → 404 or route mismatch
+# Tests path routing when upload ID is missing.
+GET {{baseUrl}}/api/v1/public-uploads/ HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 2.5 — Expired upload link
+# Pre-condition: seed an upload link in Cosmos with expires_at in the past.
+# Expected: 200 PublicUploadBlocked { status: "expired", message: "..." }
+GET {{baseUrl}}/api/v1/public-uploads/{{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  3. PUBLIC UPLOAD — SUBMIT FILES                                         ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 3.1 — Submit a single PDF file (happy path)
+# Pre-condition: uploadId must be valid & not expired; csrfToken from step 2.1.
+# Expected: 201 PublicUploadSubmitResponse with accepted_files array
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+###
+
+### 3.2 — Submit a JPEG image
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="photo.jpg"
+Content-Type: image/jpeg
+
+< ./test-fixtures/photo.jpg
+------Boundary--
+
+###
+
+### 3.3 — Submit a PNG image
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="document.png"
+Content-Type: image/png
+
+< ./test-fixtures/document.png
+------Boundary--
+
+###
+
+### 3.4 — Submit multiple files at once
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="doc1.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary
+Content-Disposition: form-data; name="files"; filename="doc2.jpg"
+Content-Type: image/jpeg
+
+< ./test-fixtures/photo.jpg
+------Boundary--
+
+###
+
+### 3.5 — Missing CSRF token → 403 Forbidden
+# Expected: 403 { "detail": "Forbidden" }
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+###
+
+### 3.6 — Invalid CSRF token → 403 Forbidden
+# Expected: 403
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: totally-invalid-token
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+###
+
+### 3.7 — Non-existent upload ID → 404
+POST {{baseUrl}}/api/v1/public-uploads/nonexistent/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+###
+
+### 3.8 — No files attached → 422 Validation Error
+# Expected: 422 (FastAPI validation: files field is required)
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary--
+
+###
+
+### 3.9 — Disallowed MIME type (e.g. text/plain) → 400
+# Expected: 400 Bad Request (MIME type not in allowed list)
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="notes.txt"
+Content-Type: text/plain
+
+This is a plain text file that should be rejected.
+------Boundary--
+
+###
+
+### 3.10 — Expired upload link → submit should fail
+# Pre-condition: use an uploadId whose link has expired.
+# Expected: 404 or PublicUploadBlocked
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+###
+
+### 3.11 — Submit with X-Forwarded-For (proxy simulation)
+POST {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+X-CSRF-Token: {{csrfToken}}
+X-Forwarded-For: 198.51.100.17
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./test-fixtures/sample.pdf
+------Boundary--
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  4. EXTRACTION ENDPOINTS                                                 ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 4.1 — List all extractions for a partner (happy path)
+# Requires non-public API access (internal / service-to-service).
+# Expected: 200 ExtractionListResponse { partner_id, extractions: [...] }
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.2 — List extractions filtered by uploadId
+# Expected: 200 with extractions only for the specified upload
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}}?uploadId={{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.3 — List extractions — non-existent partner ID
+# Expected: 200 with empty extractions array (no records match)
+GET {{baseUrl}}/api/v1/extractions/nonexistent HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.4 — Get a single extraction record (happy path)
+# Pre-condition: fileMetadataId must exist for this partnerId.
+# Requires non-public API access (internal / service-to-service).
+# Expected: 200 ExtractionFileResponse
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}}/files/{{fileMetadataId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.5 — Get extraction — non-existent file metadata ID → 404
+# Expected: 404 { "detail": "Extraction record not found" }
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}}/files/does-not-exist HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.6 — Get extraction — non-existent partner ID → 404
+GET {{baseUrl}}/api/v1/extractions/nonexistent/files/{{fileMetadataId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.7 — Process pending extractions (happy path)
+# Requires non-public API access (internal / service-to-service).
+# Expected: 200 ProcessPendingResponse { processed, skipped, remaining, partner_ids, results }
+POST {{baseUrl}}/api/v1/extractions/process-pending HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 4.8 — Process pending extractions — wrong HTTP method → 405
+# Expected: 405 Method Not Allowed
+GET {{baseUrl}}/api/v1/extractions/process-pending HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 4.9 — List extractions without auth → 403
+# Expected: 403 Forbidden
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 4.10 — Get extraction without auth → 403
+# Expected: 403 Forbidden
+GET {{baseUrl}}/api/v1/extractions/{{partnerId}}/files/{{fileMetadataId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  5. UPLOAD CHECKS (Cross-Check)                                          ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 5.1 — Run cross-check for a partner (happy path)
+# Requires non-public API access (internal / service-to-service).
+# Expected: 200 UploadCheckResponse { partner_id, status, checks, summary, missing_doc_types }
+POST {{baseUrl}}/api/v1/upload-checks/{{partnerId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer {{bearerToken}}
+
+###
+
+### 5.2 — Run cross-check without auth → 403
+# Expected: 403 Forbidden
+POST {{baseUrl}}/api/v1/upload-checks/{{partnerId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 5.3 — Run cross-check with wrong token → 403
+POST {{baseUrl}}/api/v1/upload-checks/{{partnerId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Authorization: Bearer wrong-token
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  6. OPENAPI / DOCS                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 6.1 — OpenAPI JSON schema
+# Expected: 200 JSON with full API spec
+GET {{baseUrl}}/openapi.json HTTP/1.1
+
+###
+
+### 6.2 — Swagger UI docs page
+# Expected: 200 HTML
+GET {{baseUrl}}/docs HTTP/1.1
+
+###
+
+### 6.3 — ReDoc docs page
+# Expected: 200 HTML
+GET {{baseUrl}}/redoc HTTP/1.1
+
+
+###############################################################################
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  7. EDGE CASES & ERROR SCENARIOS                                         ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+###############################################################################
+
+### 7.1 — Request to unknown API route → 404
+GET {{baseUrl}}/api/v1/does-not-exist HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 7.2 — Wrong HTTP method on health → 405
+POST {{baseUrl}}/health HTTP/1.1
+Content-Type: application/json
+
+{}
+
+###
+
+### 6.3 — Wrong HTTP method on public upload GET endpoint → 405
+DELETE {{baseUrl}}/api/v1/public-uploads/{{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+
+###
+
+### 6.4 — PUT on file submit endpoint → 405
+PUT {{baseUrl}}/api/v1/public-uploads/{{uploadId}}/files HTTP/1.1
+X-Request-Id: {{correlationId}}
+Content-Type: application/json
+
+{}
+
+###
+
+### 6.5 — POST to extractions list endpoint → 405
+POST {{baseUrl}}/api/v1/extractions/{{uploadId}} HTTP/1.1
+X-Request-Id: {{correlationId}}
+Content-Type: application/json
+
+{}
+
+###
+
+### 6.6 — Correlation ID propagation check
+# Verify the response echoes back X-Request-Id header.
+GET {{baseUrl}}/api/v1/public-uploads/{{uploadId}} HTTP/1.1
+X-Request-Id: my-custom-correlation-id-12345

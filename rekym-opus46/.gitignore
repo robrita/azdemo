@@ -1,6 +1,7 @@
 # .env and local.settings.json contain secrets — never commit
 .env
 local.settings.json
+local.env.json
 
 # Python
 __pycache__/
@@ -16,7 +17,7 @@ htmlcov/
 .coverage
 
 # IDE
-.vscode/
+
 .idea/
 
 # OS

@@ -53,6 +53,18 @@ query = f"SELECT * FROM c WHERE c.itemId = '{item_id}'"
 - Use async SDK (`azure.cosmos.aio`)
 - Handle 429 (rate limit) with retry and backoff
 
+## Pydantic → Cosmos Serialization: Use `mode="json"`
+
+When dumping a Pydantic model to a dict for Cosmos DB, always use `mode="json"` so that `datetime` (and other non-primitive types) are serialized to JSON-safe values (ISO 8601 strings). Without it, `datetime` objects reach the Cosmos SDK's `json.dumps` and raise `TypeError: Object of type datetime is not JSON serializable`.
+
+```python
+# ✅ Correct
+doc = model.model_dump(by_alias=True, mode="json")
+
+# ❌ Wrong — datetime fields remain native Python objects
+doc = model.model_dump(by_alias=True)
+```
+
 ## Repository Pattern
 
 All repositories extend `BaseRepository` which provides:

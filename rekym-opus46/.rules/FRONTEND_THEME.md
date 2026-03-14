@@ -11,9 +11,9 @@
 
 ## Color System
 
-- **Primary (`primary-*`)**: Brand blue — primary actions, navigation, trust anchor
-- **Navy (`navy-*`)**: Deep text & heading color (NOT generic gray)
-- **Surface**: Blue-tinted neutral backgrounds
+- **Primary (`primary-*`)**: GCash vibrant blue (#0D52F7) — primary actions, navigation, trust anchor
+- **Navy (`navy-*`)**: Deep text & heading color (#183462), NOT generic gray
+- **Surface**: Light blue-tinted backgrounds (#F0F7FF)
 - **Success/Warning/Error/Info**: Semantic colors for status indicators
 
 ## Rules
@@ -27,7 +27,7 @@
 
 Unstyled elements auto-inherit styling from `@layer base`:
 - **Body**: `bg-surface`, `text-navy-900`
-- **Headings**: `font-display` (Gilroy/Inter), `font-semibold`
+- **Headings**: `font-display` (Gilroy/Proxima Soft), `font-semibold`
 - **Links**: `text-primary-600` with `hover:text-primary-700`
 - **Focus rings**: `ring-2 ring-primary-500 ring-offset-2`
 

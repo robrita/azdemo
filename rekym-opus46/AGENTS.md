@@ -23,7 +23,9 @@ See [.rules/ARCHITECTURE.md](.rules/ARCHITECTURE.md) for system design, layers, 
 11. **Cosmos DB camelCase fields** — all document fields are camelCase; escape reserved words with `c["field"]`; no `/id/?` in indexing included paths; singleton IDs use `"{type}:{key}"`. → [.rules/COSMOS_DB.md](.rules/COSMOS_DB.md)
 12. **Dark mode compatibility** — every frontend change must render correctly in both light and dark mode; use `dark:` variants. → [.rules/FRONTEND_THEME.md](.rules/FRONTEND_THEME.md)
 13. **Centralized config with fail-fast validation** — all env vars go through `Settings(BaseSettings)`; never use `os.getenv()` directly. → [.rules/CONFIG_MANAGEMENT.md](.rules/CONFIG_MANAGEMENT.md)
-14. **Config parity** — any new/changed config key must be updated in `.env.example`, `local.settings.example.json`, `docker-compose.yaml`, and `Settings`. → [.rules/CONFIG_MANAGEMENT.md](.rules/CONFIG_MANAGEMENT.md)
+14. **Config parity** — any new/changed config key must be updated in `.env.example`, `local.settings.example.json`, `docker-compose.yaml`, and `Settings`. **Local file sync**: whenever `.env.example` or `local.settings.example.json` changes, also update `.env`, `local.settings.json`, and `local.env.json` to match. → [.rules/CONFIG_MANAGEMENT.md](.rules/CONFIG_MANAGEMENT.md)
+15. **Date-stamped feature branches** — branch names use `feature/<topic>-<YYYY-MM-DD>`; merge to main before branching; push with `-u`. → [.rules/BRANCHING.md](.rules/BRANCHING.md)
+16. **API test parity** — any backend API change (new/modified/removed endpoint) must update `backend/api-tests.http` with corresponding REST Client test cases.
 
 ## Navigation
 
@@ -40,6 +42,7 @@ See [.rules/ARCHITECTURE.md](.rules/ARCHITECTURE.md) for system design, layers, 
 | Runtime & Docker | [.rules/RUNTIME.md](.rules/RUNTIME.md) | Dev server, Docker, timeouts, logging |
 | Cosmos DB | [.rules/COSMOS_DB.md](.rules/COSMOS_DB.md) | Any Cosmos DB work |
 | Config management | [.rules/CONFIG_MANAGEMENT.md](.rules/CONFIG_MANAGEMENT.md) | Adding/changing env vars |
+| Branching strategy | [.rules/BRANCHING.md](.rules/BRANCHING.md) | Creating branches, merging features |
 
 ## Reading Order for New Tasks
 

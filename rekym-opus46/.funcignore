@@ -1,0 +1,71 @@
+# Python / virtual env (multiple patterns for compatibility)
+.venv
+.venv/
+.venv/**
+.python_packages
+.python_packages/
+__pycache__/
+*.py[cod]
+*.egg-info/
+/dist/
+build/
+
+# Frontend — only the built SPA (frontend/dist/) is needed at runtime
+frontend/node_modules/
+frontend/src/
+frontend/tests/
+frontend/public/
+frontend/.env*
+frontend/package.json
+frontend/package-lock.json
+frontend/tsconfig.json
+frontend/vite.config.ts
+frontend/eslint.config.js
+frontend/postcss.config.js
+frontend/tailwind.config.js
+frontend/index.html
+frontend/Dockerfile
+
+# Backend non-runtime
+backend/tests/
+backend/scripts/
+backend/Dockerfile
+
+# Caches
+.mypy_cache
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Docker / CI / scripts
+Dockerfile
+docker-compose.yaml
+Makefile
+scripts/
+.github/
+.rules/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Config / env files
+.env
+.env.example
+local.settings.example.json
+local.settings.json
+pyproject.toml
+uv.lock
+
+# Misc
+.playwright-mcp/
+.dockerignore
+.gitignore
+.funcignore
+*.md
+*.zip

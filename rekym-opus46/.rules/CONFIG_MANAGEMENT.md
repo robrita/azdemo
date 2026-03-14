@@ -17,8 +17,6 @@ All env vars are declared as typed fields in `Settings`. This provides:
 
 The `Settings` class includes a `model_validator` that blocks unsafe configurations:
 - `COSMOS_KEY` is required when `COSMOS_AUTH_MODE=key`
-- `AUTH_MODE=disabled` is rejected in production
-- `APP_DEBUG=true` is rejected in production
 
 ### 3. Type Everything
 
@@ -44,8 +42,11 @@ When a config key changes, update **all** of:
 - `.env` (local)
 - `local.settings.example.json`
 - `local.settings.json` (local)
+- `local.env.json` (local — Azure Functions App Settings format)
 - `docker-compose.yaml` (if relevant)
 - `backend/src/config.py` — `Settings` class
+
+> **Critical**: Whenever `.env.example` or `local.settings.example.json` is created or updated, always sync the corresponding values into `.env`, `local.settings.json`, and `local.env.json`. These five files must stay in sync at all times.
 
 ### 8. Never Commit Secrets
 
