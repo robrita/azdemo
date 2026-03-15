@@ -53,10 +53,10 @@ help: ## Show this help message
 ##@ Installation
 
 install: ## Install production dependencies
-	pip install -e .
+	uv sync --no-dev
 
 install-dev: ## Install with development dependencies
-	pip install -e ".[dev]"
+	uv sync
 
 ##@ Development Server
 
