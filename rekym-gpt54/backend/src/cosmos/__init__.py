@@ -1,1 +1,0 @@
-"""Cosmos client package."""
